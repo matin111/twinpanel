@@ -67,6 +67,27 @@ class CiscoTunnelTests(unittest.TestCase):
                 tun.run({}, "desktop")
             launch.assert_not_called()
 
+    def test_console_trial_times_out_and_cleans_child(self):
+        with mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "management_route") as route, \
+             mock.patch.object(tun.subprocess, "run") as change_route, \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            child = launch.return_value
+            child.stdin = mock.Mock()
+            child.wait.side_effect = [subprocess.TimeoutExpired("openconnect", 120), 0]
+            child.poll.return_value = None
+            profile = {"host": "vpn.example.com", "port": 443,
+                       "username": "alice", "password": "example",
+                       "servercert": "sha256:" + "a" * 64}
+            self.assertEqual(tun.run(profile, "console-test"), 0)
+            child.wait.assert_any_call(timeout=120)
+            child.terminate.assert_called_once()
+            route.assert_not_called()
+            change_route.assert_not_called()
+
+
     def test_no_root_means_no_network_changes(self):
         with mock.patch.object(tun.os, "geteuid", return_value=501), \
              mock.patch.object(tun.subprocess, "run") as route, \
