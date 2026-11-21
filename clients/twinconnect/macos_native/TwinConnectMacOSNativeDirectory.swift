@@ -947,9 +947,21 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         completion(.success(config))
                         return
                     }
-                    guard matches.count == 1,
-                          let config = self.reviewedSingBoxProxyConfig(
-                            matches[0], protocolCode: protocolCode) else {
+                    // Distinguish an absent or duplicate node profile
+                    // from an unsupported outbound without logging any
+                    // credentials or returning private server addresses.
+                    guard !matches.isEmpty else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "LOCAL_NODE_PROFILE_MISSING")))
+                        return
+                    }
+                    guard matches.count == 1 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "LOCAL_NODE_PROFILE_AMBIGUOUS")))
+                        return
+                    }
+                    guard let config = self.reviewedSingBoxProxyConfig(
+                        matches[0], protocolCode: protocolCode) else {
                         completion(.failure(TwinMacNativeError.failure(
                             "LOCAL_PROFILE_INVALID")))
                         return
