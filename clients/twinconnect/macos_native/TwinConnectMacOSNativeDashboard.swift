@@ -579,6 +579,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingRedrawScheduled = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
+    private var ciscoAuthBusy = false
+    private var ciscoAuthStatus = ""
     private let proxyAttemptQueue = DispatchQueue(
         label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
     private var localProxyActive = false
@@ -2201,6 +2203,27 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             section.addArrangedSubview(text(status, size: 11, color: amber))
         }
 
+        // Cisco is a separate OpenConnect transport. On an unsigned Mac,
+        // authenticate without creating a tunnel, routes or system proxy.
+        section.addArrangedSubview(text("Cisco / OpenConnect diagnostics",
+                                        size: 18, weight: .semibold))
+        let ciscoTest = button(ciscoAuthBusy ?
+            "Checking Cisco authentication…" :
+            "Test Cisco authentication (no VPN)",
+            action: #selector(testCiscoAuthentication(_:)),
+            mutedButton: true)
+        ciscoTest.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        ciscoTest.isEnabled = !ciscoAuthBusy && accountSession != nil &&
+            activeServer != nil && activeProtocol == "cisco" &&
+            snapshot?.protocols.contains(where: {
+                $0.code == "cisco" && $0.configured
+            }) == true
+        section.addArrangedSubview(ciscoTest)
+        if !ciscoAuthStatus.isEmpty {
+            section.addArrangedSubview(text(ciscoAuthStatus, size: 11,
+                                           color: muted))
+        }
+
         // Independent local proxy diagnostics and emergency stop.
         section.addArrangedSubview(text("Local proxy diagnostics",
                                         size: 18, weight: .semibold))
@@ -2902,6 +2925,102 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    @objc private func testCiscoAuthentication(_ sender: NSButton) {
+        guard !ciscoAuthBusy,
+              let session = accountSession,
+              activeProtocol == "cisco",
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "cisco" && $0.configured
+              }) == true else {
+            ciscoAuthStatus = "Select a configured Cisco server in Locations."
+            view = build()
+            return
+        }
+        ciscoAuthBusy = true
+        ciscoAuthStatus = "Checking authorized Cisco profile…"
+        view = build()
+        directory.prepareCiscoAuthentication(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            guard self.accountSession?.accessToken == session.accessToken else {
+                self.ciscoAuthBusy = false
+                return
+            }
+            switch result {
+            case .failure(let error):
+                self.ciscoAuthBusy = false
+                let reason = error.localizedDescription
+                self.ciscoAuthStatus =
+                    "Cisco authentication blocked: " +
+                    (reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                  options: .regularExpression) != nil ?
+                        reason : "CISCO_PROFILE_UNAVAILABLE")
+                self.view = self.build()
+            case .success(let profile):
+                self.ciscoAuthStatus = "Testing Cisco login only (no tunnel)…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = self.runCiscoAuthenticationOnly(profile)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.ciscoAuthBusy = false
+                        guard self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.ciscoAuthStatus = result
+                        // Authentication is intentionally never a VPN connect
+                        // success, and must not flip localProxyActive.
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func runCiscoAuthenticationOnly(_ profile: Data) -> String {
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let script = root + "/macos_native/cisco_openconnect_auth.py"
+        guard profile.count > 0, profile.count <= 16384,
+              FileManager.default.isReadableFile(atPath: script) else {
+            return "Cisco authentication blocked: CISCO_PREFLIGHT_UNAVAILABLE"
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "authenticate"]
+        let input = Pipe()
+        let output = Pipe()
+        let errors = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = errors
+        do {
+            try task.run()
+            // Pass the in-memory authorized profile through stdin, never
+            // command-line arguments, environment variables or temp files.
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            task.waitUntilExit()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard let obj = try? JSONSerialization.jsonObject(with: data)
+                    as? [String: Any] else {
+                return "Cisco authentication blocked: CISCO_PREFLIGHT_FAILED"
+            }
+            if task.terminationStatus == 0 &&
+               obj["state"] as? String == "cisco_authentication_verified" &&
+               obj["vpn_connected"] as? Bool == false {
+                return "Cisco authentication verified — VPN offline; no tunnel."
+            }
+            let reason = obj["reason"] as? String ?? "CISCO_PREFLIGHT_FAILED"
+            let code = reason.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                    options: .regularExpression) != nil ?
+                reason : "CISCO_PREFLIGHT_FAILED"
+            return "Cisco authentication failed: " + code
+        } catch {
+            input.fileHandleForWriting.closeFile()
+            return "Cisco authentication blocked: OPENCONNECT_EXECUTION_FAILED"
+        }
+    }
+
     @objc private func primaryProxyAction(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy else { return }
         guard let selected = activeProtocol,
@@ -3244,6 +3363,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             stopVerifiedLocalProxy()
             return
         }
+        if activeProtocol == "cisco" {
+            status = "Cisco uses OpenConnect. Settings can test authentication; " +
+                     "system VPN needs a privileged macOS tunnel runtime."
+            view = build()
+            return
+        }
         let enabled: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
             "snell", "naive", "shadowtls", "v2ray"
@@ -3560,7 +3685,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "Last connection status: " +
                 (status.isEmpty ? "not attempted" : status),
             "TUN preflight: " + (status.contains("TUN") ? status : "not run"),
-            "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus)
+            "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus),
+            "Cisco auth-only test: " + (ciscoAuthStatus.isEmpty ? "not run" : ciscoAuthStatus)
         ].joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
