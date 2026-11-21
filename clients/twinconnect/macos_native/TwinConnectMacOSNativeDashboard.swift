@@ -467,6 +467,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var localProxyActive = false
     private var localProxyExitIP: String?
     private var localProxyGeneration = 0
+    private var localProxyStartedAt: Date?
+    private var trafficTimer: Timer?
+    private var trafficPollBusy = false
+    private var lastTraffic: (download: Int64, upload: Int64, at: Date)?
+    private var downloadSpeed = "—"
+    private var uploadSpeed = "—"
+    private var downloadedTotal = "—"
+    private var uploadedTotal = "—"
+    private weak var downloadSpeedText: NSTextField?
+    private weak var uploadSpeedText: NSTextField?
+    private weak var downloadedTotalText: NSTextField?
+    private weak var uploadedTotalText: NSTextField?
+    private weak var proxyUptimeText: NSTextField?
     private var cliTunCheckBusy = false
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
@@ -493,6 +506,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let current = view.window?.contentView?.bounds.width {
             nativeContentWidth = current
         }
+        if trafficTimer == nil {
+            let timer = Timer(timeInterval: 2.0, repeats: true) {
+                [weak self] _ in self?.refreshTrafficMetrics()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            trafficTimer = timer
+        }
         // The unsigned AppKit fallback must use the same rotating token flow
         // as the authenticated client; never store or replay a password.
         if !didAttemptSessionRestore {
@@ -514,7 +534,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        trafficTimer?.invalidate()
+        trafficTimer = nil
+    }
+
     deinit {
+        trafficTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -1329,12 +1356,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         number.maximumNumberOfLines = 1
         number.toolTip = value
         content.addArrangedSubview(number)
+        if title == "Download" { downloadSpeedText = number }
+        if title == "Upload" { uploadSpeedText = number }
         if !subtitle.isEmpty {
             let subtitleText = text(subtitle, size: 10, color: muted)
             subtitleText.lineBreakMode = .byTruncatingTail
             subtitleText.maximumNumberOfLines = 2
             subtitleText.toolTip = subtitle
             content.addArrangedSubview(subtitleText)
+            if title == "Download" { downloadedTotalText = subtitleText }
+            if title == "Upload" { uploadedTotalText = subtitleText }
         }
         if title == "Download" || title == "Upload" {
             // A neutral divider represents unavailable traffic while offline,
@@ -2546,6 +2577,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         localProxyGeneration += 1
         localProxyActive = false
         localProxyExitIP = nil
+        resetTrafficMetrics()
         // Logout is not a VPN stop command; stop the managed loopback
         // listener without modifying network routes or system proxies.
         DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -2698,7 +2730,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if result.0 == 0 {
                     self.localProxyActive = false
                     self.localProxyExitIP = nil
-                    self.localProxyStatus = "Local proxy stopped. No system VPN was running."
+                    self.resetTrafficMetrics()
+                    self.localProxyStatus = "Disconnected."
                     self.status = self.localProxyStatus
                 } else {
                     self.localProxyStatus = "Local proxy stop failed: " +
@@ -2864,6 +2897,105 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return reason
     }
 
+    private func resetTrafficMetrics() {
+        localProxyStartedAt = nil
+        lastTraffic = nil
+        downloadSpeed = "—"
+        uploadSpeed = "—"
+        downloadedTotal = "—"
+        uploadedTotal = "—"
+        downloadSpeedText?.stringValue = "—"
+        uploadSpeedText?.stringValue = "—"
+        downloadedTotalText?.stringValue = ""
+        uploadedTotalText?.stringValue = ""
+    }
+
+    private func transferRate(_ bytes: Double) -> String {
+        guard bytes.isFinite, bytes >= 0 else { return "—" }
+        if bytes >= 1_000_000_000 {
+            return String(format: "%.1f GB/s", bytes / 1_000_000_000)
+        }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB/s", bytes / 1_000_000)
+        }
+        if bytes >= 1_000 {
+            return String(format: "%.1f KB/s", bytes / 1_000)
+        }
+        return String(format: "%.0f B/s", bytes)
+    }
+
+    private func transferTotal(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    @objc private func refreshTrafficMetrics() {
+        guard tab == 0, localProxyActive, !trafficPollBusy else { return }
+        if let startedAt = localProxyStartedAt {
+            let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
+            proxyUptimeText?.stringValue = String(
+                format: "◷  Proxy session  %02d:%02d:%02d",
+                elapsed / 3600, (elapsed / 60) % 60, elapsed % 60)
+        }
+        trafficPollBusy = true
+        let generation = localProxyGeneration
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        // Query is a local, authenticated sing-box counter, not a network
+        // speed test. Keep subprocess and JSON parsing off AppKit's main UI.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runLocalManager(["traffic"], root: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.trafficPollBusy = false
+                guard self.localProxyActive,
+                      self.localProxyGeneration == generation else { return }
+                guard response.0 == 0,
+                      let data = response.1.data(using: .utf8),
+                      let result = (try? JSONSerialization.jsonObject(with: data))
+                          as? [String: Any],
+                      result["state"] as? String == "measured",
+                      result["mode"] as? String == "local_proxy_only",
+                      let downNumber = result["download_bytes"] as? NSNumber,
+                      let upNumber = result["upload_bytes"] as? NSNumber else {
+                    // Old instances without telemetry show dashes, not
+                    // synthetic rates or total Mac interface traffic.
+                    self.lastTraffic = nil
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                    self.downloadSpeedText?.stringValue = "—"
+                    self.uploadSpeedText?.stringValue = "—"
+                    return
+                }
+                let down = downNumber.int64Value
+                let up = upNumber.int64Value
+                guard down >= 0, up >= 0 else { return }
+                let now = Date()
+                if let previous = self.lastTraffic,
+                   down >= previous.download, up >= previous.upload {
+                    let seconds = max(now.timeIntervalSince(previous.at), 0.25)
+                    self.downloadSpeed = self.transferRate(
+                        Double(down - previous.download) / seconds)
+                    self.uploadSpeed = self.transferRate(
+                        Double(up - previous.upload) / seconds)
+                } else {
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                }
+                self.lastTraffic = (down, up, now)
+                self.downloadedTotal = self.transferTotal(down)
+                self.uploadedTotal = self.transferTotal(up)
+                // Update only four labels; rebuilding the entire AppKit tree
+                // every two seconds caused heavy WindowServer usage on VMware.
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " +
+                    self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " +
+                    self.uploadedTotal
+            }
+        }
+    }
+
     private func runLocalManager(_ args: [String], root: String)
         -> (Int32, String, String) {
         let program = Process()
@@ -2953,9 +3085,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.localProxyBusy = false
                         self.localProxyActive = outcome.0
                         self.localProxyExitIP = outcome.2
+                        self.resetTrafficMetrics()
+                        self.localProxyStartedAt = outcome.0 ? Date() : nil
                         self.localProxyStatus = outcome.1
                         self.status = outcome.1
                         self.view = self.build()
+                        if outcome.0 { self.refreshTrafficMetrics() }
                     }
                 }
             }
