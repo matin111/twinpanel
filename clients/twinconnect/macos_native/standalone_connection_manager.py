@@ -348,6 +348,28 @@ def save_state(item: dict) -> None:
     os.replace(tmp, state_path())
 
 
+
+def wait_for_local_listener(proc: subprocess.Popen, port: int,
+                            timeout: float = 5.0) -> None:
+    """Require the actual loopback listener before claiming engine startup.
+
+    Process.poll() alone does not establish readiness. Only localhost is
+    contacted; no system routes, DNS or remote network state are modified.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            fail("ENGINE_EXITED_BEFORE_PROXY_READY")
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                return
+        except OSError:
+            time.sleep(0.1)
+    if proc.poll() is not None:
+        fail("ENGINE_EXITED_BEFORE_PROXY_READY")
+    fail("LOCAL_SOCKS_LISTENER_NOT_READY")
+
+
 def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
     if protocol not in PROTOCOLS:
         fail("UNKNOWN_PROTOCOL")
@@ -410,6 +432,9 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
             record["owner_pid"] = owner_pid
             record["owner_started"] = owner_started
         save_state(record)
+        # A running PID is not a usable SOCKS proxy. Wait for the listener
+        # before allowing the AppKit Connect action to probe or show success.
+        wait_for_local_listener(proc, port)
         if metrics_port is not None:
             # sing-box has parsed its runtime settings. Do not retain the
             # customer's Hysteria2 credentials on disk for the session.
