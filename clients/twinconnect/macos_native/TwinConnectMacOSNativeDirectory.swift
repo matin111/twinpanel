@@ -1207,22 +1207,37 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                   user.utf8.count <= 1024, password.utf8.count <= 4096,
                   let tls = outbound["tls"] as? [String: Any],
                   let checkedTLS = safeOutboundTLS(tls, server: host),
-                  (outbound["insecure_concurrency"] as? Int ?? 0) == 0,
+                  let sni = checkedTLS["server_name"] as? String,
+                  let authority = checkedTLS["certificate"] as? [String],
+                  !authority.isEmpty,
+                  // The panel's Naive managed-CA or custom trust model
+                  // delivers PEM, never 'insecure' or a local path.
+                  (outbound["insecure_concurrency"] == nil ||
+                   (outbound["insecure_concurrency"] as? Int) == 0),
                   outbound["extra_headers"] == nil else { return nil }
             reviewed["username"] = user
             reviewed["password"] = password
-            reviewed["tls"] = checkedTLS
+            // Naive TLS supports only server_name, certificate,
+            // certificate_path and ECH. Do not send the general sing-box
+            // tls.enabled field or trust-bypass flags to this outbound.
+            reviewed["tls"] = [
+                "server_name": sni, "certificate": authority
+            ]
             reviewed["insecure_concurrency"] = 0
             for key in ["quic", "udp_over_tcp"] {
                 if let flag = outbound[key] as? Bool {
                     if flag { reviewed[key] = true }
                 } else if outbound[key] != nil { return nil }
             }
+            // The server emits quic_congestion_control='bbr' even when
+            // network is TCP and 'quic' is absent. Validate the known
+            // value, but only forward it to sing-box for a QUIC profile.
             if let cc = outbound["quic_congestion_control"] as? String {
-                guard outbound["quic"] as? Bool == true,
-                      ["bbr", "bbr2", "cubic", "reno"].contains(cc)
+                guard ["bbr", "bbr2", "cubic", "reno"].contains(cc)
                 else { return nil }
-                reviewed["quic_congestion_control"] = cc
+                if outbound["quic"] as? Bool == true {
+                    reviewed["quic_congestion_control"] = cc
+                }
             } else if outbound["quic_congestion_control"] != nil { return nil }
         } else {
             guard let password = outbound["password"] as? String,
