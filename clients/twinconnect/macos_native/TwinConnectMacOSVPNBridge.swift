@@ -306,15 +306,25 @@ final class TwinConnectMacOSVPNBridge {
                 ] as [String: Any])
             case "macOSRuntimeStatus":
                 let installed = extensionBundle() != nil
+                let wireGuardReady = wireGuardBackendReady()
+                let libboxReady = libboxBackendReady()
+                let ready = wireGuardReady || libboxReady
+                // Runtime availability is not connection state. This call
+                // performs no privileged action and never claims an active VPN.
                 result([
                     "contractVersion": 1,
-                    "state": installed ? "backend_not_linked" : "not_installed",
+                    "state": ready ? "backend_ready_not_connected" :
+                        (installed ? "backend_not_linked" : "not_installed"),
                     "extensionInstalled": installed,
-                    "engineReady": false,
+                    "engineReady": ready,
+                    "wireguardReady": wireGuardReady,
+                    "libboxReady": libboxReady,
                     "connected": false,
-                    "reason": installed
-                        ? "MACOS_PROTOCOL_BACKEND_NOT_LINKED"
-                        : "MACOS_PACKET_TUNNEL_NOT_INSTALLED",
+                    "reason": ready
+                        ? "MACOS_TUNNEL_AVAILABLE_CONNECTION_UNVERIFIED"
+                        : (installed
+                            ? "MACOS_PROTOCOL_BACKEND_NOT_LINKED"
+                            : "MACOS_PACKET_TUNNEL_NOT_INSTALLED"),
                 ] as [String: Any])
             case "startTunnel":
                 TwinConnectMacOSVPNControl.start(
