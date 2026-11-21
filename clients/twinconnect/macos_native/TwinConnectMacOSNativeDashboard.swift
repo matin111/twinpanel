@@ -403,6 +403,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var refreshGeneration = 0
     private var nativeContentWidth: CGFloat = 1100
     private var observesWindowSize = false
+    private var didAttemptSessionRestore = false
     private var tenantLogo: NSImage?
     private var logoGeneration = 0
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
@@ -450,6 +451,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let current = view.window?.contentView?.bounds.width {
             nativeContentWidth = current
+        }
+        // The unsigned AppKit fallback must use the same rotating token flow
+        // as the authenticated client; never store or replay a password.
+        if !didAttemptSessionRestore {
+            didAttemptSessionRestore = true
+            directory.restoreSavedSession { [weak self] result in
+                guard let self = self, self.accountSession == nil,
+                      !self.busy else { return }
+                switch result {
+                case .success(let session):
+                    self.showAuthenticatedSession(session)
+                case .failure(let error):
+                    if error.localizedDescription != "NO_SAVED_SESSION" {
+                        self.status = "Automatic sign-in unavailable: " +
+                            error.localizedDescription
+                        self.view = self.build()
+                    }
+                }
+            }
         }
     }
 
@@ -2336,53 +2356,58 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             case .failure(let error):
                 self.status = "Sign-in failed: " + error.localizedDescription
             case .success(let session):
-                self.accountSession = session
-                self.restoreCurrentSelection(session)
-                self.snapshot = nil
-                self.pingGeneration += 1
-                self.nodePingResults.removeAll()
-                self.nodePingBusy.removeAll()
-                self.nodePingQueue.removeAll()
-                self.pingAllBusy = false
-                self.didAutoPing = false
-                self.tenantLogo = nil
-                self.logoGeneration += 1
-                let logoVersion = self.logoGeneration
-                self.directory.loadBrandLogo(session) { [weak self] data in
-                    guard let self = self,
-                          self.logoGeneration == logoVersion,
-                          self.accountSession?.accessToken == session.accessToken
-                    else { return }
-                    if let bytes = data, let image = NSImage(data: bytes) {
-                        self.tenantLogo = image
-                        self.view = self.build()
-                    }
-                }
-                self.tab = 0
-                self.status = "Retrieving live subscription data…"
-                NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
-                // Match Flutter desktop's two equal cards on large displays
-                // without clipping them on smaller remote Mac desktops.
-                if let window = self.view.window {
-                    if let visible = (window.screen ?? NSScreen.main)?.visibleFrame,
-                       visible.width >= 1120 {
-                        window.setContentSize(NSSize(
-                            width: min(1240, visible.width - 32),
-                            height: min(800, visible.height - 32)
-                        ))
-                        window.center()
-                    }
-                    self.nativeContentWidth = window.contentView?.bounds.width
-                        ?? window.frame.width
-                }
-                // Present the dashboard first. Panel fetch must never gate
-                // rendering the tabs or make the content disappear.
-                self.view = self.build()
-                self.refreshData()
+                self.showAuthenticatedSession(session)
                 return
             }
             self.view = self.build()
         }
+    }
+
+    private func showAuthenticatedSession(_ session: TwinMacNativeSession) {
+            self.accountSession = session
+            self.restoreCurrentSelection(session)
+            self.snapshot = nil
+            self.pingGeneration += 1
+            self.nodePingResults.removeAll()
+            self.nodePingBusy.removeAll()
+            self.nodePingQueue.removeAll()
+            self.pingAllBusy = false
+            self.didAutoPing = false
+            self.tenantLogo = nil
+            self.logoGeneration += 1
+            let logoVersion = self.logoGeneration
+            self.directory.loadBrandLogo(session) { [weak self] data in
+                guard let self = self,
+                      self.logoGeneration == logoVersion,
+                      self.accountSession?.accessToken == session.accessToken
+                else { return }
+                if let bytes = data, let image = NSImage(data: bytes) {
+                    self.tenantLogo = image
+                    self.view = self.build()
+                }
+            }
+            self.tab = 0
+            self.status = "Retrieving live subscription data…"
+            NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
+            // Match Flutter desktop's two equal cards on large displays
+            // without clipping them on smaller remote Mac desktops.
+            if let window = self.view.window {
+                if let visible = (window.screen ?? NSScreen.main)?.visibleFrame,
+                   visible.width >= 1120 {
+                    window.setContentSize(NSSize(
+                        width: min(1240, visible.width - 32),
+                        height: min(800, visible.height - 32)
+                    ))
+                    window.center()
+                }
+                self.nativeContentWidth = window.contentView?.bounds.width
+                    ?? window.frame.width
+            }
+            // Present the dashboard first. Panel fetch must never gate
+            // rendering the tabs or make the content disappear.
+            self.view = self.build()
+            self.refreshData()
+        
     }
 
     private func refreshData() {
@@ -2445,6 +2470,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func signOut(_ sender: NSButton) {
+        directory.clearSavedSession()
         refreshGeneration += 1
         pingGeneration += 1
         nodePingResults.removeAll()
