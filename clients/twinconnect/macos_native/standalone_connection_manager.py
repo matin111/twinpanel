@@ -485,6 +485,8 @@ def engine_failure_category() -> str:
     # Check specific errors before generic QUIC/handshake text. Match only
     # known fixed phrases and return a fixed code, never any user data.
     for needle, code in (
+        ("initialize outbound[0]: tls required", "NAIVE_TLS_REQUIRED"),
+        ("initialize outbound: tls required", "NAIVE_TLS_REQUIRED"),
         ("cronet: library not found", "NAIVE_CRONET_LIBRARY_MISSING"),
         ("library not loaded:", "ENGINE_NATIVE_LIBRARY_NOT_LOADED"),
         ("dyld: library", "ENGINE_NATIVE_LIBRARY_NOT_LOADED"),
