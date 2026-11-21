@@ -78,8 +78,6 @@ def capture() -> dict:
     if mode == "manual":
         mask = valid_ipv4(fields.get("Subnet mask", ""))
         gateway = valid_ipv4(fields.get("Router", ""))
-        if not ipaddress.IPv4Address(mask).is_private and mask == "0.0.0.0":
-            raise ValueError("CISCO_NETWORK_INVALID_MASK")
         try:
             ipaddress.IPv4Network("0.0.0.0/" + mask)
         except ValueError:
@@ -95,6 +93,11 @@ def capture() -> dict:
                 dns.append(valid_ipv4(value))
     if len(dns) > 8:
         raise ValueError("CISCO_NETWORK_TOO_MANY_DNS")
+    if mode == "manual":
+        # A static IPv4 address must still have a valid default route.
+        current_default = default_interface()
+        if current_default != device:
+            raise ValueError("CISCO_NETWORK_DEFAULT_ROUTE_MISMATCH")
     return {"version": 1, "interface": device, "service": service,
             "mode": mode, "ip": ip, "mask": mask, "gateway": gateway,
             "dns": dns}
@@ -166,11 +169,43 @@ def restore() -> None:
     print("CISCO_NETWORK_RESTORED_VERIFIED", flush=True)
 
 
+def watch(parent_pid: int, deadline_seconds: int) -> None:
+    """Independent root process: recover if Cisco exits uncleanly or times out.
+
+    The watcher is launched with start_new_session=True. It never reads app
+    credentials and only restores its own root-owned snapshot.
+    """
+    import signal
+    import time
+    if not (parent_pid > 1 and 10 <= deadline_seconds <= 600):
+        raise ValueError("CISCO_NETWORK_WATCH_INVALID")
+    until = time.monotonic() + deadline_seconds
+    while time.monotonic() < until:
+        if not CHECKPOINT.exists():
+            return
+        try:
+            os.kill(parent_pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(1)
+    if not CHECKPOINT.exists():
+        return
+    # Timeout may have occurred while OpenConnect is still alive: request a
+    # clean SIGTERM from its parent first, then forcibly restore network.
+    try:
+        os.kill(parent_pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    time.sleep(3)
+    if CHECKPOINT.exists():
+        restore()
+
+
 def main():
     try:
-        if len(sys.argv) != 2 or sys.argv[1] not in {
-            "inspect", "snapshot", "restore"
-        }:
+        if ((len(sys.argv) != 2 and len(sys.argv) != 4) or
+            sys.argv[1] not in {"inspect", "snapshot", "restore", "watch"} or
+            (sys.argv[1] == "watch") != (len(sys.argv) == 4)):
             raise ValueError("CISCO_NETWORK_ACTION_INVALID")
         if sys.argv[1] == "inspect":
             value = capture()
@@ -181,8 +216,10 @@ def main():
         elif sys.argv[1] == "snapshot":
             snapshot()
             print("CISCO_NETWORK_CHECKPOINT_SAVED")
-        else:
+        elif sys.argv[1] == "restore":
             restore()
+        else:
+            watch(int(sys.argv[2]), int(sys.argv[3]))
         return 0
     except (ValueError, OSError, json.JSONDecodeError, subprocess.TimeoutExpired) as error:
         reason = str(error)
