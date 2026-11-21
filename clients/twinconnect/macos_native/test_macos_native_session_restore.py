@@ -208,6 +208,26 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('safeProxyRemoteHost(host)', directory)
         self.assertIn('case "v2ray": return "V2Ray"', dashboard)
 
+    def test_failed_profile_fetch_is_visible_without_engine_process(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        handler = dashboard.split(
+            "@objc private func requestVPNConnection(", 1
+        )[1].split("/// An actual remote HTTPS request", 1)[0]
+        self.assertIn('self.localProxyStatus = self.status', handler)
+        self.assertIn('localProxyStatus = status', handler)
+        self.assertIn('"PROFILE_REQUEST_FAILED"', handler)
+        self.assertIn('"Checking authorized " + selectedProtocol', handler)
+        settings = dashboard.split('private func settingsPage()', 1)[-1]
+        self.assertIn('text(localProxyStatus, size: 11, color: muted)', settings)
+        self.assertIn('"Last connection status: " +', dashboard)
+        start = dashboard.split(
+            "private func startVerifiedLocalProxy(", 1
+        )[1].split("/// Separate read-only diagnostic", 1)[0]
+        self.assertIn('let diagnostic = runLocalManager(["diagnose"], root: root)', start)
+        self.assertIn('let reason = safeManagerReason(started.2)', start)
+        self.assertIn('"ENGINE_FAILURE_NOT_CLASSIFIED"', start)
+        self.assertIn('"Local proxy startup failed: "', start)
+
     def test_connect_reuses_existing_verified_process_control(self):
         dashboard = DASHBOARD.read_text(encoding="utf-8")
         handler = dashboard.split(
