@@ -2184,7 +2184,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Technical proxy-mode details remain in Copy diagnostics.
         let proxyActions = stack(.horizontal, spacing: 10)
         proxyActions.distribution = .fillEqually
-        let testProxy = button("Test Hysteria2 SOCKS",
+        let testProxy = button("Test selected SOCKS",
                                action: #selector(primaryProxyAction(_:)),
                                mutedButton: true)
         testProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -2879,8 +2879,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func primaryProxyAction(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy else { return }
-        guard activeProtocol == "hysteria2" else {
-            localProxyStatus = "Select Hysteria2 from Locations first. Other protocols are not yet available in AppKit proxy mode."
+        guard let selected = activeProtocol,
+              ["hysteria2", "tuic", "anytls", "socks5", "snell"]
+                .contains(selected) else {
+            localProxyStatus = "Select a supported proxy protocol in Locations."
             tab = 1
             view = build()
             return
@@ -2892,27 +2894,30 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return
         }
         guard snapshot?.protocols.contains(where: {
-            $0.code == "hysteria2" && $0.configured
+            $0.code == selected && $0.configured
         }) == true else {
-            localProxyStatus = "Hysteria2 is not enabled/configured for this subscription."
+            localProxyStatus = "The selected proxy is unavailable for this subscription."
             view = build()
             return
         }
-        testNativeHysteria2Proxy(sender)
+        testNativeLocalProxy(sender)
     }
 
-    @objc private func testNativeHysteria2Proxy(_ sender: NSButton) {
+    @objc private func testNativeLocalProxy(_ sender: NSButton) {
         guard !localProxyBusy,
               let session = accountSession,
               let serverID = activeServer,
-              activeProtocol == "hysteria2",
+              let selected = activeProtocol,
+              ["hysteria2", "tuic", "anytls", "socks5", "snell"]
+                .contains(selected),
               snapshot?.protocols.contains(where: {
-                  $0.code == "hysteria2" && $0.configured
+                  $0.code == selected && $0.configured
               }) == true else { return }
         localProxyBusy = true
         localProxyStatus = "Checking current panel permissions…"
         view = build()
-        directory.prepareLocalHysteria2(session, serverID: serverID) {
+        directory.prepareLocalSingBox(
+            session, serverID: serverID, protocolCode: selected) {
             [weak self] response in
             guard let self = self else { return }
             guard self.accountSession?.accessToken == session.accessToken else {
@@ -2925,10 +2930,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.localProxyStatus = "Proxy test blocked: " + error.localizedDescription
                 self.view = self.build()
             case .success(let bytes):
-                self.localProxyStatus = "Sending a test request via Hysteria2…"
+                self.localProxyStatus = "Testing " + selected + " connection…"
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let result = self.oneShotHysteria2Probe(bytes)
+                    let result = self.oneShotLocalProxyProbe(bytes, protocolCode: selected)
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.localProxyBusy = false
@@ -2944,7 +2949,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     /// Never changes a system route. Reuses the standalone manager's verified
     /// local SOCKS process and cleans up test credentials even on failure.
-    private func oneShotHysteria2Probe(_ config: Data) -> String {
+    private func oneShotLocalProxyProbe(_ config: Data,
+                                        protocolCode: String) -> String {
         let root = NSHomeDirectory() +
             "/twinpanel/clients/twinconnect"
         let manager = root + "/macos_native/standalone_connection_manager.py"
@@ -2978,7 +2984,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Only a single managed engine is permitted; don't interrupt existing
         // user-owned processes. Manager start refuses an existing instance.
         let started = runLocalManager([
-            "start", "hysteria2", file.path, "--owner-pid",
+            "start", protocolCode, file.path, "--owner-pid",
             String(ProcessInfo.processInfo.processIdentifier)
         ], root: root)
         guard started.0 == 0 else {
@@ -3014,7 +3020,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                          engineReason == "UNKNOWN_PROXY_FAILURE" ||
                          engineReason == "ENGINE_LOG_UNAVAILABLE" ?
                 curlReason : curlReason + " · " + engineReason
-            return "Hysteria2 test failed: " + detail + " (VPN offline)"
+            return protocolCode.uppercased() + " test failed: " + detail
         }
         return "Proxied HTTPS exit: " + address + " (not a system VPN)"
     }
