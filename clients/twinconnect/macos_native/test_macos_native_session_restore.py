@@ -118,6 +118,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
             ("snell", "Snell"),
             ("naive", "Naive"),
             ("shadowtls", "ShadowTLS"),
+            ("v2ray", "V2Ray"),
         ]:
             self.assertIn(f'case "{code}": return "{label}"', dashboard)
         self.assertIn('connectedProtocolTitle + " · Proxy"', dashboard)
@@ -136,7 +137,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
         directory = DIRECTORY.read_text(encoding="utf-8")
         dashboard = DASHBOARD.read_text(encoding="utf-8")
         for code in ('"hysteria2"', '"tuic"', '"anytls"',
-                     '"socks5"', '"snell"', '"naive"', '"shadowtls"'):
+                     '"socks5"', '"snell"', '"naive"', '"shadowtls"', '"v2ray"'):
             self.assertIn(code, dashboard)
         self.assertIn("func prepareLocalSingBox(", directory)
         self.assertIn('payload: ["protocol": protocolCode]', directory)
@@ -181,6 +182,31 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('tls["insecure"] as? Bool != true', directory)
         self.assertIn('case "naive": return "Naive"', dashboard)
         self.assertIn('case "shadowtls": return "ShadowTLS"', dashboard)
+
+    def test_xray_profiles_only_from_authorized_node_and_3_known_inbounds(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        self.assertIn('"naive", "shadowtls", "v2ray"', directory)
+        self.assertIn('response["server_groups"]', directory)
+        self.assertIn('reviewedXrayForServer(', directory)
+        self.assertIn('groups.filter { group in', directory)
+        self.assertIn('matching.count == 1', directory)
+        for inbound in ("tcp_tls", "websocket_tls", "xhttp_reality"):
+            self.assertIn('"' + inbound + '"', directory)
+        self.assertIn('url.scheme == "vless"', directory)
+        self.assertIn('UUID(uuidString: uuid)', directory)
+        self.assertIn('let required = expected', directory)
+        self.assertIn('let security = params["security"]', directory)
+        self.assertIn('let transport = params["type"]', directory)
+        self.assertIn('let sni = params["sni"]', directory)
+        self.assertIn('url.queryItems.count', directory.replace('queryItems.count', 'url.queryItems.count') if False else directory)
+        self.assertIn('"protocol": "socks"', directory)
+        self.assertIn('"listen": "127.0.0.1", "port": 17089', directory)
+        self.assertIn('"protocol": "vless"', directory)
+        self.assertIn('"network": transport', directory)
+        self.assertIn('"publicKey": pub, "shortId": sid', directory)
+        self.assertIn('safeProxyRemoteHost(host)', directory)
+        self.assertIn('case "v2ray": return "V2Ray"', dashboard)
 
     def test_connect_reuses_existing_verified_process_control(self):
         dashboard = DASHBOARD.read_text(encoding="utf-8")
