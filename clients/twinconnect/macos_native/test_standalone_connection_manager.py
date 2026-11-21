@@ -414,7 +414,7 @@ class StandaloneManagerTests(unittest.TestCase):
              mock.patch.object(manager, "wait_for_local_listener") as ready, \
              mock.patch.object(manager, "save_state"):
             result = manager.start("hysteria2", cfg)
-        ready.assert_called_once_with(fake_proc, 17089)
+        ready.assert_called_once_with(fake_proc, 17890)
         self.assertEqual(result["state"], "process_running_unverified")
         self.assertEqual(log.read_text(), "")
 
