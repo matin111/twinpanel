@@ -586,6 +586,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var trafficTimer: Timer?
     private var trafficPollBusy = false
     private var lastTraffic: (download: Int64, upload: Int64, at: Date)?
+    // Recent counter samples yield a rolling 3-second average. This is
+    // genuine transfer speed, not generated network traffic.
+    private var recentTraffic = [(download: Int64, upload: Int64, at: Date)]()
     private var downloadSpeed = "—"
     private var uploadSpeed = "—"
     private var downloadedTotal = "—"
@@ -626,7 +629,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             nativeContentWidth = current
         }
         if trafficTimer == nil {
-            let timer = Timer(timeInterval: 2.0, repeats: true) {
+            // Capture short genuine transfers without repeatedly rebuilding
+            // the heavy cloud AppKit view or running any speed-test traffic.
+            let timer = Timer(timeInterval: 1.0, repeats: true) {
                 [weak self] _ in self?.refreshTrafficMetrics()
             }
             RunLoop.main.add(timer, forMode: .common)
@@ -3029,6 +3034,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func resetTrafficMetrics() {
         localProxyStartedAt = nil
         lastTraffic = nil
+        recentTraffic.removeAll()
         downloadSpeed = "—"
         uploadSpeed = "—"
         downloadedTotal = "—"
@@ -3103,11 +3109,23 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 let up = upNumber.int64Value
                 guard down >= 0, up >= 0 else { return }
                 let now = Date()
+                // Counter reset (e.g. engine restarted) starts a new baseline.
                 if let previous = self.lastTraffic,
-                   down >= previous.download, up >= previous.upload {
-                    let seconds = max(now.timeIntervalSince(previous.at), 0.25)
-                    let downRate = Double(down - previous.download) / seconds
-                    let upRate = Double(up - previous.upload) / seconds
+                   down < previous.download || up < previous.upload {
+                    self.recentTraffic.removeAll()
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.recentTraffic.append((down, up, now))
+                self.recentTraffic.removeAll {
+                    now.timeIntervalSince($0.at) > 3.0
+                }
+                if let baseline = self.recentTraffic.first,
+                   now.timeIntervalSince(baseline.at) > 0.2,
+                   down >= baseline.download, up >= baseline.upload {
+                    let seconds = now.timeIntervalSince(baseline.at)
+                    let downRate = Double(down - baseline.download) / seconds
+                    let upRate = Double(up - baseline.upload) / seconds
                     self.downloadSpeed = self.transferRate(downRate)
                     self.uploadSpeed = self.transferRate(upRate)
                     self.downloadHistory.append(downRate)
