@@ -89,10 +89,27 @@ class StandaloneManagerTests(unittest.TestCase):
     def test_naive_local_proxy_config(self):
         cfg = self.config({
             "inbounds": [{"listen": "127.0.0.1", "listen_port": 10810, "type": "mixed"}],
-            "outbounds": [{"type": "naive", "server": "example.com", "server_port": 443}]
+            "outbounds": [{
+                "type": "naive", "tag": "proxy",
+                "server": "example.com", "server_port": 443,
+            }],
+            "route": {"final": "proxy"},
         })
         self.assertEqual(manager.validate("naive", cfg), 10810)
         self.assertEqual(manager.EXECUTABLE["naive"], "sing-box")
+
+        # The verified route and outbound tag are mandatory: an unsigned
+        # local proxy must never silently fall back to direct connections.
+        untagged = self.config({
+            "inbounds": [{"listen": "127.0.0.1", "listen_port": 10810, "type": "mixed"}],
+            "outbounds": [{
+                "type": "naive",
+                "server": "example.com", "server_port": 443,
+            }],
+            "route": {"final": "proxy"},
+        })
+        with self.assertRaisesRegex(ValueError, "VERIFIED_PROXY_TAG_REQUIRED"):
+            manager.validate("naive", untagged)
 
     def test_probe_verified_egress(self):
         record = {"protocol": "v2ray", "port": 10808, "pid": 42}
