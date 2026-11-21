@@ -1215,8 +1215,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let trailingSpace = NSView()
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
-            localProxyActive ? "◉  Local SOCKS proxy active (not VPN)" :
-                               "◌  You are offline",
+            localProxyActive ? "◉  Proxy active" : "◌  Offline",
             color: localProxyActive ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
@@ -1269,14 +1268,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
-        if !status.isEmpty && (status.contains("TUN") ||
-                               status.contains("Connection unavailable") ||
-                               status.contains("VPN connection unavailable") ||
-                               status.contains("Local proxy")) {
-            let advisory = text(status,
-                                size: 10, color: amber)
-            main.addArrangedSubview(advisory)
-        }
+        // Errors and technical details belong in Settings and Diagnostics,
+        // not as a long line beneath the primary connection button.
 
 
         // NSStackView with .leading alignment does not automatically
@@ -1370,7 +1363,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
-            localProxyActive ? "SOCKS proxy only" : "Disconnected",
+            localProxyActive ? "Proxy" : "Disconnected",
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -1378,10 +1371,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Windows layout: timing and manual refresh share a single row.
         // The timer remains at zero until a real PacketTunnel is connected.
         let timing = stack(.horizontal, spacing: 8)
-        timing.addArrangedSubview(text(
-            localProxyActive ? "◷  Local SOCKS verified · VPN offline" :
-                               "◷  Connected for    00:00:00",
-            size: 12, color: muted))
+        let uptime = text(
+            localProxyActive ? "◷  Proxy session" : "◷  00:00:00",
+            size: 12, color: muted)
+        proxyUptimeText = uptime
+        timing.addArrangedSubview(uptime)
         let timingSpace = NSView()
         timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
         timing.addArrangedSubview(timingSpace)
@@ -1400,19 +1394,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let network = stack(.horizontal, spacing: 10)
         network.distribution = .fillEqually
         network.addArrangedSubview(networkMetric("Server ping", value: reportedPing,
-            subtitle: pingDetails(selected), valueColor: pingColor(selected)))
+            valueColor: pingColor(selected)))
         network.addArrangedSubview(networkMetric(
-            localProxyActive ? "SOCKS exit IP" : "Public IP",
+            localProxyActive ? "Exit IP" : "Public IP",
             value: localProxyActive ? (localProxyExitIP ?? "—") : "—"))
         content.addArrangedSubview(network)
         network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let traffic = stack(.horizontal, spacing: 10)
         traffic.distribution = .fillEqually
-        traffic.addArrangedSubview(networkMetric("Download", value: "—",
-                                                  subtitle: "Session total: —"))
-        traffic.addArrangedSubview(networkMetric("Upload", value: "—",
-                                                  subtitle: "Session total: —"))
+        traffic.addArrangedSubview(networkMetric("Download",
+            value: localProxyActive ? downloadSpeed : "—",
+            subtitle: localProxyActive ? "Total: " + downloadedTotal : ""))
+        traffic.addArrangedSubview(networkMetric("Upload",
+            value: localProxyActive ? uploadSpeed : "—",
+            subtitle: localProxyActive ? "Total: " + uploadedTotal : ""))
         content.addArrangedSubview(traffic)
         traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
@@ -2020,11 +2016,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Independent local proxy diagnostics and emergency stop.
         section.addArrangedSubview(text("Local proxy diagnostics",
                                         size: 18, weight: .semibold))
-        section.addArrangedSubview(text(
-            "Connect can verify a local Hysteria2 SOCKS proxy at 127.0.0.1:17089. "
-            + "Configure individual apps to use it; macOS routing/DNS are unchanged. "
-            + "This is not a system-wide VPN.",
-            size: 11, color: amber))
+        // Technical proxy-mode details remain in Copy diagnostics.
         let proxyActions = stack(.horizontal, spacing: 10)
         proxyActions.distribution = .fillEqually
         let testProxy = button("Test Hysteria2 SOCKS",
