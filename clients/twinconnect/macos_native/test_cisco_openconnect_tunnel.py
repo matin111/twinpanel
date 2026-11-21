@@ -18,6 +18,25 @@ spec.loader.exec_module(tun)
 
 
 class CiscoTunnelTests(unittest.TestCase):
+    def setUp(self):
+        # Older runner tests exercise connection logic with the safety interlock
+        # mocked. Production must remain fail closed until recovery is verified.
+        enabled = mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", True)
+        enabled.start()
+        self.addCleanup(enabled.stop)
+
+    def test_production_interlock_blocks_tunnel_before_network_changes(self):
+        with mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", False), \
+             mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun.subprocess, "run") as route, \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            with self.assertRaisesRegex(
+                ValueError, "CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY"
+            ):
+                tun.run({}, "console-test")
+            route.assert_not_called()
+            launch.assert_not_called()
+
     def test_rejects_missing_or_private_management_address(self):
         for value in ("127.0.0.1", "192.168.1.2", "not-an-ip", "::1"):
             with self.subTest(value=value), self.assertRaises(ValueError):
