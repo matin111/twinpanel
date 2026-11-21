@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import socket
 import sys
 from pathlib import Path
@@ -32,8 +34,15 @@ def encode_request(action: str, config: object = None) -> bytes:
 
 def query(action: str, config: object = None,
           socket_path: Path = SOCKET) -> dict:
-    if socket_path.is_symlink() or not socket_path.exists():
-        raise ValueError("TUN_SERVICE_UNAVAILABLE")
+    try:
+        info = socket_path.lstat()
+    except OSError:
+        raise ValueError("TUN_SERVICE_UNAVAILABLE") from None
+    # Never send VPN credentials to a user's fake socket. The trusted local
+    # service binds /var/run with root ownership and validates peer UID.
+    if (not stat.S_ISSOCK(info.st_mode) or info.st_uid != 0 or
+            info.st_mode & 0o022):
+        raise ValueError("TUN_SERVICE_UNTRUSTED")
     data = encode_request(action, config)
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
         client.settimeout(6)
