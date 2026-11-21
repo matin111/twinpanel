@@ -15,6 +15,15 @@ install -d -o root -g wheel -m 0755 "$base"
 for filename in cisco_openconnect_auth.py cisco_openconnect_tunnel.py; do
   install -o root -g wheel -m 0755 "macos_native/$filename" "$base/$filename"
 done
+# Always install an administrator-owned copy of vpnc-script. Never execute
+# a user-owned Homebrew script as root when connecting Cisco.
+vpn_source=""
+for candidate in /usr/local/etc/vpnc/vpnc-script /opt/homebrew/etc/vpnc/vpnc-script; do
+  if [[ -f "$candidate" && ! -L "$candidate" ]]; then vpn_source="$candidate"; break; fi
+done
+[[ -n "$vpn_source" ]] || { echo "CISCO_VPN_SCRIPT_NOT_FOUND" >&2; exit 1; }
+install -o root -g wheel -m 0755 "$vpn_source" "$base/vpnc-script"
+stat -f '%Su %Sp %N' "$base/vpnc-script"
 # Ensure files cannot be changed by the app's unprivileged account.
 for filename in cisco_openconnect_auth.py cisco_openconnect_tunnel.py; do
   stat -f '%Su %Sp %N' "$base/$filename"
