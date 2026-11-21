@@ -67,7 +67,7 @@ for spec in "singbox:sing-box" "xray:xray"; do
   binary="${spec##*:}"
   executable="$runtime/macos_native/build/$family/$arch/$binary"
   test -x "$executable" || { echo "PACKAGED_ENGINE_MISSING: $family" >&2; exit 3; }
-  /usr/bin/lipo -archs "$executable" | tr ' ' '\\n' | grep -Fxq "$macarch" ||
+  /usr/bin/lipo -archs "$executable" | tr ' ' '\n' | grep -Fxq "$macarch" ||
     { echo "PACKAGED_ENGINE_WRONG_ARCH: $family" >&2; exit 3; }
 done
 
@@ -110,6 +110,6 @@ Do not claim internet traffic is tunneled unless verified via SOCKS egress.
 No installer signing, notarization or Gatekeeper bypass is provided.
 Keep the archive and SHA256 file off the expiring VPS.
 EOF
-printf '%s\\n' "$commit" > "$output/$name.commit.txt"
-printf 'MACOS_UNSIGNED_EXPORT_SUCCEEDED\\nArchive: %s\\nSHA256: %s\\nREADME: %s\\n' \
+printf '%s\n' "$commit" > "$output/$name.commit.txt"
+printf 'MACOS_UNSIGNED_EXPORT_SUCCEEDED\nArchive: %s\nSHA256: %s\nREADME: %s\n' \
   "$zip" "$zip.sha256" "$output/$name.README.txt"
