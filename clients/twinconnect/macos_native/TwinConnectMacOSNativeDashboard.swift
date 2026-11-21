@@ -1200,8 +1200,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         startSpace.widthAnchor.constraint(equalTo: endSpace.widthAnchor).isActive = true
         content.addArrangedSubview(logoRow)
         logoRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        let brand = text(accountSession?.brandName ?? "TwinConnect",
-                         size: 18, weight: .bold)
+        // Preserve the tenant-defined brand, but normalize the common VPN
+        // acronym casing in titles (e.g. "Matin Vpn" -> "Matin VPN").
+        let rawBrand = accountSession?.brandName ?? "TwinConnect"
+        let displayBrand = rawBrand.replacingOccurrences(
+            of: " vpn", with: " VPN", options: .caseInsensitive)
+        let brand = text(displayBrand, size: 18, weight: .bold)
         brand.alignment = .center
         content.addArrangedSubview(brand)
         brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
