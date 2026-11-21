@@ -14,6 +14,7 @@ enum MacWireGuardError: Int, Error {
     case backendNotLinked = 2001
     case missingProfile = 2002
     case invalidConfiguration = 2003
+    case alreadyRunning = 2004
 }
 
 final class TwinConnectMacWireGuardEngine {
@@ -26,11 +27,20 @@ final class TwinConnectMacWireGuardEngine {
     }
 
     func start(completion: @escaping (Error?) -> Void) {
+        // Never replace a live adapter: doing so would orphan a tunnel and
+        // leave the app unable to disconnect it.
+        guard adapter == nil else {
+            completion(MacWireGuardError.alreadyRunning)
+            return
+        }
         guard let provider = provider,
               let configuration = provider.protocolConfiguration as? NETunnelProviderProtocol,
               let reference = configuration.passwordReference,
-              let profile = Self.readProfile(reference),
-              let text = String(data: profile, encoding: .utf8),
+              let profile = Self.readProfile(reference) else {
+            completion(MacWireGuardError.missingProfile)
+            return
+        }
+        guard let text = String(data: profile, encoding: .utf8),
               let tunnel = try? TwinConnectWgQuickParser.parse(text) else {
             completion(MacWireGuardError.invalidConfiguration)
             return
@@ -188,12 +198,13 @@ private enum TwinConnectWgQuickParser {
                 }
                 peer.preSharedKey = secret
             }
-            if let value = fields["endpoint"] {
-                guard let endpoint = Endpoint(from: value) else {
-                    throw ParseError.invalidProfile
-                }
-                peer.endpoint = endpoint
+            // TwinConnect is a client: a peer without a valid endpoint
+            // cannot initiate the connection and must not be shown as ready.
+            guard let endpointString = fields["endpoint"],
+                  let endpoint = Endpoint(from: endpointString) else {
+                throw ParseError.invalidProfile
             }
+            peer.endpoint = endpoint
             if let value = fields["persistentkeepalive"] {
                 guard let interval = UInt16(value) else { throw ParseError.invalidProfile }
                 peer.persistentKeepAlive = interval
