@@ -17,7 +17,9 @@ import signal
 import subprocess
 import sys
 
-from cisco_network_recovery import snapshot as snapshot_network, restore as restore_network
+from cisco_network_recovery import (snapshot as snapshot_network,
+                                    restore as restore_network,
+                                    record_tunnel_pid)
 from cisco_openconnect_auth import validate, binary
 
 SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
@@ -212,6 +214,7 @@ def run(profile: dict, management_ip: str) -> int:
         child = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                  stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL, start_new_session=False)
+        record_tunnel_pid(child.pid)
         assert child.stdin is not None
         child.stdin.write((profile["password"] + "\n").encode("utf-8"))
         child.stdin.close()
