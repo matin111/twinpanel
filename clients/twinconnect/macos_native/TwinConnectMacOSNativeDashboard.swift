@@ -369,6 +369,8 @@ private final class TwinNativeNetworkFabric: NSView {
         didSet { needsDisplay = true; updatePulse() }
     }
     private let halo = CAShapeLayer()
+    private var travelDots = [CAShapeLayer]()
+    private var animatedCanvasSize: CGSize = .zero
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -380,6 +382,21 @@ private final class TwinNativeNetworkFabric: NSView {
         halo.lineWidth = 1.8
         halo.opacity = 0
         layer?.addSublayer(halo)
+        // Four small Core Animation layers follow the existing paths.
+        // This is decorative motion, NOT synthetic download activity.
+        for _ in 0..<4 {
+            let dot = CAShapeLayer()
+            dot.path = CGPath(ellipseIn: CGRect(
+                x: -3.25, y: -3.25, width: 6.5, height: 6.5),
+                transform: nil)
+            dot.fillColor = NSColor(calibratedRed: 0.32, green: 0.99,
+                                    blue: 0.88, alpha: 1).cgColor
+            dot.strokeColor = NSColor.white.withAlphaComponent(0.48).cgColor
+            dot.lineWidth = 0.65
+            dot.opacity = 0
+            layer?.addSublayer(dot)
+            travelDots.append(dot)
+        }
     }
 
     required init?(coder: NSCoder) { return nil }
@@ -392,9 +409,14 @@ private final class TwinNativeNetworkFabric: NSView {
         halo.path = CGPath(ellipseIn: CGRect(
             x: bounds.midX - radius, y: bounds.midY - radius,
             width: radius * 2, height: radius * 2), transform: nil)
+        if animatedCanvasSize != bounds.size {
+            animatedCanvasSize = bounds.size
+            updateTravellingDots()
+        }
     }
 
     private func updatePulse() {
+        updateTravellingDots()
         halo.removeAllAnimations()
         halo.opacity = proxyActive ? 0.62 : 0
         guard proxyActive,
@@ -417,6 +439,44 @@ private final class TwinNativeNetworkFabric: NSView {
         shimmer.repeatCount = .infinity
         shimmer.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         halo.add(shimmer, forKey: "networkGlow")
+    }
+
+    private func updateTravellingDots() {
+        let running = proxyActive &&
+            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
+            bounds.width > 100 && bounds.height > 80
+        for (index, dot) in travelDots.enumerated() {
+            dot.removeAllAnimations()
+            dot.opacity = running ? 0.96 : 0
+            guard running else { continue }
+            let side: CGFloat = index.isMultiple(of: 2) ? -1 : 1
+            let lane: CGFloat = index < 2 ? -0.18 : 0.19
+            let x = bounds.midX
+            let y = bounds.midY
+            let path = CGMutablePath()
+            let begin = CGPoint(x: x + side * 20,
+                                y: y + bounds.height * lane * 0.12)
+            let finish = CGPoint(x: x + side * bounds.width * 0.42,
+                                 y: y + bounds.height * lane)
+            path.move(to: begin)
+            path.addCurve(to: finish,
+                control1: CGPoint(
+                    x: x + side * bounds.width * 0.18,
+                    y: y + bounds.height * lane * 0.29),
+                control2: CGPoint(
+                    x: x + side * bounds.width * 0.32,
+                    y: y + bounds.height * lane * 0.90))
+            dot.position = begin
+            let travel = CAKeyframeAnimation(keyPath: "position")
+            travel.path = path
+            travel.calculationMode = .paced
+            travel.duration = index < 2 ? 2.9 : 3.5
+            travel.beginTime = CACurrentMediaTime() +
+                Double(index % 2) * 0.65 + Double(index / 2) * 0.38
+            travel.repeatCount = .infinity
+            travel.isRemovedOnCompletion = false
+            dot.add(travel, forKey: "movingNetworkDot")
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -466,25 +526,8 @@ private final class TwinNativeNetworkFabric: NSView {
                 strand.stroke()
             }
         }
-        // Real verified proxy traffic enables the brighter network nodes.
-        // These are static AppKit paths, never synthetic throughput dots.
-        if proxyActive {
-            for side in [CGFloat(-1), CGFloat(1)] {
-                for (fraction, offset) in [(CGFloat(0.23), CGFloat(-6)),
-                                           (CGFloat(0.36), CGFloat(8))] {
-                    let x = cx + side * rect.width * fraction
-                    let dot = NSBezierPath(ovalIn: NSRect(
-                        x: x - 4, y: cy + offset - 4, width: 8, height: 8))
-                    accent.withAlphaComponent(0.93).setFill()
-                    dot.fill()
-                    let border = NSBezierPath(ovalIn: NSRect(
-                        x: x - 7, y: cy + offset - 7, width: 14, height: 14))
-                    accent.withAlphaComponent(0.19).setStroke()
-                    border.lineWidth = 1.2
-                    border.stroke()
-                }
-            }
-        }
+        // Network nodes move on CAKeyframeAnimation paths above this
+        // vector drawing, so no redraw loop runs on the Mac's CPU.
         let hub = NSBezierPath(roundedRect: NSRect(
             x: cx - 21, y: cy - 24, width: 42, height: 48),
             xRadius: 13, yRadius: 13)
