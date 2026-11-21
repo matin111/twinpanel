@@ -325,6 +325,8 @@ class StandaloneManagerTests(unittest.TestCase):
     def test_safe_naive_fatal_categories_do_not_echo_private_logs(self):
         logfile = self.root / "engine.log"
         cases = {
+            "FATAL[0000] create service: initialize outbound[0]: TLS required":
+                "NAIVE_TLS_REQUIRED",
             "FATAL[0000] cronet: library not found secret=TOP_SECRET":
                 "NAIVE_CRONET_LIBRARY_MISSING",
             "FATAL[0000] unsupported on naive outbound secret=TOP_SECRET":
