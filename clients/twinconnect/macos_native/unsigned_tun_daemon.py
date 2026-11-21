@@ -57,6 +57,9 @@ def daemon_preflight() -> None:
         raise ValueError("LOCAL_CONSOLE_APPROVAL_MISSING")
     if APPROVAL.read_text(encoding="ascii").strip() != "LOCAL_MAC_WITH_RECOVERY":
         raise ValueError("LOCAL_CONSOLE_APPROVAL_INVALID")
+    # Fail closed if there is no signed-in physical console owner.
+    if os.stat("/dev/console").st_uid <= 0:
+        raise ValueError("NO_LOCAL_CONSOLE_OWNER")
     # Not proof that networking is recoverable. Administrator must install
     # only with working physical console or equivalent out-of-band access.
 
@@ -69,24 +72,36 @@ class Session:
         self.owner: int | None = None
         self.started: float | None = None
 
+    def console_owner_present(self) -> bool:
+        """Kill the tunnel when console ownership changes or user logs out."""
+        if self.owner is None:
+            return True
+        try:
+            return os.stat("/dev/console").st_uid == self.owner
+        except OSError:
+            return False
+
     def cleanup(self) -> None:
         with self.lock:
             child = self.process
-            if child is not None and child.poll() is None:
-                try:
-                    os.killpg(child.pid, signal.SIGTERM)
-                    child.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    os.killpg(child.pid, signal.SIGKILL)
-                    child.wait(timeout=5)
-                except ProcessLookupError:
-                    pass
-            self.process = None
-            if self.config is not None:
-                self.config.unlink(missing_ok=True)
-            self.config = None
-            self.owner = None
-            self.started = None
+            # Clear state even if kill fails; do not leave credential files.
+            try:
+                if child is not None and child.poll() is None:
+                    try:
+                        os.killpg(child.pid, signal.SIGTERM)
+                        child.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(child.pid, signal.SIGKILL)
+                        child.wait(timeout=5)
+                    except ProcessLookupError:
+                        pass
+            finally:
+                if self.config is not None:
+                    self.config.unlink(missing_ok=True)
+                self.process = None
+                self.config = None
+                self.owner = None
+                self.started = None
 
     def status(self) -> dict:
         with self.lock:
@@ -94,7 +109,7 @@ class Session:
                 if self.process.poll() is not None or (
                     self.started is not None and
                     time.monotonic() - self.started > MAX_SESSION
-                ):
+                ) or not self.console_owner_present():
                     self.cleanup()
             return {
                 "state": "engine_running_unverified" if self.process else "stopped",
@@ -213,7 +228,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, request_shutdown)
     try:
         while not stop.is_set():
-            session.status()  # reap process and enforce time limit
+            session.status()  # reap, expiry, and console logout cleanup
             try:
                 conn, _ = server.accept()
             except socket.timeout:
