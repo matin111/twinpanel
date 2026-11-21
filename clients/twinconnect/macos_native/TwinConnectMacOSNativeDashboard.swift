@@ -466,6 +466,25 @@ private final class TwinNativeNetworkFabric: NSView {
                 strand.stroke()
             }
         }
+        // Real verified proxy traffic enables the brighter network nodes.
+        // These are static AppKit paths, never synthetic throughput dots.
+        if proxyActive {
+            for side in [CGFloat(-1), CGFloat(1)] {
+                for (fraction, offset) in [(CGFloat(0.23), CGFloat(-6)),
+                                           (CGFloat(0.36), CGFloat(8))] {
+                    let x = cx + side * rect.width * fraction
+                    let dot = NSBezierPath(ovalIn: NSRect(
+                        x: x - 4, y: cy + offset - 4, width: 8, height: 8))
+                    accent.withAlphaComponent(0.93).setFill()
+                    dot.fill()
+                    let border = NSBezierPath(ovalIn: NSRect(
+                        x: x - 7, y: cy + offset - 7, width: 14, height: 14))
+                    accent.withAlphaComponent(0.19).setStroke()
+                    border.lineWidth = 1.2
+                    border.stroke()
+                }
+            }
+        }
         let hub = NSBezierPath(roundedRect: NSRect(
             x: cx - 21, y: cy - 24, width: 42, height: 48),
             xRadius: 13, yRadius: 13)
@@ -1334,6 +1353,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         connect.toolTip = "Unsigned macOS: Hysteria2 loopback SOCKS only. Other apps will not automatically use it; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
+        if localProxyActive {
+            // More vivid green state like the shared Windows design, while
+            // still representing ONLY a verified SOCKS proxy.
+            let mint = NSColor(calibratedRed: 0.07, green: 0.82,
+                               blue: 0.63, alpha: 1)
+            connect.setAccentGradient(
+                mint.withAlphaComponent(0.94),
+                (mint.blended(withFraction: 0.32, of: .black) ?? mint)
+                    .withAlphaComponent(0.90))
+        }
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
         connect.layer?.shadowColor = sea.cgColor
         connect.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 : 0.17
