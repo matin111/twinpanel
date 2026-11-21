@@ -580,6 +580,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var localProxyBusy = false
     private var localProxyStatus = ""
     private var localProxyActive = false
+    // This is set only after a successful HTTPS probe and is independent
+    // of the protocol currently highlighted in the location picker.
+    private var verifiedProxyProtocol: String?
     private var localProxyExitIP: String?
     private var localProxyGeneration = 0
     private var localProxyStartedAt: Date?
@@ -1357,6 +1360,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return side
     }
 
+    private var connectedProtocolTitle: String {
+        guard localProxyActive else { return "" }
+        switch verifiedProxyProtocol {
+        case "hysteria2": return "Hysteria2"
+        case "tuic": return "TUIC"
+        case "anytls": return "AnyTLS"
+        case "socks5": return "SOCKS5"
+        case "snell": return "Snell"
+        default: return "Proxy"
+        }
+    }
+
     private func connectPage() -> NSView {
         let main = stack(spacing: 10)
         main.alignment = .leading
@@ -1366,7 +1381,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let trailingSpace = NSView()
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
-            localProxyActive ? "◉  Proxy active" : "◌  Offline",
+            localProxyActive ? "◉  " + connectedProtocolTitle + " active" :
+                               "◌  Offline",
             color: localProxyActive ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
@@ -1528,7 +1544,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
-            localProxyActive ? "Proxy" : "Disconnected",
+            localProxyActive ? connectedProtocolTitle + " · Proxy" :
+                               "Disconnected",
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -1537,7 +1554,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // The timer remains at zero until a real PacketTunnel is connected.
         let timing = stack(.horizontal, spacing: 8)
         let uptime = text(
-            localProxyActive ? "◷  Proxy session" : "◷  00:00:00",
+            localProxyActive ? "◷  " + connectedProtocolTitle + " session" :
+                               "◷  00:00:00",
             size: 12, color: muted)
         proxyUptimeText = uptime
         timing.addArrangedSubview(uptime)
@@ -2710,6 +2728,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         accountSession = nil
         localProxyGeneration += 1
         localProxyActive = false
+        verifiedProxyProtocol = nil
         localProxyExitIP = nil
         resetTrafficMetrics()
         // Logout is not a VPN stop command; stop the managed loopback
@@ -2863,6 +2882,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.localProxyBusy = false
                 if result.0 == 0 {
                     self.localProxyActive = false
+                    self.verifiedProxyProtocol = nil
                     self.localProxyExitIP = nil
                     self.resetTrafficMetrics()
                     self.localProxyStatus = "Disconnected."
@@ -3078,7 +3098,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let startedAt = localProxyStartedAt {
             let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
             proxyUptimeText?.stringValue = String(
-                format: "◷  Proxy session  %02d:%02d:%02d",
+                format: "◷  " + connectedProtocolTitle + "  %02d:%02d:%02d",
                 elapsed / 3600, (elapsed / 60) % 60, elapsed % 60)
         }
         trafficPollBusy = true
@@ -3257,6 +3277,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         }
                         self.localProxyBusy = false
                         self.localProxyActive = outcome.0
+                        self.verifiedProxyProtocol = outcome.0 ?
+                            selectedProtocol : nil
                         self.localProxyExitIP = outcome.2
                         self.resetTrafficMetrics()
                         self.localProxyStartedAt = outcome.0 ? Date() : nil
@@ -3469,6 +3491,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
             "Hysteria2 entitled/configured: " + (hysteriaAvailable ? "yes" : "no"),
             "Protocol selected: " + (activeProtocol ?? "none"),
+            "Proxy verified protocol: " + (verifiedProxyProtocol ?? "none"),
             "Server selected: " + (activeServer == nil ? "no" : "yes"),
             "TUN preflight: " + (status.contains("TUN") ? status : "not run"),
             "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus)
