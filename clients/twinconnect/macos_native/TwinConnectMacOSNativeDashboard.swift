@@ -1449,6 +1449,28 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // Cisco uses OpenConnect, not the SOCKS proxy launcher. Offer the
+        // panel-authorized login check directly for a selected Cisco location.
+        // An unsigned application cannot claim that this creates a VPN tunnel.
+        if activeProtocol == "cisco" {
+            let ciscoAction = button(ciscoAuthBusy ?
+                "Verifying Cisco login…" : "Verify Cisco login (no VPN)",
+                action: #selector(testCiscoAuthentication(_:)),
+                mutedButton: true)
+            ciscoAction.isEnabled = !ciscoAuthBusy && accountSession != nil &&
+                activeServer != nil &&
+                snapshot?.protocols.contains(where: {
+                    $0.code == "cisco" && $0.configured
+                }) == true
+            ciscoAction.heightAnchor.constraint(equalToConstant: 40).isActive = true
+            ciscoAction.toolTip = "OpenConnect authentication only. No TUN, DNS, routes or system-wide VPN."
+            main.addArrangedSubview(ciscoAction)
+            ciscoAction.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+            if !ciscoAuthStatus.isEmpty {
+                main.addArrangedSubview(text(ciscoAuthStatus, size: 11,
+                                             color: muted))
+            }
+        }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
