@@ -130,15 +130,22 @@ class _MacStandaloneConnectionCardState
       _message = 'Checking current subscription permissions…';
     });
     try {
-      // Development binaries installed by install_standalone_engines.sh.
-      // A sandboxed/released app may not be allowed to spawn processes;
-      // errors must be displayed instead of claiming a connection.
-      final home = Platform.environment['HOME'];
-      if (home == null || home.isEmpty) {
-        throw const FormatException('MAC_STANDALONE_HOME_UNAVAILABLE');
+      // Bundled engines are authoritative. The checkout fallback only
+      // supports older developer builds without embedded engines.
+      // A sandboxed app may still refuse child process creation; this is
+      // reported as failure, never mistaken for a connected system VPN.
+      final packaged = MacStandaloneProxyRuntime.packagedEngineRoot();
+      final Directory engineRoot;
+      if (packaged != null) {
+        engineRoot = packaged;
+      } else {
+        final home = Platform.environment['HOME'];
+        if (home == null || home.isEmpty) {
+          throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INSTALLED');
+        }
+        engineRoot = Directory(
+            '$home/twinpanel/clients/twinconnect/macos_native/build');
       }
-      final engineRoot = Directory(
-          '$home/twinpanel/clients/twinconnect/macos_native/build');
       final archResult = await Process.run('/usr/bin/uname', ['-m'])
           .timeout(const Duration(seconds: 4));
       if (archResult.exitCode != 0) {
