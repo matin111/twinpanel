@@ -320,5 +320,66 @@ class StandaloneManagerTests(unittest.TestCase):
         spawned.assert_not_called()
 
 
+    def test_measured_profile_is_private_and_source_unchanged(self):
+        source = self.config({
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 17089}],
+            "outbounds": [{"type": "hysteria2", "tag": "proxy"}],
+        })
+        original = source.read_bytes()
+        with mock.patch.object(manager, "STATE", self.root / "private"):
+            runtime, port, secret = manager.measured_runtime_config("hysteria2", source)
+            self.assertNotEqual(runtime, source)
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(runtime.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(runtime.parent.stat().st_mode & 0o777, 0o700)
+            self.assertTrue(1024 <= port <= 65535)
+            self.assertGreaterEqual(len(secret), 32)
+            generated = json.loads(runtime.read_text())
+            api = generated["experimental"]["clash_api"]
+            self.assertEqual(api["external_controller"], f"127.0.0.1:{port}")
+            self.assertEqual(api["secret"], secret)
+            self.assertFalse(api["access_control_allow_private_network"])
+            manager.cleanup_runtime_config({"managed_profile": str(runtime)})
+            self.assertFalse(runtime.exists())
+
+    def test_traffic_reads_authenticated_local_counter_without_secrets(self):
+        secret = "a" * 48
+        state = {"pid": 42, "protocol": "hysteria2",
+                 "metrics_port": 17293, "metrics_secret": secret}
+        connection = mock.Mock()
+        reply = connection.getresponse.return_value
+        reply.status = 200
+        reply.read.return_value = b'{"uploadTotal":2345,"downloadTotal":6789}'
+        with mock.patch.object(manager, "read_state", return_value=state), \\
+             mock.patch.object(manager, "process_matches", return_value=True), \\
+             mock.patch.object(manager.http.client, "HTTPConnection",
+                               return_value=connection) as client:
+            result = manager.traffic()
+        client.assert_called_once_with("127.0.0.1", 17293, timeout=2)
+        request = connection.request.call_args
+        self.assertEqual(request.args[:2], ("GET", "/connections"))
+        self.assertEqual(request.kwargs["headers"]["Authorization"],
+                         "Bearer " + secret)
+        self.assertEqual(result["download_bytes"], 6789)
+        self.assertEqual(result["upload_bytes"], 2345)
+        self.assertEqual(result["mode"], "local_proxy_only")
+        self.assertNotIn(secret, repr(result))
+
+    def test_traffic_unavailable_does_not_fabricate_counters(self):
+        state = {"pid": 42, "metrics_port": 17293,
+                 "metrics_secret": "a" * 48}
+        connection = mock.Mock()
+        reply = connection.getresponse.return_value
+        reply.status = 200
+        reply.read.return_value = b'{"connections":[]}'
+        with mock.patch.object(manager, "read_state", return_value=state), \\
+             mock.patch.object(manager, "process_matches", return_value=True), \\
+             mock.patch.object(manager.http.client, "HTTPConnection",
+                               return_value=connection):
+            with self.assertRaisesRegex(ValueError, "TRAFFIC_MONITOR_UNAVAILABLE"):
+                manager.traffic()
+
+
 if __name__ == "__main__":
     unittest.main()
