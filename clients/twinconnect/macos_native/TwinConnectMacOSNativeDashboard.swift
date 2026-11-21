@@ -3000,7 +3000,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             encoding: .utf8)
         let mgmt = configured?.trimmingCharacters(in: .whitespacesAndNewlines)
             ?? ""
-        guard mgmt.range(of:
+        guard mgmt == "desktop" || mgmt.range(of:
             "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
             options: .regularExpression) != nil else {
             ciscoTunnelStatus = "CISCO_MANAGEMENT_ROUTE_NOT_CONFIGURED"
