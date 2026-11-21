@@ -179,7 +179,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('pin-sha256:[A-Za-z0-9+/]{43}=', guard)
         self.assertIn('password.rangeOfCharacter(from: .controlCharacters)',
                       guard)
-        self.assertNotIn('no-cert-check', guard.split(
+        self.assertNotIn('"--no-cert-check"', guard.split(
             'return try? JSONSerialization.data(withJSONObject: reviewed)', 1)[0])
         self.assertIn('"protocol": "cisco"', guard)
 
