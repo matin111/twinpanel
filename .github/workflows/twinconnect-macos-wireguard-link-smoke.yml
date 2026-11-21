@@ -1,0 +1,112 @@
+name: TwinConnect macOS WireGuardKit Native Link Smoke
+
+on:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/**'
+      - '.github/workflows/twinconnect-macos-wireguard-link-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-wireguard-link-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wireguard-macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.19.13'
+      - name: Check native tools
+        run: |
+          go version
+          xcodebuild -version
+          ruby --version
+          gem install xcodeproj --no-document
+      - name: Fetch pinned upstream WireGuard and adapt Swift package manifest
+        run: |
+          set -euo pipefail
+          git clone https://github.com/WireGuard/wireguard-apple.git macos_native/vendor-wireguard-apple
+          cd macos_native/vendor-wireguard-apple
+          git checkout --detach 2fec12a6e1f6e3460b6ee483aa00ad29cddadab1
+          test "$(git rev-parse HEAD)" = "2fec12a6e1f6e3460b6ee483aa00ad29cddadab1"
+          cd ../..
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('macos_native/vendor-wireguard-apple/Package.swift')
+          s = p.read_text()
+          assert s.startswith('// swift-tools-version:5.3')
+          assert '.macOS(.v12)' in s and '.iOS(.v15)' in s
+          p.write_text(s.replace('// swift-tools-version:5.3',
+                                 '// swift-tools-version:5.5', 1))
+          # Xcode 16's Clang modules now require explicit Darwin integer types.
+          # Only patch the temporary pinned upstream checkout for CI.
+          header = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKitC/WireGuardKitC.h')
+          h = header.read_text()
+          assert '#include "key.h"' in h
+          assert '#include <sys/types.h>' not in h
+          header.write_text(h.replace('#include "key.h"',
+                                     '#include <sys/types.h>\n#include "key.h"', 1))
+          # Avoid the overly generic KEY_H include guard colliding with
+          # Xcode 16's Darwin SDK headers when C modules are imported by Swift.
+          key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKitC/key.h')
+          key_src = key.read_text()
+          assert '#ifndef KEY_H' in key_src and '#define KEY_H' in key_src
+          key_src = key_src.replace('#ifndef KEY_H', '#ifndef TWINCONNECT_WGK_KEY_H', 1)
+          key_src = key_src.replace('#define KEY_H', '#define TWINCONNECT_WGK_KEY_H', 1)
+          key.write_text(key_src)
+          # Explicit C-module import for Xcode's local Swift package build;
+          # avoid relying on the SWIFT_PACKAGE conditional build flag.
+          private_key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKit/PrivateKey.swift')
+          swift = private_key.read_text()
+          conditional = '#if SWIFT_PACKAGE\nimport WireGuardKitC\n#endif'
+          assert conditional in swift
+          private_key.write_text(swift.replace(conditional, 'import WireGuardKitC', 1))
+          PY
+      - name: Generate unsigned Mac project and native Packet Tunnel
+        run: |
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby macos_native/link_wireguardkit.rb
+      - name: Resolve pinned official WireGuardKit
+        run: |
+          xcodebuild -resolvePackageDependencies -project macos/Runner.xcodeproj
+          test -f macos_native/vendor-wireguard-apple/Package.swift
+      - name: Compile upstream wireguard-go bridge
+        run: |
+          bash macos_native/build_wireguard_go.sh "$PWD/macos_native/vendor-wireguard-apple"
+      - name: Compile linked macOS PacketTunnel (unsigned)
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/mac-wireguard-xcodebuild.log"
+          if ! xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
+            -configuration Release -sdk macosx -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            echo "====== Native compiler diagnostics ======"
+            grep -n -E -C 3 "error:|fatal error:|Undefined symbols|ld: |BUILD FAILED" "$log" | tail -170 || true
+            echo "====== Build log tail ======"
+            tail -40 "$log"
+            exit 1
+          fi
+          tail -35 "$log"
+      - name: Validate compiled artifacts
+        run: |
+          test -s macos_native/build/wireguard/libwg-go.a
+          echo "WireGuardKit linked: compile-only validation."
+          echo "Apple entitlement, VPN handshake and user traffic: NOT VERIFIED."

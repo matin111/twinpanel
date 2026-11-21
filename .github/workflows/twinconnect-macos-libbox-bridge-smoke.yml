@@ -1,0 +1,149 @@
+name: TwinConnect macOS Libbox Framework Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - '.github/workflows/twinconnect-macos-libbox-bridge-smoke.yml'
+      - 'clients/twinconnect/macos_native/libbox/**'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: twinconnect-macos-libbox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-libbox-macos:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Reuse prior verified Libbox build for faster Swift-only regression checks
+        id: reuse
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: TwinConnect-macOS-Libbox-Unsigned-Framework
+          repository: matin111/twinpanel
+          run-id: 43791177981
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/libbox-verified
+      - name: Verify or reject reused framework
+        id: restored
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/libbox-verified"
+          target="$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox/Libbox.xcframework"
+          if test -f "$source/Libbox.xcframework/Info.plist"; then
+            mkdir -p "$(dirname "$target")"
+            ditto "$source/Libbox.xcframework" "$target"
+          elif test -f "$source/Info.plist"; then
+            mkdir -p "$(dirname "$target")"
+            ditto "$source" "$target"
+          fi
+          # GitHub artifact archives flatten symbolic links. Restore the
+          # canonical macOS framework bundle links before Xcode embeds it.
+          if test -f "$target/Info.plist"; then
+            for framework in "$target"/*/Libbox.framework; do
+              test -d "$framework/Versions/A" || continue
+              test -s "$framework/Versions/A/Libbox" || exit 1
+              rm -rf "$framework/Versions/Current"
+              ln -s A "$framework/Versions/Current"
+              for entry in Libbox Headers Modules Resources; do
+                if test -e "$framework/Versions/A/$entry"; then
+                  rm -rf "$framework/$entry"
+                  ln -s "Versions/Current/$entry" "$framework/$entry"
+                fi
+              done
+              test -L "$framework/Versions/Current"
+              test -L "$framework/Libbox"
+              test -s "$framework/Libbox"
+              echo "Restored macOS Libbox framework symlinks: $framework"
+            done
+          fi
+          if test -f "$target/Info.plist" &&
+             plutil -lint "$target/Info.plist"; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'Using CI-verified Libbox macOS artifact from successful source build'
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'No reusable Libbox artifact; will build pinned official source'
+          fi
+      - name: Build official in-process sing-box Libbox macOS framework
+        if: steps.restored.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          go version
+          git clone --depth 1 --branch v1.14.4 https://github.com/SagerNet/sing-box.git "$RUNNER_TEMP/sing-box"
+          cd "$RUNNER_TEMP/sing-box"
+          test "$(git describe --tags --exact-match HEAD)" = "v1.14.4"
+          go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          "$(go env GOPATH)/bin/gomobile" init
+          go run ./cmd/internal/build_libbox -target apple -platform macos
+          test -d Libbox.xcframework
+          find Libbox.xcframework -maxdepth 3 -type f | head -30
+          plutil -lint Libbox.xcframework/Info.plist
+          test -s Libbox.xcframework/Info.plist
+          mkdir -p "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox"
+          ditto Libbox.xcframework "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox/Libbox.xcframework"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Compile native Libbox inside macOS PacketTunnel (unsigned)
+        shell: bash
+        working-directory: clients/twinconnect
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby macos_native/libbox/link_libbox_packet_tunnel.rb
+          # Do not silently pass a link-only test with engine sources omitted.
+          for source in TwinConnectMacLibboxPlatform.swift TwinConnectMacLibboxEngine.swift; do
+            grep -q "$source" macos/Runner.xcodeproj/project.pbxproj
+          done
+          log="$RUNNER_TEMP/twinconnect-libbox-extension.log"
+          if ! xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
+            -configuration Release -sdk macosx -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            grep -nE -C 3 'error:|fatal error:|Undefined symbols|BUILD FAILED' "$log" | tail -150 || true
+            tail -50 "$log"
+            exit 1
+          fi
+          tail -20 "$log"
+          # Upstream gomobile produces a static Go archive inside the
+          # framework bundle; it is linked into the extension, not embedded
+          # as a dynamic framework. otool -L cannot report static archives.
+          packet="$(find macos/build -type f -path '*/PacketTunnel.appex/Contents/MacOS/PacketTunnel' -print -quit)"
+          test -n "$packet"
+          nm -g "$packet" > "$RUNNER_TEMP/packet-tunnel-symbols.txt"
+          grep -E '(_LibboxSetup|_LibboxNewCommandServer|OBJC_CLASS_.*Libbox)' "$RUNNER_TEMP/packet-tunnel-symbols.txt"
+          echo "PacketTunnel static Libbox ObjC/Go symbol linkage verified: $packet"
+          echo 'Libbox PlatformInterface and engine compiled; signed live traffic NOT VERIFIED'
+      - name: Verify this is not a signed or connected VPN
+        shell: bash
+        run: |
+          test -d clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
+          echo 'Unsigned Libbox PacketTunnel compiled; real signed runtime and egress NOT VERIFIED'
+          echo 'No entitlement, signed extension, VPN connection, DNS protection, handshake, or traffic claims'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Libbox-Unsigned-Framework
+          path: clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
+          retention-days: 7
+          if-no-files-found: error
