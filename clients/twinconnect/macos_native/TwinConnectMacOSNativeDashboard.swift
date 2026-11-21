@@ -1607,15 +1607,34 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             content.addArrangedSubview(traffic)
             traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         } else {
-            // Hide non-existent exit IP, throughput and uptime entirely.
-            content.addArrangedSubview(text(
-                "No active VPN tunnel. Select a supported protocol to connect.",
-                size: 13, color: muted))
+            // Keep the full Network dashboard visible even before connection.
+            // Never imply an exit IP or throughput has been verified offline.
+            let network = stack(.horizontal, spacing: 10)
+            network.distribution = .fillEqually
+            network.addArrangedSubview(networkMetric("Server ping",
+                value: pingText(selected), valueColor: pingColor(selected)))
+            network.addArrangedSubview(networkMetric("Exit IP", value: "—"))
+            content.addArrangedSubview(network)
+            network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+            let traffic = stack(.horizontal, spacing: 10)
+            traffic.distribution = .fillEqually
+            traffic.addArrangedSubview(networkMetric("Download",
+                value: "—", subtitle: "Total: —"))
+            traffic.addArrangedSubview(networkMetric("Upload",
+                value: "—", subtitle: "Total: —"))
+            content.addArrangedSubview(traffic)
+            traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
             if activeProtocol == "cisco" {
                 content.addArrangedSubview(text(
                     ciscoTunnelStatus.isEmpty ?
                     "Cisco tunnel not verified." : ciscoTunnelStatus,
                     size: 12, color: amber))
+            } else {
+                content.addArrangedSubview(text(
+                    "Disconnected · Traffic and exit IP not yet verified.",
+                    size: 11, color: muted))
             }
         }
 
