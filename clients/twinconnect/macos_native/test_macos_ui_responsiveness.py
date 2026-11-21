@@ -19,6 +19,15 @@ class NativeUIResponsivenessTests(unittest.TestCase):
         self.assertIn("guard !pingRedrawScheduled else { return }", source)
         self.assertIn("deadline: .now() + 0.3", source)
 
+    def test_cloud_lightweight_render_budget(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn('TWINCONNECT_MAC_LIGHTWEIGHT_UI', source)
+        self.assertIn('blur.alphaValue = TwinNativeRenderBudget.lightweight ? 0 : 0.14', source)
+        self.assertIn('if TwinNativeRenderBudget.lightweight { blur.state = .inactive }', source)
+        self.assertIn('if TwinNativeRenderBudget.lightweight { return }', source)
+        self.assertIn('box.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 :', source)
+        self.assertIn('guard !TwinNativeRenderBudget.lightweight,', source)
+
     def test_ping_process_runs_off_main_thread(self):
         source = (SOURCE.parent / "TwinConnectMacOSNativeDirectory.swift"
                   ).read_text(encoding="utf-8")
