@@ -309,6 +309,59 @@ private final class TwinNativeGlassCard: NSView {
     }
 }
 
+// Compact traffic chart. Every point comes from a successful measurement of
+// this local Hysteria2 proxy; zero throughput is drawn as a flat line.
+private final class TwinNativeTrafficSparkline: NSView {
+    var samples: [Double] = [] {
+        didSet { needsDisplay = true }
+    }
+    var accent = NSColor(calibratedRed: 0.18, green: 0.90,
+                         blue: 0.77, alpha: 1) {
+        didSet { needsDisplay = true }
+    }
+    override var isOpaque: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let rect = bounds.insetBy(dx: 2, dy: 3)
+        guard rect.width > 0, rect.height > 0 else { return }
+        let baseline = NSBezierPath()
+        baseline.move(to: CGPoint(x: rect.minX, y: rect.minY + 2))
+        baseline.line(to: CGPoint(x: rect.maxX, y: rect.minY + 2))
+        accent.withAlphaComponent(0.17).setStroke()
+        baseline.lineWidth = 0.8
+        baseline.stroke()
+        guard samples.count >= 2 else { return }
+        let peak = max(samples.max() ?? 0, 1024.0)
+        let points = samples.enumerated().map { index, value -> CGPoint in
+            let x = rect.minX + rect.width * CGFloat(index) /
+                CGFloat(max(1, samples.count - 1))
+            let y = rect.minY + 2 + CGFloat(max(0, value) / peak) *
+                max(1, rect.height - 5)
+            return CGPoint(x: x, y: y)
+        }
+        let line = NSBezierPath()
+        line.move(to: points[0])
+        for point in points.dropFirst() { line.line(to: point) }
+        let fill = NSBezierPath()
+        fill.move(to: CGPoint(x: points[0].x, y: rect.minY + 2))
+        for point in points { fill.line(to: point) }
+        fill.line(to: CGPoint(x: points[points.count - 1].x,
+                              y: rect.minY + 2))
+        fill.close()
+        accent.withAlphaComponent(0.10).setFill()
+        fill.fill()
+        if !TwinNativeRenderBudget.lightweight {
+            accent.withAlphaComponent(0.20).setStroke()
+            line.lineWidth = 4
+            line.stroke()
+        }
+        accent.withAlphaComponent(0.94).setStroke()
+        line.lineWidth = 1.65
+        line.stroke()
+    }
+}
+
 // Lightweight vector hero: visible while offline, subtly animated only
 // when the verified Hysteria2 SOCKS listener is active. It never signals VPN.
 private final class TwinNativeNetworkFabric: NSView {
