@@ -51,6 +51,11 @@ def package(binary: Path, output: Path, arch: str) -> int:
     while waiting:
         obj = waiting.pop()
         for dep in dependencies(obj):
+            # otool -L includes each dylib's *own install name* as its
+            # first entry. It is metadata, not another library to copy.
+            # Rewriting it with install_name_tool -id happens below.
+            if obj != executable and dep.startswith(BREW_PREFIXES) and Path(dep).name == obj.name:
+                continue
             if dep.startswith(SYSTEM_PREFIXES) or dep.startswith("@"):
                 continue
             if not dep.startswith(BREW_PREFIXES):
