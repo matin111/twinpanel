@@ -68,6 +68,35 @@ def daemon_preflight() -> None:
     # only with working physical console or equivalent out-of-band access.
 
 
+def observe_route() -> dict:
+    """Read-only macOS route observation, not proof of tunneled egress.
+
+    The selected route is merely observed, so system_vpn_verified remains false.
+    The daemon never changes routes or DNS to perform this check.
+    """
+    if platform.system() != "Darwin":
+        return {"route_state": "not_macos"}
+    try:
+        result = subprocess.run(
+            ["/sbin/route", "-n", "get", "1.1.1.1"],
+            check=False, capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return {"route_state": "unavailable"}
+    if result.returncode != 0 or len(result.stdout) > 16384:
+        return {"route_state": "unavailable"}
+    interface = None
+    for line in result.stdout.splitlines():
+        key, sep, value = line.strip().partition(":")
+        if sep and key == "interface":
+            interface = value.strip()
+            break
+    if not interface or not interface.isascii():
+        return {"route_state": "unavailable"}
+    if interface.startswith("utun") and interface[4:].isdigit():
+        return {"route_state": "utun_route_observed_unverified"}
+    return {"route_state": "not_utun_route"}
+
+
 class Session:
     def __init__(self) -> None:
         self.lock = threading.RLock()
@@ -119,12 +148,15 @@ class Session:
                     time.monotonic() - self.started > MAX_SESSION
                 ) or not self.console_owner_present():
                     self.cleanup()
-            return {
+            status = {
                 "state": "engine_running_unverified" if self.process else "stopped",
                 "system_vpn_verified": False,
                 "owner_present": self.owner is not None,
                 "maximum_session_seconds": MAX_SESSION,
             }
+            if self.process is not None:
+                status.update(observe_route())
+            return status
 
     def start(self, uid: int, profile: object) -> dict:
         with self.lock:
