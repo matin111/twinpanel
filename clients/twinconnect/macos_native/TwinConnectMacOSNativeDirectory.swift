@@ -974,13 +974,14 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         // credential-bearing proxy. DNS names are rechecked by the OS.
         if host == "localhost" || host.hasSuffix(".localhost") ||
             host == "0.0.0.0" || host == "::1" { return nil }
-        if host.contains(":") || host.first?.isNumber == true {
-            // For IP literals, force globally routable addresses; for valid
-            // DNS names containing digits, allow only a conservative charset.
-            if TwinMacNativePing.validatedPublicIP(host) == nil &&
-                host.range(of: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$",
-                           options: .regularExpression) == nil { return nil }
-        }
+        // Require a public IP literal or a conservative DNS name. A private
+        // dotted IPv4 value must never pass through the hostname fallback.
+        let domainName = host.range(
+            of: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$",
+            options: .regularExpression) != nil &&
+            host.rangeOfCharacter(from: .letters) != nil
+        guard TwinMacNativePing.validatedPublicIP(host) != nil || domainName
+        else { return nil }
         var reviewed: [String: Any] = [
             "type": type, "tag": "proxy",
             "server": host, "server_port": port
