@@ -86,6 +86,25 @@ class StandaloneManagerTests(unittest.TestCase):
             self.assertNotEqual(listed[code]["state"], "proxy_engine_present")
 
 
+    def test_listener_waits_until_proxy_port_is_ready(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        sock = mock.MagicMock()
+        with mock.patch.object(manager.socket, "create_connection",
+                               side_effect=[ConnectionRefusedError(), sock]) as conn, \
+             mock.patch.object(manager.time, "sleep"):
+            manager.wait_for_local_listener(process, 17089)
+        self.assertEqual(conn.call_count, 2)
+        conn.assert_called_with(("127.0.0.1", 17089), timeout=0.2)
+
+    def test_listener_exited_before_ready(self):
+        process = mock.Mock()
+        process.poll.return_value = 1
+        with self.assertRaisesRegex(
+            ValueError, "^ENGINE_EXITED_BEFORE_PROXY_READY$"
+        ):
+            manager.wait_for_local_listener(process, 17089)
+
     def test_safe_last_attempt_is_available_when_engine_stopped(self):
         with mock.patch.object(manager, "STATE", self.root / "state"):
             self.assertEqual(manager.last_attempt(), {"state": "not_recorded"})
@@ -392,8 +411,10 @@ class StandaloneManagerTests(unittest.TestCase):
              mock.patch.object(manager, "read_state", return_value=None), \
              mock.patch.object(manager.subprocess, "Popen", return_value=fake_proc), \
              mock.patch.object(manager.time, "sleep"), \
+             mock.patch.object(manager, "wait_for_local_listener") as ready, \
              mock.patch.object(manager, "save_state"):
             result = manager.start("hysteria2", cfg)
+        ready.assert_called_once_with(fake_proc, 17089)
         self.assertEqual(result["state"], "process_running_unverified")
         self.assertEqual(log.read_text(), "")
 
