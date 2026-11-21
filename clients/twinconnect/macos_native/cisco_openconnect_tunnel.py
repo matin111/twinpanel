@@ -16,7 +16,6 @@ import re
 import signal
 import subprocess
 import sys
-import time
 
 from cisco_openconnect_auth import validate, binary
 
@@ -43,9 +42,12 @@ def management_route(ip: str) -> tuple[str, str]:
             or not gateway):
         raise ValueError("CISCO_MANAGEMENT_ROUTE_UNKNOWN")
     try:
-        if not ipaddress.ip_address(gateway).is_global:
-            raise ValueError("CISCO_MANAGEMENT_ROUTE_UNSAFE")
+        gateway_ip = ipaddress.ip_address(gateway)
     except ValueError:
+        raise ValueError("CISCO_MANAGEMENT_ROUTE_UNSAFE")
+    if (gateway_ip.version != 4 or gateway_ip.is_loopback or
+            gateway_ip.is_link_local or gateway_ip.is_multicast or
+            gateway_ip.is_unspecified):
         raise ValueError("CISCO_MANAGEMENT_ROUTE_UNSAFE")
     return gateway, interface
 
@@ -59,6 +61,11 @@ def run(profile: dict, management_ip: str) -> int:
     gateway, _ = management_route(management_ip)
     protected = False
     child = None
+    def requested_stop(_signum, _frame):
+        raise KeyboardInterrupt
+
+    previous_term = signal.signal(signal.SIGTERM, requested_stop)
+    previous_int = signal.signal(signal.SIGINT, requested_stop)
     try:
         route_add = subprocess.run(
             [ROUTE, "-n", "add", "-host", management_ip, gateway],
@@ -84,8 +91,13 @@ def run(profile: dict, management_ip: str) -> int:
         child.stdin.close()
         print(json.dumps({"state": "cisco_tunnel_starting",
                           "vpn_connected": False}), flush=True)
-        return child.wait()
+        try:
+            return child.wait()
+        except KeyboardInterrupt:
+            return 0
     finally:
+        signal.signal(signal.SIGTERM, previous_term)
+        signal.signal(signal.SIGINT, previous_int)
         if child is not None and child.poll() is None:
             child.terminate()
             try:
