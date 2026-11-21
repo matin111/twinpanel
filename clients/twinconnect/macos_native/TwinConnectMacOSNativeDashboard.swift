@@ -581,6 +581,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var localProxyStatus = ""
     private var ciscoAuthBusy = false
     private var ciscoAuthStatus = ""
+    private var ciscoTunnelBusy = false
+    private var ciscoTunnelStatus = ""
+    private var ciscoTunnelTask: Process?
+    private var ciscoTunnelGeneration = 0
     private let proxyAttemptQueue = DispatchQueue(
         label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
     private var localProxyActive = false
@@ -1418,14 +1422,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             "Cisco VPN unavailable" :
+                             (ciscoTunnelBusy ? "Cisco connecting…" :
+                              (ciscoTunnelTask != nil ? "Disconnect Cisco" :
+                                                       "Connect Cisco")) :
                              (localProxyActive ? "ϟ    Disconnect     ›" :
                                                  "ϟ    Connect     ›"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy &&
-            activeProtocol != "cisco"
+            (activeProtocol != "cisco" || !ciscoTunnelBusy)
         connect.toolTip = activeProtocol == "cisco" ?
-            "Cisco needs a privileged network tunnel. Login test is in Settings." :
+            "Requires installed root-owned helper, explicit management route and authorized sudo." :
             "Unsigned macOS: local SOCKS proxy only; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
@@ -1454,11 +1460,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // Cisco auth-only checks are diagnostics, never the primary connection.
+        // Cisco status comes from the privileged engine, never the login test.
         if activeProtocol == "cisco" {
             main.addArrangedSubview(text(
-                "Cisco VPN is not available in this unsigned build. " +
-                "Use Settings to test authentication only.",
+                ciscoTunnelStatus.isEmpty ?
+                "Cisco needs an installed privileged helper and route protection." :
+                ciscoTunnelStatus,
                 size: 11, color: muted))
         }
         // Diagnostics, emergency shutdown and technical warnings belong
@@ -1605,7 +1612,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 size: 13, color: muted))
             if activeProtocol == "cisco" {
                 content.addArrangedSubview(text(
-                    "Cisco login was verified, but a system tunnel is not installed.",
+                    ciscoTunnelStatus.isEmpty ?
+                    "Cisco tunnel not verified." : ciscoTunnelStatus,
                     size: 12, color: amber))
             }
         }
@@ -2933,6 +2941,143 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    // The root-owned launcher must be installed separately by an administrator.
+    // Do not elevate a writable script from the user's checkout.
+    private func ciscoInstalledHelper() -> String? {
+        let path = "/usr/local/libexec/twinconnect/cisco_openconnect_tunnel.py"
+        let companion = "/usr/local/libexec/twinconnect/cisco_openconnect_auth.py"
+        for candidate in [path, companion] {
+            guard let attr = try? FileManager.default.attributesOfItem(atPath: candidate),
+                  let owner = attr[.ownerAccountID] as? NSNumber,
+                  owner.intValue == 0,
+                  let permissions = attr[.posixPermissions] as? NSNumber,
+                  (permissions.intValue & 0o022) == 0 else { return nil }
+        }
+        return path
+    }
+
+    @objc private func requestCiscoTunnel(_ sender: NSButton) {
+        if let existing = ciscoTunnelTask {
+            ciscoTunnelStatus = "Stopping Cisco tunnel…"
+            existing.terminate()
+            view = build()
+            return
+        }
+        guard !ciscoTunnelBusy, let session = accountSession,
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "cisco" && $0.configured
+              }) == true else {
+            ciscoTunnelStatus = "Choose a configured Cisco location."
+            view = build()
+            return
+        }
+        guard let helper = ciscoInstalledHelper() else {
+            ciscoTunnelStatus = "CISCO_PRIVILEGED_HELPER_NOT_INSTALLED"
+            view = build()
+            return
+        }
+        let mgmt = ProcessInfo.processInfo.environment[
+            "TWINCONNECT_CISCO_MANAGEMENT_IPV4"] ?? ""
+        guard mgmt.range(of:
+            "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+            options: .regularExpression) != nil else {
+            ciscoTunnelStatus = "CISCO_MANAGEMENT_ROUTE_NOT_CONFIGURED"
+            view = build()
+            return
+        }
+        ciscoTunnelBusy = true
+        ciscoTunnelStatus = "Checking Cisco profile and permissions…"
+        ciscoTunnelGeneration += 1
+        let generation = ciscoTunnelGeneration
+        view = build()
+        directory.prepareCiscoAuthentication(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            guard self.ciscoTunnelGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else {
+                return
+            }
+            switch result {
+            case .failure(let error):
+                self.ciscoTunnelBusy = false
+                self.ciscoTunnelStatus = "CISCO_PROFILE_UNAVAILABLE: " +
+                    (error.localizedDescription.range(
+                        of: "^[A-Z0-9_]{3,64}$",
+                        options: .regularExpression) != nil ?
+                     error.localizedDescription : "PROFILE_ERROR")
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    self.launchCiscoTunnel(profile, helper: helper,
+                                           managementIP: mgmt,
+                                           generation: generation)
+                }
+            }
+        }
+    }
+
+    private func launchCiscoTunnel(_ profile: Data, helper: String,
+                                   managementIP: String, generation: Int) {
+        // No sudo password prompt or automated sudoers changes.
+        // An administrator must explicitly authorize this fixed root-owned command.
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n", "/usr/bin/python3", helper, "connect",
+                          managementIP]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { task.terminate(); return }
+                if self.ciscoTunnelGeneration == generation {
+                    self.ciscoTunnelTask = task
+                    self.ciscoTunnelBusy = false
+                    self.ciscoTunnelStatus = "Cisco starting; VPN not verified."
+                    self.view = self.build()
+                } else { task.terminate() }
+            }
+            // Consume all bounded output only as sanitized state codes.
+            // Never show cookies, credentials, raw stderr or process messages.
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            let lines = String(data: data.prefix(16384), encoding: .utf8) ?? ""
+            let states = lines.split(separator: "\n").compactMap { line -> String? in
+                guard let obj = try? JSONSerialization.jsonObject(
+                    with: Data(line.utf8)) as? [String: Any] else { return nil }
+                return obj["reason"] as? String
+            }
+            let reason = states.last ?? "CISCO_TUNNEL_STOPPED"
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.ciscoTunnelGeneration == generation else { return }
+                self.ciscoTunnelTask = nil
+                self.ciscoTunnelBusy = false
+                self.ciscoTunnelStatus = reason.range(
+                    of: "^CISCO_[A-Z0-9_]{3,64}$",
+                    options: .regularExpression) != nil ?
+                    reason : "CISCO_TUNNEL_STOPPED"
+                self.view = self.build()
+            }
+        } catch {
+            input.fileHandleForWriting.closeFile()
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.ciscoTunnelGeneration == generation else { return }
+                self.ciscoTunnelBusy = false
+                self.ciscoTunnelTask = nil
+                self.ciscoTunnelStatus = "CISCO_PRIVILEGED_LAUNCH_FAILED"
+                self.view = self.build()
+            }
+        }
+    }
+
     @objc private func testCiscoAuthentication(_ sender: NSButton) {
         guard !ciscoAuthBusy,
               let session = accountSession,
@@ -3372,8 +3517,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return
         }
         if activeProtocol == "cisco" {
-            status = "Cisco VPN requires a provisioned network tunnel."
-            view = build()
+            requestCiscoTunnel(sender)
             return
         }
         let enabled: Set<String> = [
