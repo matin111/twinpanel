@@ -58,7 +58,12 @@ def run(profile: dict, management_ip: str) -> int:
     exe = binary()
     if exe is None or not os.path.isfile(SCRIPT):
         raise ValueError("CISCO_ENGINE_UNAVAILABLE")
-    gateway, _ = management_route(management_ip)
+    # "desktop" is an explicit installer-authorized mode for a locally
+    # controlled Mac. It is never selected automatically on a remote Mac.
+    local_desktop = management_ip == "desktop"
+    gateway = ""
+    if not local_desktop:
+        gateway, _ = management_route(management_ip)
     protected = False
     child = None
     def requested_stop(_signum, _frame):
@@ -67,13 +72,14 @@ def run(profile: dict, management_ip: str) -> int:
     previous_term = signal.signal(signal.SIGTERM, requested_stop)
     previous_int = signal.signal(signal.SIGINT, requested_stop)
     try:
-        route_add = subprocess.run(
-            [ROUTE, "-n", "add", "-host", management_ip, gateway],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
-            check=False)
-        if route_add.returncode:
-            raise ValueError("CISCO_MANAGEMENT_ROUTE_PROTECTION_FAILED")
-        protected = True
+        if not local_desktop:
+            route_add = subprocess.run(
+                [ROUTE, "-n", "add", "-host", management_ip, gateway],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+                check=False)
+            if route_add.returncode:
+                raise ValueError("CISCO_MANAGEMENT_ROUTE_PROTECTION_FAILED")
+            protected = True
         cmd = [exe, "--protocol=anyconnect", "--no-proxy", "--non-inter",
                "--passwd-on-stdin", "--user=" + profile["username"],
                "--script=" + SCRIPT, "--no-system-trust"]
@@ -85,7 +91,7 @@ def run(profile: dict, management_ip: str) -> int:
         cmd.append("https://" + profile["host"] + ":" + str(profile["port"]))
         child = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                  stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, start_new_session=True)
+                                 stderr=subprocess.DEVNULL, start_new_session=False)
         assert child.stdin is not None
         child.stdin.write((profile["password"] + "\n").encode("utf-8"))
         child.stdin.close()
