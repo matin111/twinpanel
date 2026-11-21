@@ -130,6 +130,20 @@ final class TwinConnectMacOSVPNBridge {
         #endif
     }
 
+    private static func supportedTunnelCodes() -> [String] {
+        var codes: [String] = []
+        // A ready signed WireGuard PacketTunnel is independent of Libbox.
+        // Unsigned previews retain empty capabilities and cannot start VPN.
+        if wireGuardBackendReady() { codes.append("wireguard") }
+        if libboxBackendReady() {
+            codes.append(contentsOf: [
+                "hysteria2", "tuic", "anytls", "naive",
+                "shadowtls", "snell", "socks5"
+            ])
+        }
+        return codes
+    }
+
     static func register(binaryMessenger messenger: FlutterBinaryMessenger) {
         let channel = FlutterMethodChannel(
             name: "com.twinpanel.twinconnect/vpn",
@@ -140,8 +154,8 @@ final class TwinConnectMacOSVPNBridge {
             case "getCapabilities":
                 result([
                     "contractVersion": 1,
-                    "engineReady": libboxBackendReady(),
-                    "fullTunnel": libboxBackendReady(),
+                    "engineReady": wireGuardBackendReady() || libboxBackendReady(),
+                    "fullTunnel": wireGuardBackendReady() || libboxBackendReady(),
                     "includeApps": false,
                     "excludeApps": false,
                     "killSwitchEnforced": false,
@@ -159,8 +173,7 @@ final class TwinConnectMacOSVPNBridge {
             case "getProtocolCapabilities":
                 result([
                     "contractVersion": 1,
-                    "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"] : [String]()
+                    "supportedCodes": supportedTunnelCodes()
                 ] as [String: Any])
             case "prepareMieru":
                 TwinConnectMacOSMieruControl.prepare(
@@ -278,6 +291,18 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_TUIC_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_TUIC_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSWireGuardEngineStatus":
+                let ready = wireGuardBackendReady()
+                result([
+                    "contractVersion": 1,
+                    "protocol": "wireguard",
+                    "extensionInstalled": extensionBundle() != nil,
+                    "packetFlowBridgeReady": ready,
+                    "engineReady": ready,
+                    "reason": ready
+                        ? "MACOS_WIREGUARD_SIGNED_START_UNVERIFIED"
+                        : "MACOS_WIREGUARD_SIGNING_OR_BACKEND_MISSING"
                 ] as [String: Any])
             case "macOSRuntimeStatus":
                 let installed = extensionBundle() != nil
