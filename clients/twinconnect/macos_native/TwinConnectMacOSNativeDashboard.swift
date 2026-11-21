@@ -2993,8 +2993,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             view = build()
             return
         }
-        let mgmt = ProcessInfo.processInfo.environment[
-            "TWINCONNECT_CISCO_MANAGEMENT_IPV4"] ?? ""
+        // Read the exact IP provisioned by the administrator for the sudoers
+        // rule. Never rely on an app-controlled environment override.
+        let configured = try? String(contentsOfFile:
+            "/Library/PrivilegedHelperTools/TwinConnectCisco/management_ipv4",
+            encoding: .utf8)
+        let mgmt = configured?.trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? ""
         guard mgmt.range(of:
             "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
             options: .regularExpression) != nil else {
