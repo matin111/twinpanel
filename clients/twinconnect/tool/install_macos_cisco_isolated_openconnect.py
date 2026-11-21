@@ -35,8 +35,12 @@ def dependency_info(path):
 
 
 def install_id(path):
-    lines = command("/usr/bin/otool", "-D", str(path)).splitlines()
-    return lines[1].strip() if len(lines) > 1 else None
+    # Mach-O executables generally have no LC_ID_DYLIB load command.
+    result = subprocess.run(
+        ["/usr/bin/otool", "-D", str(path)], capture_output=True,
+        text=True, check=False, timeout=30)
+    lines = result.stdout.splitlines()
+    return lines[1].strip() if result.returncode == 0 and len(lines) > 1 else None
 
 
 def closure(source):
@@ -95,11 +99,9 @@ def build():
         raise RuntimeError("CISCO_OPENCONNECT_NOT_FOUND")
     files = closure(source)
     resolved_exe = str(Path(source).resolve(strict=True))
-    names = {p: Path(p).name + "-" + hashlib.sha256(p.encode()).hexdigest()[:12]
-             for p in files if p != resolved_exe}
-    # Keep dylib extension for signing and troubleshooting.
+    # Unique names avoid collisions between libraries from different formulas.
     names = {p: (Path(p).stem + "-" + hashlib.sha256(p.encode()).hexdigest()[:12]
-                  + Path(p).suffix) for p in names}
+                  + Path(p).suffix) for p in files if p != resolved_exe}
     staging = Path(tempfile.mkdtemp(prefix=".openconnect-stage-", dir=BASE))
     try:
         bindir = staging / "bin"
