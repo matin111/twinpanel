@@ -195,7 +195,7 @@ def restore() -> None:
     # target the original service directly, not whichever interface is primary.
     def matches() -> bool:
         details = command(NETWORKSETUP, "-getinfo", service)
-        fields = dict(re.findall(r"(?m)^([^:\\n]+):\\s*([^\\n]+)$", details))
+        fields = dict(re.findall(r"(?m)^([^:\n]+):\s*([^\n]+)$", details))
         original_mode = ("Manual Configuration" in details if saved["mode"] == "manual"
                          else "DHCP Configuration" in details)
         addr_match = (saved["mode"] != "manual" or
