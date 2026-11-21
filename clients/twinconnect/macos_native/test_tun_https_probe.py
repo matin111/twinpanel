@@ -25,7 +25,7 @@ class HTTPSProbeTests(unittest.TestCase):
     def test_https_probe_reports_actual_global_exit_ip(self):
         response = mock.MagicMock()
         response.status = 200
-        response.read.return_value = b"ip=1.1.1.1\\nloc=US\\n"
+        response.read.return_value = b"ip=1.1.1.1\nloc=US\n"
         opener = mock.MagicMock()
         opener.open.return_value.__enter__.return_value = response
         with mock.patch.object(daemon, "observe_route",
