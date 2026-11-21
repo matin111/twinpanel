@@ -23,7 +23,7 @@ if [[ -e "$destination" &&
       ! -f "$destination/macos_native/standalone_connection_manager.py" ]]; then
   echo "UNRECOGNIZED_EXISTING_RUNTIME_REFUSED" >&2; exit 2
 fi
-for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py; do
+for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/openvpn_profile_review.py; do
   if [[ ! -f "$source" || -L "$source" ]]; then
     echo "MISSING_OR_UNSAFE_RUNTIME_SOURCE: $source" >&2; exit 2
   fi
@@ -42,6 +42,8 @@ install -m 0755 macos_native/cisco_openconnect_auth.py \
   "$stage/macos_native/cisco_openconnect_auth.py"
 install -m 0755 macos_native/unsigned_tun_client.py \
   "$stage/macos_native/unsigned_tun_client.py"
+install -m 0644 macos_native/openvpn_profile_review.py \
+  "$stage/macos_native/openvpn_profile_review.py"
 installed=0
 for family in singbox xray; do
   if [[ "$family" == "singbox" ]]; then binary="sing-box"; else binary="xray"; fi
@@ -78,6 +80,14 @@ done
 if [[ -n "$openvpn_candidate" ]]; then
   /usr/bin/python3 tool/package_macos_openvpn_cli.py \
     "$openvpn_candidate" "$stage/macos_native/build/openvpn/$arch" "$host_arch"
+  # An actual load/launch smoke test, NOT just an otool dependency check.
+  # --version does not start OpenVPN, touch utun, or change routes.
+  "$stage/macos_native/build/openvpn/$arch/bin/openvpn" --version \
+      > "$stage/macos_native/build/openvpn/$arch/version.txt" 2>&1 ||
+    { echo "OPENVPN_BUNDLED_EXECUTION_FAILED" >&2; exit 3; }
+  grep -q '^OpenVPN ' "$stage/macos_native/build/openvpn/$arch/version.txt" ||
+    { echo "OPENVPN_BUNDLED_VERSION_INVALID" >&2; exit 3; }
+  echo "OPENVPN_BUNDLED_EXECUTION_VERIFIED"
   installed=$((installed + 1))
 else
   echo "OPENVPN_CLI_NOT_INSTALLED; NOT_PACKAGED"
