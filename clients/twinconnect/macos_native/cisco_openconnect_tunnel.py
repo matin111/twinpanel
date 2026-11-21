@@ -19,7 +19,10 @@ import sys
 
 from cisco_openconnect_auth import validate, binary
 
-SCRIPT = "/usr/local/etc/vpnc/vpnc-script"
+SCRIPTS = (
+    "/opt/homebrew/etc/vpnc/vpnc-script",
+    "/usr/local/etc/vpnc/vpnc-script",
+)
 ROUTE = "/sbin/route"
 ROUTE_GET = re.compile(r"^\s*(gateway|interface):\s*(\S+)\s*$", re.M)
 
@@ -56,7 +59,8 @@ def run(profile: dict, management_ip: str) -> int:
     if os.geteuid() != 0:
         raise ValueError("CISCO_ROOT_REQUIRED")
     exe = binary()
-    if exe is None or not os.path.isfile(SCRIPT):
+    script = next((path for path in SCRIPTS if os.path.isfile(path)), None)
+    if exe is None or script is None:
         raise ValueError("CISCO_ENGINE_UNAVAILABLE")
     # "desktop" is an explicit installer-authorized mode for a locally
     # controlled Mac. It is never selected automatically on a remote Mac.
@@ -82,7 +86,7 @@ def run(profile: dict, management_ip: str) -> int:
             protected = True
         cmd = [exe, "--protocol=anyconnect", "--no-proxy", "--non-inter",
                "--passwd-on-stdin", "--user=" + profile["username"],
-               "--script=" + SCRIPT, "--no-system-trust"]
+               "--script=" + script, "--no-system-trust"]
         # Explicit certificate pin required for privileged route changes:
         # no trust-on-first-use or insecure certificate overrides.
         if not profile.get("servercert"):
