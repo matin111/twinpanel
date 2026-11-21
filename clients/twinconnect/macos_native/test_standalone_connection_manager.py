@@ -95,7 +95,13 @@ class StandaloneManagerTests(unittest.TestCase):
                 "protocol": "naive",
                 "reason": "LOCAL_PROFILE_INVALID",
             })
-            self.assertEqual(manager.last_attempt(), recorded)
+            observed = manager.last_attempt()
+            self.assertEqual(
+                {key: observed[key] for key in recorded}, recorded)
+            self.assertIn(observed["age"], (
+                "less_than_minute", "one_to_ten_minutes",
+                "ten_to_sixty_minutes", "older_than_hour",
+            ))
             self.assertEqual(manager.status(), {"state": "stopped"})
             self.assertEqual(
                 manager.attempt_path().stat().st_mode & 0o777, 0o600)
@@ -104,7 +110,13 @@ class StandaloneManagerTests(unittest.TestCase):
                 manager.record_attempt("naive", "user@example.com?token=SECRET")
             with self.assertRaisesRegex(ValueError, "UNKNOWN_PROTOCOL"):
                 manager.record_attempt("unknown", "CONNECT_REQUESTED")
-            self.assertEqual(manager.last_attempt(), recorded)
+            observed = manager.last_attempt()
+            self.assertEqual(
+                {key: observed[key] for key in recorded}, recorded)
+            self.assertIn(observed["age"], (
+                "less_than_minute", "one_to_ten_minutes",
+                "ten_to_sixty_minutes", "older_than_hour",
+            ))
 
     def test_last_attempt_cannot_be_symlink_or_untrusted_record(self):
         with mock.patch.object(manager, "STATE", self.root / "state"):
