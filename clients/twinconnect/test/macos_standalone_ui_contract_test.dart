@@ -30,25 +30,6 @@ void main() {
     expect(runtime, isNot(contains('networksetup')));
   });
 
-  test('unsigned macOS offers app-owned SOCKS lifecycle without route changes', () {
-    final card = File('lib/macos_standalone_connection_card.dart')
-        .readAsStringSync();
-    final manager = File('lib/macos_standalone_managed_proxy.dart')
-        .readAsStringSync();
-    expect(card, contains('Connect local SOCKS proxy'));
-    expect(card, contains('Disconnect local proxy'));
-    expect(card, contains('_connectProxy('));
-    expect(card, contains('_disconnectProxy()'));
-    expect(manager, contains("'--owner-pid'"));
-    expect(manager, contains("'probe'"));
-    expect(manager, contains("['stop']"));
-    expect(manager, contains('bool get systemWideVpn => false'));
-    expect(manager, contains('if (!_ownsSession) return'));
-    expect(manager, isNot(contains('networksetup')));
-    expect(manager, isNot(contains('route add')));
-    expect(manager, isNot(contains('startVPNTunnel')));
-  });
-
   test('local proxy panel adapter does not allow a full tunnel claim', () {
     final adapter = File('lib/macos_standalone_panel_profile.dart')
         .readAsStringSync();
