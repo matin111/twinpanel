@@ -273,11 +273,30 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                       let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 result = .success(value)
             } else if let http = response as? HTTPURLResponse {
+                // Surface only known, non-sensitive API error identifiers.
+                // The service may return PROFILES_NOT_READY as JSON detail;
+                // treating every 404 as PANEL_NOT_FOUND concealed the real
+                // missing-profile problem during macOS engine setup.
+                let safeDetails: Set<String> = [
+                    "PROFILES_NOT_READY", "PROTOCOL_NOT_SELECTED",
+                    "APP_NOT_AUTHORIZED", "APP_LOGIN_INVALID",
+                    "SERVER_NOT_ALLOWED", "PROTOCOL_NOT_ALLOWED",
+                    "SUBSCRIPTION_NOT_FOUND", "SUBSCRIPTION_EXPIRED",
+                    "SUBSCRIPTION_DISABLED", "DEVICE_LIMIT_REACHED"
+                ]
+                var detail: String?
+                if let data = data, data.count < 8192,
+                   let obj = try? JSONSerialization.jsonObject(with: data)
+                       as? [String: Any],
+                   let candidate = obj["detail"] as? String,
+                   safeDetails.contains(candidate) {
+                    detail = candidate
+                }
                 let code: String
                 switch http.statusCode {
                 case 401: code = "APP_LOGIN_INVALID"
-                case 403: code = "APP_NOT_AUTHORIZED"
-                case 404: code = "PANEL_NOT_FOUND"
+                case 403: code = detail ?? "APP_NOT_AUTHORIZED"
+                case 404: code = detail ?? "PANEL_NOT_FOUND"
                 case 429: code = "APP_LOGIN_LOCKED"
                 case 301, 302, 303, 307, 308: code = "UNSAFE_REDIRECT"
                 default: code = "INVALID_SERVER_RESPONSE"
