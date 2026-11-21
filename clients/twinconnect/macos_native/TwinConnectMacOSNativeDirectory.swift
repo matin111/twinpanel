@@ -500,28 +500,37 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         }
                         return
                     }
-                    self.request(self.endpoint(panel, "v1/central-app/session/brand"),
-                                 payload: nil, bearer: newToken) { brandResult in
-                        guard case .success(let brand) = brandResult,
-                              let session = self.makeSession(
-                                brand: brand, token: newToken,
-                                namespace: saved.namespace,
-                                username: saved.username, panel: panel
-                              ) else {
-                            if case .failure(let error) = brandResult {
-                                completion(.failure(error))
-                            } else {
+                    // Refresh tokens are rotating and the previous token may
+                    // already be invalid. Persist the replacement BEFORE the
+                    // optional brand fetch, so a transient branding failure
+                    // cannot strand the next login attempt.
+                    let next = TwinMacSavedRefresh(
+                        username: saved.username, namespace: saved.namespace,
+                        origin: panel.absoluteString, token: nextRefresh)
+                    DispatchQueue.global(qos: .utility).async {
+                        let stored = TwinMacNativeKeychain.save(next)
+                        DispatchQueue.main.async {
+                            guard stored else {
                                 completion(.failure(TwinMacNativeError.failure(
-                                    "INVALID_SESSION_BRAND")))
+                                    "KEYCHAIN_SAVE_FAILED")))
+                                return
                             }
-                            return
-                        }
-                        let next = TwinMacSavedRefresh(
-                            username: saved.username, namespace: saved.namespace,
-                            origin: panel.absoluteString, token: nextRefresh)
-                        DispatchQueue.global(qos: .utility).async {
-                            _ = TwinMacNativeKeychain.save(next)
-                            DispatchQueue.main.async {
+                            self.request(self.endpoint(panel, "v1/central-app/session/brand"),
+                                         payload: nil, bearer: newToken) { brandResult in
+                                guard case .success(let brand) = brandResult,
+                                      let session = self.makeSession(
+                                        brand: brand, token: newToken,
+                                        namespace: saved.namespace,
+                                        username: saved.username, panel: panel
+                                      ) else {
+                                    if case .failure(let error) = brandResult {
+                                        completion(.failure(error))
+                                    } else {
+                                        completion(.failure(TwinMacNativeError.failure(
+                                            "INVALID_SESSION_BRAND")))
+                                    }
+                                    return
+                                }
                                 completion(.success(session))
                             }
                         }
