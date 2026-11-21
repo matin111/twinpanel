@@ -1197,13 +1197,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let leftGap = NSView()
         let rightGap = NSView()
         buttonRow.addArrangedSubview(leftGap)
-        // Mirror the original Windows primary button. An unsigned macOS
-        // build cannot connect a system VPN, so this button must NEVER
-        // silently launch the Hysteria2 diagnostic SOCKS engine.
-        let connect = button("ϟ    Check TUN readiness     ›",
-                             action: #selector(unavailableConnect(_:)), primary: true)
-        connect.isEnabled = accountSession != nil && !cliTunCheckBusy
-        connect.toolTip = "Validate the selected Hysteria2 TUN profile without changing routes or starting VPN."
+        // Preserve the Windows primary action label. Diagnostics belong only
+        // in Settings, and must never masquerade as a successful VPN connection.
+        let connect = button("ϟ    Connect     ›",
+                             action: #selector(requestVPNConnection(_:)), primary: true)
+        connect.isEnabled = accountSession != nil
+        connect.toolTip = "Connect to the selected VPN server when the system tunnel engine is provisioned."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
@@ -1224,7 +1223,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
-        if !status.isEmpty && (status.contains("TUN") || status.contains("Connection unavailable")) {
+        if !status.isEmpty && (status.contains("TUN") ||
+                               status.contains("Connection unavailable") ||
+                               status.contains("VPN connection unavailable")) {
             let advisory = text(status,
                                 size: 10, color: amber)
             main.addArrangedSubview(advisory)
@@ -1948,8 +1949,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         section.addArrangedSubview(appearance)
         appearance.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
 
-        // Independent diagnostics; cannot be confused with the Connect
-        // action. Keep verified emergency stop available at all times.
+        // The unsigned preflight is a separate, explicitly diagnostic action.
+        // It must not replace the Connect button on the home page.
+        section.addArrangedSubview(text("VPN engine diagnostics",
+                                        size: 18, weight: .semibold))
+        let tunCheck = button(cliTunCheckBusy ? "Checking TUN readiness…" :
+                              "Check TUN readiness",
+                              action: #selector(unavailableConnect(_:)),
+                              mutedButton: true)
+        tunCheck.isEnabled = accountSession != nil && !cliTunCheckBusy
+        tunCheck.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        section.addArrangedSubview(tunCheck)
+        if status.contains("TUN") {
+            section.addArrangedSubview(text(status, size: 11, color: amber))
+        }
+
+        // Independent local proxy diagnostics and emergency stop.
         section.addArrangedSubview(text("Local proxy diagnostics",
                                         size: 18, weight: .semibold))
         section.addArrangedSubview(text(
@@ -2768,8 +2783,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
-    /// First-stage CLI TUN integration: validate only. Running a privileged
-    /// tunnel and routing system traffic requires a separately protected helper.
+    // The primary action does not silently run a proxy test or a TUN check.
+    // The AppKit fallback has no signed PacketTunnel lifecycle to invoke.
+    // Fail closed instead of reporting a fabricated connection.
+    @objc private func requestVPNConnection(_ sender: NSButton) {
+        guard accountSession != nil else { return }
+        if activeProtocol == nil || activeServer == nil {
+            status = "Connection unavailable: select a server and protocol in Locations."
+        } else {
+            status = "VPN connection unavailable: this unsigned macOS build has no provisioned PacketTunnel engine. No VPN was started."
+        }
+        view = build()
+    }
+
+    /// Separate read-only diagnostic available from Settings only. Running a
+    /// privileged tunnel and routing system traffic requires a protected engine.
     /// Never report Connected after a config check.
     @objc private func unavailableConnect(_ sender: NSButton) {
         guard !cliTunCheckBusy, let session = accountSession else { return }
