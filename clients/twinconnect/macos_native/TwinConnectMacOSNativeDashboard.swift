@@ -2560,8 +2560,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func selectProtocolChip(_ sender: NSButton) {
-        guard protocolChipCodes.indices.contains(sender.tag) else { return }
-        activeProtocol = protocolChipCodes[sender.tag]
+        guard protocolChipCodes.indices.contains(sender.tag),
+              !localProxyBusy else { return }
+        let chosen = protocolChipCodes[sender.tag]
+        if activeProtocol != chosen && localProxyActive {
+            activeProtocol = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeProtocol = chosen
         persistCurrentSelection()
         view = build()
     }
@@ -2576,24 +2584,48 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func selectLocationServer(_ sender: NSButton) {
-        guard locationRowIDs.indices.contains(sender.tag) else { return }
-        activeServer = locationRowIDs[sender.tag]
+        guard locationRowIDs.indices.contains(sender.tag),
+              !localProxyBusy else { return }
+        let chosen = locationRowIDs[sender.tag]
+        if activeServer != chosen && localProxyActive {
+            activeServer = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeServer = chosen
         persistCurrentSelection()
-        status = "Location selected. A signed VPN engine is required to connect."
+        status = "Location selected."
         view = build()
     }
 
     @objc private func changeQuickServer(_ sender: NSPopUpButton) {
-        activeServer = sender.selectedItem?.representedObject as? String
+        guard !localProxyBusy else { return }
+        let chosen = sender.selectedItem?.representedObject as? String
+        if activeServer != chosen && localProxyActive {
+            activeServer = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeServer = chosen
         persistCurrentSelection()
-        status = "Location selected. VPN connection remains unavailable."
+        status = "Location selected."
         view = build()
     }
 
     @objc private func changeQuickProtocol(_ sender: NSPopUpButton) {
-        activeProtocol = sender.selectedItem?.representedObject as? String
+        guard !localProxyBusy else { return }
+        let chosen = sender.selectedItem?.representedObject as? String
+        if activeProtocol != chosen && localProxyActive {
+            activeProtocol = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeProtocol = chosen
         persistCurrentSelection()
-        status = "Protocol selected. VPN connection remains unavailable."
+        status = "Protocol selected."
         view = build()
     }
 
