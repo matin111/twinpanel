@@ -10,7 +10,10 @@ from __future__ import annotations
 import argparse
 import json
 import ipaddress
+import http.client
 import os
+import secrets
+import socket
 from pathlib import Path
 import signal
 import subprocess
@@ -90,6 +93,78 @@ def validate(protocol: str, filename: Path) -> int:
 
 def state_path() -> Path:
     return STATE / "current.json"
+
+
+def measured_runtime_config(protocol: str, source: Path) -> tuple[Path, int | None, str | None]:
+    """Prepare a private authenticated loopback counter without editing source."""
+    if protocol != "hysteria2":
+        return source, None, None
+    config = json.loads(source.read_text(encoding="utf-8"))
+    if "experimental" in config:
+        fail("EXPERIMENTAL_CONFIG_NOT_ALLOWED")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        metrics_port = int(listener.getsockname()[1])
+    secret = secrets.token_urlsafe(36)
+    config["experimental"] = {"clash_api": {
+        "external_controller": f"127.0.0.1:{metrics_port}",
+        "secret": secret,
+        "access_control_allow_origin": ["http://localhost.invalid"],
+        "access_control_allow_private_network": False,
+    }}
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(STATE, 0o700)
+    runtime = STATE / ("managed-" + secrets.token_hex(16) + ".json")
+    fd = os.open(runtime, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(config, stream)
+    except Exception:
+        runtime.unlink(missing_ok=True)
+        raise
+    return runtime, metrics_port, secret
+
+
+def cleanup_runtime_config(item: dict) -> None:
+    value = item.get("managed_profile")
+    if not isinstance(value, str):
+        return
+    path = Path(value)
+    if path.parent == STATE and path.name.startswith("managed-") and path.suffix == ".json":
+        path.unlink(missing_ok=True)
+
+
+def traffic() -> dict:
+    """Real bytes transferred through this managed engine, not Mac NIC bytes."""
+    item = read_state()
+    if not item or not process_matches(item):
+        fail("ENGINE_NOT_RUNNING")
+    port, secret = item.get("metrics_port"), item.get("metrics_secret")
+    if type(port) is not int or not 1024 <= port <= 65535 or \
+            not isinstance(secret, str) or len(secret) < 32:
+        fail("TRAFFIC_MONITOR_NOT_CONFIGURED")
+    client = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+    try:
+        client.request("GET", "/connections", headers={
+            "Authorization": "Bearer " + secret,
+            "Accept": "application/json",
+        })
+        response = client.getresponse()
+        if response.status != 200:
+            fail("TRAFFIC_MONITOR_UNAVAILABLE")
+        raw = response.read(131073)
+        if len(raw) > 131072:
+            fail("TRAFFIC_RESPONSE_TOO_LARGE")
+        value = json.loads(raw)
+        upload, download = value.get("uploadTotal"), value.get("downloadTotal")
+        if not all(type(n) is int and 0 <= n < 2**62 for n in [upload, download]):
+            fail("TRAFFIC_COUNTERS_INVALID")
+        return {"state": "measured", "mode": "local_proxy_only",
+                "download_bytes": download, "upload_bytes": upload}
+    except (OSError, ValueError, http.client.HTTPException):
+        fail("TRAFFIC_MONITOR_UNAVAILABLE")
+    finally:
+        client.close()
 
 
 def read_state() -> dict | None:
@@ -180,14 +255,15 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
             fail("PROXY_OWNER_NOT_RUNNING")
     config = config.expanduser().resolve(strict=True)
     port = validate(protocol, config)
+    runtime, metrics_port, metrics_secret = measured_runtime_config(protocol, config)
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(STATE, 0o700)
     logpath = STATE / "engine.log"
     # Keep this attempt's errors separate from earlier server/protocol tests.
     # A single managed engine is allowed at a time. Never return raw logs.
     logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    args = ([str(exe), "run", "-config", str(config)] if protocol == "v2ray"
-            else [str(exe), "run", "-c", str(config)])
+    args = ([str(exe), "run", "-config", str(runtime)] if protocol == "v2ray"
+            else [str(exe), "run", "-c", str(runtime)])
     try:
         with os.fdopen(logfd, "a") as log:
             proc = subprocess.Popen(
@@ -198,8 +274,12 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
         if proc.poll() is not None:
             fail("ENGINE_EXITED_EARLY_CHECK_LOCAL_LOG")
         record = {"protocol": protocol, "pid": proc.pid, "port": port,
-                  "mode": "local_proxy_only", "config": str(config),
+                  "mode": "local_proxy_only", "config": str(runtime),
                   "executable": str(exe)}
+        if metrics_port is not None and metrics_secret is not None:
+            record.update({"metrics_port": metrics_port,
+                           "metrics_secret": metrics_secret,
+                           "managed_profile": str(runtime)})
         if owner_pid is not None:
             record["owner_pid"] = owner_pid
             record["owner_started"] = owner_started
@@ -224,6 +304,12 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
     except Exception:
         if "proc" in locals() and proc.poll() is None:
             proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        if "proc" not in locals() or proc.poll() is not None:
+            cleanup_runtime_config({"managed_profile": str(runtime)})
         raise
 
 
@@ -358,18 +444,21 @@ def stop() -> dict:
     if not item:
         return {"state": "stopped"}
     if not process_matches(item):
+        cleanup_runtime_config(item)
         state_path().unlink(missing_ok=True)
         return {"state": "stopped", "reason": "ENGINE_NOT_RUNNING"}
     pid = item["pid"]
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
+        cleanup_runtime_config(item)
         state_path().unlink(missing_ok=True)
         return {"state": "stopped"}
     except PermissionError:
         fail("ENGINE_STOP_PERMISSION_DENIED")
     for _ in range(30):
         if not process_matches(item):
+            cleanup_runtime_config(item)
             state_path().unlink(missing_ok=True)
             return {"state": "stopped"}
         time.sleep(0.1)
@@ -384,6 +473,7 @@ def stop() -> dict:
             fail("ENGINE_STOP_PERMISSION_DENIED")
     for _ in range(15):
         if not process_matches(item):
+            cleanup_runtime_config(item)
             state_path().unlink(missing_ok=True)
             return {"state": "stopped"}
         time.sleep(0.1)
@@ -407,6 +497,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("list")
     sub.add_parser("status")
+    sub.add_parser("traffic")
     sub.add_parser("diagnose")
     sub.add_parser("stop")
     check = sub.add_parser("probe")
@@ -423,6 +514,7 @@ def main() -> int:
     try:
         result = (list_protocols() if args.action == "list" else
                   status() if args.action == "status" else
+                  traffic() if args.action == "traffic" else
                   {"state": "diagnosis", "reason": engine_failure_category()} if args.action == "diagnose" else
                   stop() if args.action == "stop" else
                   probe(args.expected_ip) if args.action == "probe" else
