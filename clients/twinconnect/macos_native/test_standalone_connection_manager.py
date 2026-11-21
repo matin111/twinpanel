@@ -351,8 +351,8 @@ class StandaloneManagerTests(unittest.TestCase):
         reply = connection.getresponse.return_value
         reply.status = 200
         reply.read.return_value = b'{"uploadTotal":2345,"downloadTotal":6789}'
-        with mock.patch.object(manager, "read_state", return_value=state), \\
-             mock.patch.object(manager, "process_matches", return_value=True), \\
+        with mock.patch.object(manager, "read_state", return_value=state), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
              mock.patch.object(manager.http.client, "HTTPConnection",
                                return_value=connection) as client:
             result = manager.traffic()
@@ -373,8 +373,8 @@ class StandaloneManagerTests(unittest.TestCase):
         reply = connection.getresponse.return_value
         reply.status = 200
         reply.read.return_value = b'{"connections":[]}'
-        with mock.patch.object(manager, "read_state", return_value=state), \\
-             mock.patch.object(manager, "process_matches", return_value=True), \\
+        with mock.patch.object(manager, "read_state", return_value=state), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
              mock.patch.object(manager.http.client, "HTTPConnection",
                                return_value=connection):
             with self.assertRaisesRegex(ValueError, "TRAFFIC_MONITOR_UNAVAILABLE"):
