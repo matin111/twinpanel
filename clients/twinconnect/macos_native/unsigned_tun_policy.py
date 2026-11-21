@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 import platform
 import stat
-import subprocess
 
 TRUSTED_ROOT = Path("/Library/PrivilegedHelperTools/TwinConnectTUN")
 MAX_CONFIG = 256 * 1024
@@ -20,7 +19,7 @@ MAX_CONFIG = 256 * 1024
 
 def trusted_root_file(path: Path, root: Path = TRUSTED_ROOT) -> bool:
     """Reject symlinks, user-writable files and writable parent directories."""
-    if not path.is_absolute() or not path.is_relative_to(root):
+    if (not path.is_absolute() or ".." in path.parts or\n            not path.is_relative_to(root)):
         return False
     current = path
     while True:
