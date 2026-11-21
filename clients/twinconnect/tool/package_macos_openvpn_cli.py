@@ -7,8 +7,8 @@ routes. Rewrite absolute Homebrew loads to relocatable @loader_path references.
 from __future__ import annotations
 
 import os
+import hashlib
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +32,24 @@ def inspect_arch(path: Path, arch: str) -> None:
         raise ValueError("OPENVPN_ARCH_MISMATCH")
 
 
+def bundled_name(path: str) -> str:
+    """Give every Homebrew install name a stable collision-free filename."""
+    original = Path(path)
+    digest = hashlib.sha256(str(original.resolve(strict=True)).encode()).hexdigest()[:16]
+    return digest + "-" + original.name
+
+
+def binary_dependencies(path: Path, is_library: bool) -> list[str]:
+    rows = dependencies(path)
+    # The first otool -L entry in a dylib is its own install name.
+    return rows[1:] if is_library else rows
+
+
+def validate_rpath_dependency(dep: str) -> None:
+    if dep.startswith("@rpath/") or dep.startswith("@executable_path/"):
+        raise ValueError("UNRESOLVED_RUNTIME_RPATH")
+
+
 def package(binary: Path, output: Path, arch: str) -> int:
     if not binary.is_file() or binary.is_symlink():
         raise ValueError("OPENVPN_BINARY_MISSING")
@@ -45,18 +63,13 @@ def package(binary: Path, output: Path, arch: str) -> int:
     shutil.copy2(binary, executable)
     os.chmod(executable, 0o755)
     found: dict[str, Path] = {}
-    names: dict[str, str] = {}
     waiting = [executable]
 
     while waiting:
         obj = waiting.pop()
-        for dep in dependencies(obj):
-            # otool -L includes each dylib's *own install name* as its
-            # first entry. It is metadata, not another library to copy.
-            # Rewriting it with install_name_tool -id happens below.
-            if obj != executable and dep.startswith(BREW_PREFIXES) and Path(dep).name == obj.name:
-                continue
-            if dep.startswith(SYSTEM_PREFIXES) or dep.startswith("@"):
+        for dep in binary_dependencies(obj, is_library=obj != executable):
+            validate_rpath_dependency(dep)
+            if dep.startswith(SYSTEM_PREFIXES) or dep.startswith("@loader_path/"):
                 continue
             if not dep.startswith(BREW_PREFIXES):
                 raise ValueError("UNEXPECTED_ABSOLUTE_DYLIB")
@@ -66,10 +79,7 @@ def package(binary: Path, output: Path, arch: str) -> int:
             if dep not in found:
                 if len(found) >= MAX_LIBRARIES:
                     raise ValueError("EXCESSIVE_OPENVPN_DYLIBS")
-                name = original.name
-                if name in names and names[name] != dep:
-                    raise ValueError("AMBIGUOUS_DYLIB_BASENAME")
-                names[name] = dep
+                name = bundled_name(dep)
                 target = libdir / name
                 if target.exists():
                     raise ValueError("DYLIB_COLLISION")
@@ -79,7 +89,7 @@ def package(binary: Path, output: Path, arch: str) -> int:
                 found[dep] = target
                 waiting.append(target)
             reference = ("@loader_path/../lib/" if obj == executable
-                         else "@loader_path/") + original.name
+                         else "@loader_path/") + found[dep].name
             subprocess.run(["/usr/bin/install_name_tool", "-change", dep,
                             reference, str(obj)], check=True, timeout=15)
         if obj != executable:
@@ -88,9 +98,10 @@ def package(binary: Path, output: Path, arch: str) -> int:
                            check=True, timeout=15)
 
     for item in [executable, *found.values()]:
-        for dep in dependencies(item):
+        for dep in binary_dependencies(item, is_library=item != executable):
             if dep.startswith(BREW_PREFIXES):
                 raise ValueError("UNRELOCATED_HOMEBREW_DYLIB")
+            validate_rpath_dependency(dep)
             if not (dep.startswith(SYSTEM_PREFIXES) or dep.startswith("@loader_path/")):
                 raise ValueError("UNEXPECTED_RUNTIME_DYLIB")
     return len(found)
