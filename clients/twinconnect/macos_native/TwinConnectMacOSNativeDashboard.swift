@@ -1747,18 +1747,39 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         view = build()
     }
 
+    private func visibleLocationServers() -> [TwinMacNativeServer] {
+        let all = snapshot?.servers ?? []
+        let needle = locationSearch.trimmingCharacters(
+            in: .whitespacesAndNewlines).localizedLowercase
+        guard !needle.isEmpty else { return all }
+        return all.filter { server in
+            server.name.localizedLowercase.contains(needle) ||
+                countryName(server.country).localizedLowercase.contains(needle) ||
+                server.country.localizedLowercase.contains(needle)
+        }
+    }
+
     @objc private func selectFastestMeasuredServer(_ sender: NSButton) {
-        guard let servers = snapshot?.servers else { return }
-        let eligible = servers.filter {
+        guard !localProxyBusy && !ciscoTunnelBusy && ciscoTunnelTask == nil else {
+            return
+        }
+        let eligible = visibleLocationServers().filter {
             $0.online && nodePingResults[$0.id]?.measuredMs != nil
         }
         guard let best = eligible.min(by: {
             (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
                 (nodePingResults[$1.id]?.measuredMs ?? Int.max)
         }) else { return }
+        if best.id == activeServer { return }
         activeServer = best.id
         expandedCountries.insert(best.country.uppercased())
         persistCurrentSelection()
+        if localProxyActive {
+            // Selecting a different node must never leave the previous
+            // SOCKS process running behind the new server label.
+            stopVerifiedLocalProxy()
+            return
+        }
         view = build()
     }
 
@@ -1946,7 +1967,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         // A fastest-node action must use real local ICMP measurements,
         // never panel estimates or synthetic timers.
-        let fastest = (snapshot?.servers ?? []).filter { server in
+        let fastest = visibleLocationServers().filter { server in
             server.online && nodePingResults[server.id]?.measuredMs != nil
         }.min {
             (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
@@ -1959,18 +1980,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             } ?? "✦  Fastest server  ·  Measure ping first",
             action: #selector(selectFastestMeasuredServer(_:)),
             mutedButton: true)
-        fastestButton.isEnabled = fastest != nil
+        fastestButton.isEnabled = fastest != nil && !localProxyBusy &&
+            !ciscoTunnelBusy && ciscoTunnelTask == nil
         fastestButton.heightAnchor.constraint(equalToConstant: 39).isActive = true
         fastestButton.toolTip = "Choose the lowest real ICMP RTT among online nodes"
         wrapper.addArrangedSubview(fastestButton)
 
-        let visible = (snapshot?.servers ?? []).filter { server in
-            if locationSearch.isEmpty { return true }
-            let needle = locationSearch.localizedLowercase
-            return server.name.localizedLowercase.contains(needle) ||
-                countryName(server.country).localizedLowercase.contains(needle) ||
-                server.country.localizedLowercase.contains(needle)
-        }
+        let visible = visibleLocationServers()
         let grouped = Dictionary(grouping: visible) { $0.country.uppercased() }
         let codes = grouped.keys.sorted {
             countryName($0).localizedStandardCompare(countryName($1)) == .orderedAscending
