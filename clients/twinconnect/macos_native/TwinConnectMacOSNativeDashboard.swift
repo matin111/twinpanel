@@ -3658,6 +3658,29 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             "TUN engine running; system VPN NOT verified." :
                             "TUN start rejected; no connection confirmed."
                         self.view = self.build()
+                        if self.fullTunActive {
+                            DispatchQueue.global(qos: .utility).async {
+                                let probe = self.runFullTunClient("probe")
+                                DispatchQueue.main.async { [weak self] in
+                                    guard let self = self, self.fullTunActive,
+                                          self.localProxyGeneration == generation else { return }
+                                    if probe.0 == 0,
+                                       let data = probe.1.data(using: .utf8),
+                                       let state = (try? JSONSerialization.jsonObject(
+                                           with: data)) as? [String: Any],
+                                       state["https_state"] as? String ==
+                                           "system_https_reachable",
+                                       let address = state["observed_exit_ip"] as? String,
+                                       address.count <= 64 {
+                                        self.status = "System HTTPS reachable via TUN route; exit IP: " +
+                                            address + ". Full VPN not yet verified."
+                                    } else {
+                                        self.status = "TUN route active; system HTTPS probe not verified."
+                                    }
+                                    self.view = self.build()
+                                }
+                            }
+                        }
                     }
                 }
             }
