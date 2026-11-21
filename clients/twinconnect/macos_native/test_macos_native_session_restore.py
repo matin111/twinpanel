@@ -116,6 +116,8 @@ class NativeSessionRestoreTests(unittest.TestCase):
             ("anytls", "AnyTLS"),
             ("socks5", "SOCKS5"),
             ("snell", "Snell"),
+            ("naive", "Naive"),
+            ("shadowtls", "ShadowTLS"),
         ]:
             self.assertIn(f'case "{code}": return "{label}"', dashboard)
         self.assertIn('connectedProtocolTitle + " · Proxy"', dashboard)
@@ -133,7 +135,8 @@ class NativeSessionRestoreTests(unittest.TestCase):
     def test_entitled_singbox_protocols_bound_to_selected_server(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
         dashboard = DASHBOARD.read_text(encoding="utf-8")
-        for code in ('"hysteria2"', '"tuic"', '"anytls"', '"socks5"', '"snell"'):
+        for code in ('"hysteria2"', '"tuic"', '"anytls"',
+                     '"socks5"', '"snell"', '"naive"', '"shadowtls"'):
             self.assertIn(code, dashboard)
         self.assertIn("func prepareLocalSingBox(", directory)
         self.assertIn('payload: ["protocol": protocolCode]', directory)
@@ -159,6 +162,25 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('"SERVER_NOT_ALLOWED"', directory)
         self.assertIn('"PROTOCOL_NOT_ALLOWED"', directory)
         self.assertIn('"PROFILES_NOT_READY"', directory)
+
+    def test_naive_and_shadowtls_are_strict_verified_local_only(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        self.assertIn('"naive", "shadowtls"', directory)
+        self.assertIn('protocolCode == "naive"', directory)
+        self.assertIn('outbound["insecure_concurrency"]', directory)
+        self.assertIn('outbound["extra_headers"] == nil', directory)
+        self.assertIn('reviewed["insecure_concurrency"] = 0', directory)
+        self.assertIn('reviewedShadowTLSProxyConfig(item)', directory)
+        self.assertIn('rows.count == 2', directory)
+        self.assertIn('ss["detour"] as? String == tag', directory)
+        self.assertIn('"type": "shadowsocks", "tag": "proxy"', directory)
+        self.assertIn('"type": "shadowtls", "tag": "shadowtls-transport"', directory)
+        self.assertIn('"route": ["final": "proxy"]', directory)
+        self.assertIn('safeProxyRemoteHost(host)', directory)
+        self.assertIn('tls["insecure"] as? Bool != true', directory)
+        self.assertIn('case "naive": return "Naive"', dashboard)
+        self.assertIn('case "shadowtls": return "ShadowTLS"', dashboard)
 
     def test_connect_reuses_existing_verified_process_control(self):
         dashboard = DASHBOARD.read_text(encoding="utf-8")
