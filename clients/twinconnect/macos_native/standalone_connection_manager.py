@@ -85,6 +85,18 @@ def validate(protocol: str, filename: Path) -> int:
         expected = {"socks5": "socks", "shadowtls": "shadowtls"}.get(protocol, protocol)
         if expected not in types:
             fail("PROTOCOL_OUTBOUND_MISSING")
+    if protocol in {"tuic", "anytls", "socks5", "snell"}:
+        # These newly integrated GUI profiles are one outbound only. Extra
+        # rules or a direct fallback could silently bypass the chosen proxy.
+        if set(obj) - {"log", "inbounds", "outbounds", "route"}:
+            fail("UNEXPECTED_PROXY_CONFIG_SECTION")
+        if len(outbounds) != 1 or not isinstance(outbounds[0], dict):
+            fail("SINGLE_VERIFIED_OUTBOUND_REQUIRED")
+        if outbounds[0].get("tag") != "proxy":
+            fail("VERIFIED_PROXY_TAG_REQUIRED")
+        route = obj.get("route")
+        if not isinstance(route, dict) or route != {"final": "proxy"}:
+            fail("VERIFIED_PROXY_ROUTE_REQUIRED")
     # Do not allow a TUN inbound anywhere in the supplied profile.
     if any(isinstance(i, dict) and i.get("type") == "tun" for i in inbounds):
         fail("TUN_INBOUND_FORBIDDEN")
