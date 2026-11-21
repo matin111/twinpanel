@@ -60,6 +60,13 @@ class OpenVPNPackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "UNRESOLVED_RUNTIME_RPATH"):
             module.validate_rpath_dependency("@rpath/libcrypto.dylib")
 
+    def test_packaged_engine_is_executed_safely_without_vpn(self):
+        script = APP_PACKAGER.read_text()
+        self.assertIn('OPENVPN_BUNDLED_EXECUTION_VERIFIED', script)
+        self.assertIn('OPENVPN_BUNDLED_EXECUTION_FAILED', script)
+        self.assertIn('bin/openvpn" --version', script)
+        self.assertIn('macos_native/openvpn_profile_review.py', script)
+
     def test_does_not_launch_openvpn(self):
         packager = PACKAGER.read_text()
         self.assertNotIn('openvpn --config', packager)
