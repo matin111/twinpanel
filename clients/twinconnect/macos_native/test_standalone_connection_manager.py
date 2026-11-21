@@ -381,5 +381,59 @@ class StandaloneManagerTests(unittest.TestCase):
                 manager.traffic()
 
 
+    def test_new_singbox_protocols_use_real_local_manager(self):
+        for protocol, outbound in [
+            ("tuic", {"type": "tuic", "uuid": "f3cd1140-2eb6-4c84-976c-8b72177ead67",
+                      "password": "secret"}),
+            ("anytls", {"type": "anytls", "password": "secret"}),
+            ("socks5", {"type": "socks", "version": "5",
+                        "username": "user", "password": "secret"}),
+            ("snell", {"type": "snell", "version": 4,
+                       "psk": "secret-credentials"}),
+        ]:
+            with self.subTest(protocol=protocol):
+                conf = self.config({
+                    "inbounds": [{
+                        "type": "mixed", "listen": "127.0.0.1",
+                        "listen_port": 17089
+                    }],
+                    "outbounds": [outbound],
+                    "route": {"final": "proxy"}
+                })
+                self.assertEqual(manager.validate(protocol, conf), 17089)
+                with mock.patch.object(manager, "STATE", self.root / protocol):
+                    managed, port, secret = manager.measured_runtime_config(
+                        protocol, conf)
+                    self.assertNotEqual(managed, conf)
+                    self.assertIsInstance(port, int)
+                    self.assertGreaterEqual(len(secret), 32)
+                    data = json.loads(managed.read_text())
+                    self.assertEqual(data["outbounds"], [outbound])
+                    self.assertEqual(data["route"], {"final": "proxy"})
+                    self.assertEqual(data["experimental"]["clash_api"][
+                        "external_controller"], f"127.0.0.1:{port}")
+                    manager.cleanup_runtime_config(
+                        {"managed_profile": str(managed)})
+
+    def test_new_protocols_never_accept_system_tun(self):
+        for protocol, outbound in [
+            ("tuic", {"type": "tuic"}),
+            ("anytls", {"type": "anytls"}),
+            ("socks5", {"type": "socks"}),
+            ("snell", {"type": "snell"}),
+        ]:
+            with self.subTest(protocol=protocol):
+                conf = self.config({
+                    "inbounds": [{"type": "tun",
+                                  "listen": "127.0.0.1",
+                                  "listen_port": 17089}],
+                    "outbounds": [outbound]
+                })
+                with self.assertRaisesRegex(
+                    ValueError, "TUN_OR_NON_PROXY_INBOUND_FORBIDDEN"
+                ):
+                    manager.validate(protocol, conf)
+
+
 if __name__ == "__main__":
     unittest.main()
