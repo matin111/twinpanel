@@ -42,7 +42,7 @@ class CiscoTunnelTests(unittest.TestCase):
         # Locally approved desktop connections have no SSH/VNC management IP.
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
-             mock.patch.object(tun.os.path, "isfile", return_value=True), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
              mock.patch.object(tun, "management_route") as route, \
              mock.patch.object(tun.subprocess, "run") as change_route, \
              mock.patch.object(tun.subprocess, "Popen") as launch:
@@ -58,6 +58,15 @@ class CiscoTunnelTests(unittest.TestCase):
             change_route.assert_not_called()
 
 
+    def test_refuses_untrusted_vpn_script(self):
+        with mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
+             mock.patch.object(tun, "trusted_script", return_value=False), \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            with self.assertRaisesRegex(ValueError, "CISCO_TRUSTED_VPN_SCRIPT_REQUIRED"):
+                tun.run({}, "desktop")
+            launch.assert_not_called()
+
     def test_no_root_means_no_network_changes(self):
         with mock.patch.object(tun.os, "geteuid", return_value=501), \
              mock.patch.object(tun.subprocess, "run") as route, \
@@ -71,7 +80,7 @@ class CiscoTunnelTests(unittest.TestCase):
         failed = subprocess.CompletedProcess([], 1, "", "")
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
-             mock.patch.object(tun.os.path, "isfile", return_value=True), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
              mock.patch.object(tun, "management_route", return_value=("192.168.0.1", "en0")), \
              mock.patch.object(tun.subprocess, "run", return_value=failed), \
              mock.patch.object(tun.subprocess, "Popen") as launch:
