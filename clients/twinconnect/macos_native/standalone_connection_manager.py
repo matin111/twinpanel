@@ -284,6 +284,11 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
             record["owner_pid"] = owner_pid
             record["owner_started"] = owner_started
         save_state(record)
+        if metrics_port is not None:
+            # sing-box has parsed its runtime settings. Do not retain the
+            # customer's Hysteria2 credentials on disk for the session.
+            # Process identity still matches executable + argv config path.
+            cleanup_runtime_config(record)
         if owner_pid is not None:
             # Separate watchdog survives a GUI crash; never requires root.
             try:
