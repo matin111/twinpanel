@@ -34,7 +34,7 @@ def _changed_items(result: dict) -> list[dict]:
     ]
 
 
-async def _main() -> int:
+async def _main(*, xray_only: bool = False) -> int:
     from app.services.quota_runtime_reconcile import reconcile_quota_runtime_once
     from app.services.l2tp_quota_runtime_v113 import (
         reconcile_l2tp_quota_runtime_once,
@@ -46,10 +46,19 @@ async def _main() -> int:
     # OpenVPN is now owned by the independent 30-second fast observer in
     # quota_process_isolation_v1. Never run two simultaneous OpenVPN writers:
     # the heavy sweep remains for L2TP and Cisco/Xray only.
-    collectors = (
-        ("l2tp", reconcile_l2tp_quota_runtime_once),
-        ("cisco_xray", reconcile_quota_runtime_once),
-    )
+    if xray_only:
+        # One fast, single-writer Xray pass. No L2TP/Cisco work on this path.
+        async def xray_pass():
+            return await reconcile_quota_runtime_once(include_cisco=False, include_xray=True)
+        collectors = (("xray", xray_pass),)
+    else:
+        # The slow worker must not race the fast Xray cursor writer.
+        async def cisco_pass():
+            return await reconcile_quota_runtime_once(include_cisco=True, include_xray=False)
+        collectors = (
+            ("l2tp", reconcile_l2tp_quota_runtime_once),
+            ("cisco", cisco_pass),
+        )
 
     for name, reconcile in collectors:
         started = asyncio.get_running_loop().time()
@@ -97,4 +106,6 @@ async def _main() -> int:
 
 if __name__ == "__main__":
     _lower_priority()
-    raise SystemExit(asyncio.run(_main()))
+    if any(arg != "--xray-only" for arg in sys.argv[1:]):
+        raise SystemExit("unsupported quota worker argument")
+    raise SystemExit(asyncio.run(_main(xray_only="--xray-only" in sys.argv[1:])))

@@ -26,7 +26,7 @@ async def _terminate_process(process: asyncio.subprocess.Process) -> None:
         await process.wait()
 
 
-async def _run_quota_reconcile_process() -> dict[str, Any]:
+async def _run_quota_reconcile_process(*, xray_only: bool = False) -> dict[str, Any]:
     """Run canonical quota telemetry outside the interactive API process."""
 
     if not WORKER.is_file():
@@ -37,6 +37,7 @@ async def _run_quota_reconcile_process() -> dict[str, Any]:
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         str(WORKER),
+        *(["--xray-only"] if xray_only else []),
         cwd=str(WORKER.parents[1]),
         env=env,
         stdout=asyncio.subprocess.PIPE,
@@ -45,7 +46,7 @@ async def _run_quota_reconcile_process() -> dict[str, Any]:
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(),
-            timeout=PROCESS_TIMEOUT_SECONDS,
+            timeout=90 if xray_only else PROCESS_TIMEOUT_SECONDS,
         )
     except asyncio.CancelledError:
         await _terminate_process(process)
@@ -176,6 +177,41 @@ def install() -> None:
             elapsed = asyncio.get_running_loop().time() - started
             await asyncio.sleep(max(3.0, 30.0 - elapsed))
 
+    async def _fast_xray_accounting_worker() -> None:
+        """Collect Xray's authoritative per-user counters independently of L2TP.
+
+        The slow quota subprocess is deliberately Cisco/L2TP-only: running
+        two Xray writers would race cumulative cursor updates. Each fast
+        invocation finishes (or is terminated) before another is started.
+        """
+        interval_seconds = 30.0
+        while True:
+            started = asyncio.get_running_loop().time()
+            try:
+                result = await _run_quota_reconcile_process(xray_only=True)
+                changed = result.get("changed") or []
+                activations = sum(
+                    int(item.get("activated") or 0)
+                    for item in changed if item.get("collector") == "xray"
+                )
+                failures = result.get("errors") or []
+                if activations or failures:
+                    print(
+                        "XRAY_FAST_ACCOUNTING",
+                        {"activations": activations, "errors": failures[:10]},
+                        flush=True,
+                    )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                print(
+                    "XRAY_FAST_ACCOUNTING_ERROR",
+                    f"{type(exc).__name__}:{str(exc)[:300]}",
+                    flush=True,
+                )
+            elapsed = asyncio.get_running_loop().time() - started
+            await asyncio.sleep(max(3.0, interval_seconds - elapsed))
+
     async def _process_isolated_quota_runtime_worker() -> None:
         if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
             await asyncio.Event().wait()
@@ -187,6 +223,9 @@ def install() -> None:
         )
         asyncio.create_task(
             _fast_openvpn_presence_worker(), name="openvpn-fast-presence",
+        )
+        asyncio.create_task(
+            _fast_xray_accounting_worker(), name="xray-fast-accounting",
         )
         while True:
             cycle_failed = False
@@ -223,6 +262,6 @@ def install() -> None:
     _installed = True
     print(
         f"{MARKER}_ACTIVE scheduling=worker_process nice=10 "
-        "quota_semantics=unchanged collectors=cisco-xray,l2tp; fast=cisco,openvpn",
+        "quota_semantics=unchanged collectors=cisco,l2tp; fast=cisco,openvpn,xray",
         flush=True,
     )
