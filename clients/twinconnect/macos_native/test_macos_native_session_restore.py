@@ -234,6 +234,52 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('case "naive": return "Naive"', dashboard)
         self.assertIn('case "shadowtls": return "ShadowTLS"', dashboard)
 
+    def test_shadowtls_panel_legacy_and_identity_v2_preserve_proxied_udp(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        backend = (DIRECTORY.parents[3] / "backend" / "app" /
+                   "singbox_subscription_accounts.py").read_text(encoding="utf-8")
+        identity = (DIRECTORY.parents[3] / "backend" / "app" / "services" /
+                    "shadowtls_2022_identity_v1.py").read_text(encoding="utf-8")
+        shadow = directory.split(
+            'private func reviewedShadowTLSProxyConfig(', 1
+        )[1].split('private func safeProxyRemoteHost(', 1)[0]
+        # Both supported server projections deliver a 2-outbound detour
+        # chain containing udp_over_tcp v2 on the inner Shadowsocks.
+        self.assertIn('"udp_over_tcp": {"enabled": True, "version": 2}',
+                      backend)
+        self.assertIn('"udp_over_tcp": {"enabled": True, "version": 2}',
+                      identity)
+        self.assertIn('"udp_over_tcp"', shadow)
+        self.assertIn('Set(uot.keys) == Set(["enabled", "version"])', shadow)
+        self.assertIn('uot["enabled"] as? Bool == true', shadow)
+        self.assertIn('uot["version"] as? Int == 2', shadow)
+        self.assertIn(
+            'inner["udp_over_tcp"] = ["enabled": true, "version": 2]',
+            shadow)
+        self.assertIn('ss["detour"] as? String == tag', shadow)
+        self.assertIn('"route": ["final": "proxy"]', shadow)
+        self.assertIn('ss["server"] == nil', shadow)
+        self.assertIn('ss["plugin"] == nil', shadow)
+        self.assertIn('Set(ss.keys).isSubset', shadow)
+
+    def test_shadowtls_refuses_insecure_certificate_bypass(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        shadow = directory.split(
+            'private func reviewedShadowTLSProxyConfig(', 1
+        )[1].split('private func safeProxyRemoteHost(', 1)[0]
+        backend = (DIRECTORY.parents[3] / "backend" / "app" /
+                   "singbox_subscription_accounts.py").read_text(encoding="utf-8")
+        # Backend may emit insecure=true for generic TLS. The app MUST
+        # explicitly override it to false and use platform CA/SNI checking.
+        self.assertIn('"insecure": not trusted_custom_cert', backend)
+        self.assertIn('let sni = tls["server_name"] as? String', shadow)
+        self.assertIn('safeProxyRemoteHost(sni)', shadow)
+        self.assertIn('trustedTLS["insecure"] = false', shadow)
+        self.assertIn('safeOutboundTLS(trustedTLS, server: host)', shadow)
+        self.assertIn('"tls": checkedTLS', shadow)
+        self.assertNotIn('"insecure": true', shadow)
+        self.assertNotIn('"type": "direct"', shadow)
+
     def test_xray_profiles_only_from_authorized_node_and_3_known_inbounds(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
         dashboard = DASHBOARD.read_text(encoding="utf-8")
