@@ -117,6 +117,54 @@ def state_path() -> Path:
     return STATE / "current.json"
 
 
+def attempt_path() -> Path:
+    return STATE / "last_attempt.json"
+
+
+def record_attempt(protocol: str, reason: str) -> dict:
+    """Store only a bounded diagnostic code; never store customer data."""
+    import re
+    if protocol not in PROTOCOLS:
+        fail("UNKNOWN_PROTOCOL")
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", reason):
+        fail("INVALID_ATTEMPT_CODE")
+    if STATE.is_symlink():
+        fail("UNSAFE_ATTEMPT_DIRECTORY")
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(STATE, 0o700)
+    record = {"state": "last_attempt", "protocol": protocol,
+              "reason": reason}
+    tmp = STATE / ("last_attempt." + secrets.token_hex(10) + ".tmp")
+    try:
+        with tmp.open("x", encoding="utf-8") as stream:
+            os.chmod(tmp, 0o600)
+            json.dump(record, stream)
+        os.replace(tmp, attempt_path())
+    finally:
+        tmp.unlink(missing_ok=True)
+    return record
+
+
+def last_attempt() -> dict:
+    import re
+    path = attempt_path()
+    if not path.exists():
+        return {"state": "not_recorded"}
+    if path.is_symlink() or path.stat().st_size > 1024:
+        fail("INVALID_ATTEMPT_RECORD")
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        fail("INVALID_ATTEMPT_RECORD")
+    if not isinstance(record, dict) or record.get("state") != "last_attempt":
+        fail("INVALID_ATTEMPT_RECORD")
+    protocol, reason = record.get("protocol"), record.get("reason")
+    if protocol not in PROTOCOLS or not isinstance(reason, str) or not re.fullmatch(
+            r"[A-Z][A-Z0-9_]{2,63}", reason):
+        fail("INVALID_ATTEMPT_RECORD")
+    return {"state": "last_attempt", "protocol": protocol, "reason": reason}
+
+
 def measured_runtime_config(protocol: str, source: Path) -> tuple[Path, int | None, str | None]:
     """Prepare a private authenticated loopback counter without editing source."""
     if protocol not in SINGBOX:
@@ -526,6 +574,10 @@ def main() -> int:
     sub.add_parser("status")
     sub.add_parser("traffic")
     sub.add_parser("diagnose")
+    sub.add_parser("last-attempt")
+    record = sub.add_parser("record-attempt", help=argparse.SUPPRESS)
+    record.add_argument("protocol", choices=PROTOCOLS)
+    record.add_argument("reason")
     sub.add_parser("stop")
     check = sub.add_parser("probe")
     check.add_argument("--expected-ip", default=None)
@@ -543,6 +595,9 @@ def main() -> int:
                   status() if args.action == "status" else
                   traffic() if args.action == "traffic" else
                   {"state": "diagnosis", "reason": engine_failure_category()} if args.action == "diagnose" else
+                  last_attempt() if args.action == "last-attempt" else
+                  record_attempt(args.protocol, args.reason)
+                      if args.action == "record-attempt" else
                   stop() if args.action == "stop" else
                   probe(args.expected_ip) if args.action == "probe" else
                   watch_owner(args.owner_pid, args.engine_pid, args.owner_started)
