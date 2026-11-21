@@ -423,9 +423,13 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                                 origin: panel.absoluteString, token: refresh)
                             DispatchQueue.global(qos: .utility).async {
                                 _ = TwinMacNativeKeychain.save(saved)
+                                DispatchQueue.main.async {
+                                    completion(.success(session))
+                                }
                             }
+                        } else {
+                            completion(.success(session))
                         }
-                        completion(.success(session))
                     }
                 }
             }
@@ -517,8 +521,10 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             origin: panel.absoluteString, token: nextRefresh)
                         DispatchQueue.global(qos: .utility).async {
                             _ = TwinMacNativeKeychain.save(next)
+                            DispatchQueue.main.async {
+                                completion(.success(session))
+                            }
                         }
-                        completion(.success(session))
                     }
                 }
             }
@@ -526,9 +532,9 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     }
 
     func clearSavedSession() {
-        DispatchQueue.global(qos: .utility).async {
-            TwinMacNativeKeychain.clear()
-        }
+        // Deletion must finish before a new account can log in; never leave
+        // a queued old-token write racing with a logout.
+        TwinMacNativeKeychain.clear()
     }
 
     // Load only tenant-provided public branding over the same ephemeral
