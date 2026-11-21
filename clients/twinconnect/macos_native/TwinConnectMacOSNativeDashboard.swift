@@ -426,6 +426,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingRedrawScheduled = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
+    private var localProxyActive = false
+    private var localProxyExitIP: String?
+    private var localProxyGeneration = 0
     private var cliTunCheckBusy = false
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
@@ -1173,7 +1176,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let leadingSpace = NSView()
         let trailingSpace = NSView()
         offlineRow.addArrangedSubview(leadingSpace)
-        offlineRow.addArrangedSubview(pill("◌  You are offline", color: muted))
+        offlineRow.addArrangedSubview(pill(
+            localProxyActive ? "◉  Local SOCKS proxy active (not VPN)" :
+                               "◌  You are offline",
+            color: localProxyActive ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1199,10 +1205,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button("ϟ    Connect     ›",
+        let connect = button(localProxyActive ? "ϟ    Disconnect     ›" :
+                                                "ϟ    Connect     ›",
                              action: #selector(requestVPNConnection(_:)), primary: true)
-        connect.isEnabled = accountSession != nil
-        connect.toolTip = "Connect to the selected VPN server when the system tunnel engine is provisioned."
+        connect.isEnabled = accountSession != nil && !localProxyBusy
+        connect.toolTip = "Unsigned macOS: Hysteria2 loopback SOCKS only. Other apps will not automatically use it; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
@@ -1225,7 +1232,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // as Windows; no SOCKS process starts from Quick Connect.
         if !status.isEmpty && (status.contains("TUN") ||
                                status.contains("Connection unavailable") ||
-                               status.contains("VPN connection unavailable")) {
+                               status.contains("VPN connection unavailable") ||
+                               status.contains("Local proxy")) {
             let advisory = text(status,
                                 size: 10, color: amber)
             main.addArrangedSubview(advisory)
@@ -1322,7 +1330,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.addArrangedSubview(spacer)
-        header.addArrangedSubview(pill("Disconnected", color: muted))
+        header.addArrangedSubview(pill(
+            localProxyActive ? "SOCKS proxy only" : "Disconnected",
+            color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
@@ -1350,7 +1360,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         network.distribution = .fillEqually
         network.addArrangedSubview(networkMetric("Server ping", value: reportedPing,
             subtitle: pingDetails(selected), valueColor: pingColor(selected)))
-        network.addArrangedSubview(networkMetric("Public IP", value: "—"))
+        network.addArrangedSubview(networkMetric(
+            localProxyActive ? "SOCKS exit IP" : "Public IP",
+            value: localProxyActive ? (localProxyExitIP ?? "—") : "—"))
         content.addArrangedSubview(network)
         network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
@@ -2496,6 +2508,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         logoGeneration += 1
         tenantLogo = nil
         accountSession = nil
+        localProxyGeneration += 1
+        localProxyActive = false
+        localProxyExitIP = nil
+        // Logout is not a VPN stop command; stop the managed loopback
+        // listener without modifying network routes or system proxies.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            _ = self.runLocalManager(
+                ["stop"], root: NSHomeDirectory() + "/twinpanel/clients/twinconnect")
+        }
         localProxyStatus = ""
         snapshot = nil
         activeProtocol = nil
@@ -2588,18 +2610,34 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
 
     @objc private func stopLocalProxyNow(_ sender: NSButton) {
-        // Never block the AppKit main thread while waiting for the engine.
-        // The manager validates the PID and confirms exit before clearing state.
+        stopVerifiedLocalProxy()
+    }
+
+    private func stopVerifiedLocalProxy() {
+        guard !localProxyBusy else { return }
+        localProxyBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
         let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
-        sender.isEnabled = false
+        status = "Stopping local proxy…"
+        view = build()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             let result = self.runLocalManager(["stop"], root: root)
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.localProxyStatus = result.0 == 0 ?
-                    "Local proxy stopped. System VPN remains offline." :
-                    "Local proxy stop failed: " + self.safeManagerReason(result.2)
+                guard let self = self,
+                      self.localProxyGeneration == generation else { return }
+                self.localProxyBusy = false
+                if result.0 == 0 {
+                    self.localProxyActive = false
+                    self.localProxyExitIP = nil
+                    self.localProxyStatus = "Local proxy stopped. No system VPN was running."
+                    self.status = self.localProxyStatus
+                } else {
+                    self.localProxyStatus = "Local proxy stop failed: " +
+                        self.safeManagerReason(result.2)
+                    self.status = self.localProxyStatus
+                }
                 self.view = self.build()
             }
         }
@@ -2783,17 +2821,128 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
-    // The primary action does not silently run a proxy test or a TUN check.
-    // The AppKit fallback has no signed PacketTunnel lifecycle to invoke.
-    // Fail closed instead of reporting a fabricated connection.
+    // Unsigned macOS cannot start the Network Extension. The primary button
+    // may start a real, verified Hysteria2 SOCKS listener on loopback only.
+    // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
+    // Do not label a SOCKS listener as a connected system VPN.
     @objc private func requestVPNConnection(_ sender: NSButton) {
-        guard accountSession != nil else { return }
-        if activeProtocol == nil || activeServer == nil {
-            status = "Connection unavailable: select a server and protocol in Locations."
-        } else {
-            status = "VPN connection unavailable: this unsigned macOS build has no provisioned PacketTunnel engine. No VPN was started."
+        guard accountSession != nil, !localProxyBusy else { return }
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+            return
         }
+        guard activeProtocol == "hysteria2",
+              let serverID = activeServer,
+              let session = accountSession,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "hysteria2" && $0.configured
+              }) == true else {
+            status = activeProtocol == nil || activeServer == nil ?
+                "Connection unavailable: select Hysteria2 and an entitled server in Locations." :
+                "Connection unavailable: unsigned macOS supports a verified Hysteria2 SOCKS proxy only, not a system VPN."
+            view = build()
+            return
+        }
+        localProxyBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Local proxy: fetching authorized Hysteria2 profile…"
         view = build()
+        directory.prepareLocalHysteria2(session, serverID: serverID) {
+            [weak self] response in
+            guard let self = self,
+                  self.localProxyGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            switch response {
+            case .failure(let error):
+                self.localProxyBusy = false
+                let reason = error.localizedDescription
+                self.status = "Local proxy unavailable: " + (
+                    reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    reason : "PROFILE_REQUEST_FAILED")
+                self.view = self.build()
+            case .success(let profile):
+                self.status = "Local proxy: verifying outgoing Hysteria2 HTTPS…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let outcome = self.startVerifiedLocalProxy(profile)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        // A session change means this engine cannot be retained
+                        // for the previous account; stop it before returning.
+                        guard self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken == session.accessToken
+                        else {
+                            if outcome.0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runLocalManager(
+                                        ["stop"], root: NSHomeDirectory() +
+                                        "/twinpanel/clients/twinconnect")
+                                }
+                            }
+                            return
+                        }
+                        self.localProxyBusy = false
+                        self.localProxyActive = outcome.0
+                        self.localProxyExitIP = outcome.2
+                        self.localProxyStatus = outcome.1
+                        self.status = outcome.1
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    /// An actual remote HTTPS request must succeed before proxy mode becomes
+    /// active. The verified listener remains running until Disconnect, logout,
+    /// or the owner-process watchdog stops it; no system traffic is rerouted.
+    private func startVerifiedLocalProxy(_ config: Data)
+        -> (Bool, String, String?) {
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-live-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            return (false, "Local proxy cannot create its private profile directory.", nil)
+        }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let profile = folder.appendingPathComponent("client.json")
+        guard FileManager.default.createFile(atPath: profile.path, contents: config,
+                                            attributes: [.posixPermissions: 0o600]) else {
+            return (false, "Local proxy could not prepare its profile.", nil)
+        }
+        let started = runLocalManager([
+            "start", "hysteria2", profile.path, "--owner-pid",
+            String(ProcessInfo.processInfo.processIdentifier)
+        ], root: root)
+        guard started.0 == 0 else {
+            return (false, "Local proxy startup failed: " +
+                safeManagerReason(started.2), nil)
+        }
+        let tested = runLocalManager(["probe"], root: root)
+        if tested.0 == 0,
+           let bytes = tested.1.data(using: .utf8),
+           let result = (try? JSONSerialization.jsonObject(with: bytes))
+               as? [String: Any],
+           result["state"] as? String == "proxy_egress_reachable",
+           let exitIP = result["egress_ip"] as? String,
+           TwinMacNativePing.validatedPublicIP(exitIP) != nil {
+            return (true, "Local proxy verified: " + exitIP +
+                " — SOCKS 127.0.0.1:17089 (not a system VPN)", exitIP)
+        }
+        let diagnosis = runLocalManager(["diagnose"], root: root)
+        let why = safeManagerReason(tested.2)
+        let remote = safeManagerReason(diagnosis.1)
+        let stopped = runLocalManager(["stop"], root: root)
+        let cleanup = stopped.0 == 0 ? "" : " · STOP_PROXY_MANUALLY"
+        return (false, "Local proxy failed: " + why + " · " + remote +
+            cleanup, nil)
     }
 
     /// Separate read-only diagnostic available from Settings only. Running a
