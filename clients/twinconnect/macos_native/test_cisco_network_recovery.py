@@ -17,9 +17,9 @@ recovery = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(recovery)
 
 STATIC = {"version": 1, "interface": "en0", "service": "Ethernet",
-          "mode": "manual", "ip": "185.236.39.36",
-          "mask": "255.255.255.240", "gateway": "185.236.39.33",
-          "dns": ["185.236.39.19"]}
+          "mode": "manual", "ip": "198.51.100.36",
+          "mask": "255.255.255.240", "gateway": "198.51.100.33",
+          "dns": ["198.51.100.19"]}
 
 
 class CiscoRecoveryTests(unittest.TestCase):
@@ -37,11 +37,11 @@ class CiscoRecoveryTests(unittest.TestCase):
                 return "(1) Ethernet\n(Hardware Port: Ethernet, Device: en0)\n"
             if "-getinfo" in args:
                 return ("Manual Configuration\n"
-                        "IP address: 185.236.39.36\n"
+                        "IP address: 198.51.100.36\n"
                         "Subnet mask: 255.255.255.240\n"
-                        "Router: 185.236.39.33\n")
+                        "Router: 198.51.100.33\n")
             if "-getdnsservers" in args:
-                return "185.236.39.19\n"
+                return "198.51.100.19\n"
             if "get" in args:
                 return "route to: default\ninterface: en0\n"
             raise AssertionError(args)
@@ -55,11 +55,11 @@ class CiscoRecoveryTests(unittest.TestCase):
             if "-listnetworkserviceorder" in args:
                 return "(1) Ethernet\n(Hardware Port: Ethernet, Device: en0)\n"
             if "-getinfo" in args:
-                return ("Manual Configuration\nIP address: 185.236.39.36\n"
+                return ("Manual Configuration\nIP address: 198.51.100.36\n"
                         "Subnet mask: 255.255.255.240\nRouter: (null)\n")
             if "get" in args:
                 return "interface: en0\n"
-            return "185.236.39.19\n"
+            return "198.51.100.19\n"
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
              mock.patch.object(recovery, "command", side_effect=fake_command):
             with self.assertRaisesRegex(ValueError, "CISCO_NETWORK_INVALID_IPV4"):
@@ -79,10 +79,10 @@ class CiscoRecoveryTests(unittest.TestCase):
         def fake_command(*args):
             commands.append(args)
             if "-getinfo" in args:
-                return ("Manual Configuration\nIP address: 185.236.39.36\n"
-                        "Subnet mask: 255.255.255.240\nRouter: 185.236.39.33\n")
+                return ("Manual Configuration\nIP address: 198.51.100.36\n"
+                        "Subnet mask: 255.255.255.240\nRouter: 198.51.100.33\n")
             if "-getdnsservers" in args:
-                return "185.236.39.19\n"
+                return "198.51.100.19\n"
             return ""
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
              mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
@@ -100,12 +100,12 @@ class CiscoRecoveryTests(unittest.TestCase):
                 if not restored[0]:
                     return ("DHCP Configuration\nIP address: 169.254.111.69\n"
                             "Subnet mask: 255.255.0.0\nRouter: (null)\n")
-                return ("Manual Configuration\nIP address: 185.236.39.36\n"
-                        "Subnet mask: 255.255.255.240\nRouter: 185.236.39.33\n")
+                return ("Manual Configuration\nIP address: 198.51.100.36\n"
+                        "Subnet mask: 255.255.255.240\nRouter: 198.51.100.33\n")
             if "-setmanual" in args:
                 restored[0] = True
             if "-getdnsservers" in args:
-                return "185.236.39.19\n"
+                return "198.51.100.19\n"
             return ""
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
              mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
@@ -115,7 +115,7 @@ class CiscoRecoveryTests(unittest.TestCase):
         self.assertTrue(restored[0])
         command.assert_any_call(
             recovery.NETWORKSETUP, "-setmanual", "Ethernet",
-            "185.236.39.36", "255.255.255.240", "185.236.39.33")
+            "198.51.100.36", "255.255.255.240", "198.51.100.33")
         self.assertFalse(recovery.CHECKPOINT.exists())
 
     def test_watcher_does_nothing_without_checkpoint(self):
