@@ -1417,11 +1417,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button(localProxyActive ? "ϟ    Disconnect     ›" :
-                                                "ϟ    Connect     ›",
+        let connect = button(activeProtocol == "cisco" ?
+                             (ciscoAuthBusy ? "Verifying Cisco…" :
+                                              "Verify Cisco login") :
+                             (localProxyActive ? "ϟ    Disconnect     ›" :
+                                                 "ϟ    Connect     ›"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
-        connect.isEnabled = accountSession != nil && !localProxyBusy
-        connect.toolTip = "Unsigned macOS: Hysteria2 loopback SOCKS only. Other apps will not automatically use it; no system VPN."
+        connect.isEnabled = accountSession != nil && !localProxyBusy &&
+            (activeProtocol != "cisco" || (!ciscoAuthBusy && activeServer != nil))
+        connect.toolTip = activeProtocol == "cisco" ?
+            "Checks OpenConnect credentials only; no system VPN tunnel." :
+            "Unsigned macOS: local SOCKS proxy only; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         if localProxyActive {
@@ -1452,24 +1458,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Cisco uses OpenConnect, not the SOCKS proxy launcher. Offer the
         // panel-authorized login check directly for a selected Cisco location.
         // An unsigned application cannot claim that this creates a VPN tunnel.
-        if activeProtocol == "cisco" {
-            let ciscoAction = button(ciscoAuthBusy ?
-                "Verifying Cisco login…" : "Verify Cisco login (no VPN)",
-                action: #selector(testCiscoAuthentication(_:)),
-                mutedButton: true)
-            ciscoAction.isEnabled = !ciscoAuthBusy && accountSession != nil &&
-                activeServer != nil &&
-                snapshot?.protocols.contains(where: {
-                    $0.code == "cisco" && $0.configured
-                }) == true
-            ciscoAction.heightAnchor.constraint(equalToConstant: 40).isActive = true
-            ciscoAction.toolTip = "OpenConnect authentication only. No TUN, DNS, routes or system-wide VPN."
-            main.addArrangedSubview(ciscoAction)
-            ciscoAction.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-            if !ciscoAuthStatus.isEmpty {
-                main.addArrangedSubview(text(ciscoAuthStatus, size: 11,
-                                             color: muted))
-            }
+        if activeProtocol == "cisco" && !ciscoAuthStatus.isEmpty {
+            main.addArrangedSubview(text(ciscoAuthStatus, size: 11,
+                                         color: muted))
         }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
@@ -3386,9 +3377,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return
         }
         if activeProtocol == "cisco" {
-            status = "Cisco uses OpenConnect. Settings can test authentication; " +
-                     "system VPN needs a privileged macOS tunnel runtime."
-            view = build()
+            testCiscoAuthentication(sender)
             return
         }
         let enabled: Set<String> = [
