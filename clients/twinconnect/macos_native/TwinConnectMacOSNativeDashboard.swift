@@ -4,6 +4,13 @@
 import Cocoa
 import CryptoKit
 
+// Low-cost AppKit renderer for remote/macOS machines without a working Metal
+// backend. Set TWINCONNECT_MAC_LIGHTWEIGHT_UI=0 before launching to opt out.
+private enum TwinNativeRenderBudget {
+    static let lightweight =
+        ProcessInfo.processInfo.environment["TWINCONNECT_MAC_LIGHTWEIGHT_UI"] != "0"
+}
+
 private final class TwinNativeFlippedDocument: NSView {
     override var isFlipped: Bool { true }
 }
@@ -38,7 +45,8 @@ private final class TwinNativeBackdrop: NSView {
             glow.withAlphaComponent(0.12).cgColor,
             glow.withAlphaComponent(0).cgColor
         ]
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+        guard !TwinNativeRenderBudget.lightweight,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
               ambientAura.animation(forKey: "ambientBreath") == nil
         else { return }
         let breathe = CABasicAnimation(keyPath: "opacity")
@@ -88,7 +96,8 @@ private final class TwinNativeBackdrop: NSView {
             shade
         ])?.draw(in: area, angle: 138)
 
-        if let context = NSGraphicsContext.current?.cgContext {
+        if !TwinNativeRenderBudget.lightweight,
+           let context = NSGraphicsContext.current?.cgContext {
             context.saveGState()
             // Off-canvas light shafts give believable dimensional depth.
             radialLight(context,
@@ -108,6 +117,7 @@ private final class TwinNativeBackdrop: NSView {
 
         // An asymmetric luminous orbital feature sits mostly behind the
         // content, with enough of its sweep visible in the page margins.
+        if TwinNativeRenderBudget.lightweight { return }
         let origin = CGPoint(x: w * 0.87, y: h * 0.52)
         for index in 0..<7 {
             let expansion = CGFloat(index) * 31
@@ -209,7 +219,8 @@ private final class TwinNativeGlassCard: NSView {
         blur.material = .sidebar
         blur.blendingMode = .withinWindow
         blur.state = .active
-        blur.alphaValue = 0.14
+        blur.alphaValue = TwinNativeRenderBudget.lightweight ? 0 : 0.14
+        if TwinNativeRenderBudget.lightweight { blur.state = .inactive }
         blur.wantsLayer = true
         addSubview(blur)
         tintOverlay.wantsLayer = true
@@ -537,7 +548,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         box.layer?.borderColor = tint().withAlphaComponent(
             style == .panel ? 0.35 : 0.17).cgColor
         box.layer?.shadowColor = NSColor.black.cgColor
-        box.layer?.shadowOpacity = style == .panel ? 0.10 : 0.025
+        box.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 :
+            (style == .panel ? 0.10 : 0.025)
         box.layer?.shadowRadius = style == .panel ? 14 : 5
         box.layer?.shadowOffset = CGSize(width: 0, height: -3)
         let column = stack(spacing: 13)
@@ -1176,7 +1188,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
         connect.layer?.shadowColor = sea.cgColor
-        connect.layer?.shadowOpacity = 0.17
+        connect.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 : 0.17
         connect.layer?.shadowRadius = 10
         connect.layer?.shadowOffset = CGSize(width: 0, height: -2)
         connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
