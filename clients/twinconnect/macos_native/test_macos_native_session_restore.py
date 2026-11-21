@@ -57,8 +57,8 @@ class NativeSessionRestoreTests(unittest.TestCase):
             "@objc private func requestVPNConnection(", 1
         )[1].split("@objc private func unavailableConnect(", 1)[0]
         self.assertNotIn("prepareUnroutedHysteria2TUN", handler)
-        self.assertIn("prepareLocalHysteria2", handler)
-        self.assertIn("startVerifiedLocalProxy(profile)", handler)
+        self.assertIn("prepareLocalSingBox(", handler)
+        self.assertIn("startVerifiedLocalProxy(\n                        profile, protocolCode: selectedProtocol)", handler)
         self.assertIn("Local proxy", handler)
         self.assertIn("stopVerifiedLocalProxy()", handler)
         self.assertNotIn("setGlobalProxy", handler)
@@ -105,6 +105,51 @@ class NativeSessionRestoreTests(unittest.TestCase):
         monitor = dashboard.split("private func refreshTrafficMetrics()", 1)[1].split(
             "private func runLocalManager(", 1)[0]
         self.assertNotIn("self.view = self.build()", monitor)
+
+    def test_entitled_singbox_protocols_bound_to_selected_server(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        for code in ('"hysteria2"', '"tuic"', '"anytls"', '"socks5"', '"snell"'):
+            self.assertIn(code, dashboard)
+        self.assertIn("func prepareLocalSingBox(", directory)
+        self.assertIn('payload: ["protocol": protocolCode]', directory)
+        self.assertIn('self.validEnvelope(response, session.namespace)', directory)
+        self.assertIn('($0["selected"] as? Bool) == true', directory)
+        self.assertIn('($0["config_record_present"] as? Bool) == true', directory)
+        self.assertIn('($0["id"] as? String) == serverID', directory)
+        self.assertIn('item["node_id"]', directory)
+        self.assertIn('guard matches.count == 1', directory)
+        self.assertIn('type == (protocolCode == "socks5" ? "socks" : protocolCode)', directory)
+        self.assertIn('"listen": "127.0.0.1", "listen_port": 17089', directory)
+        self.assertIn('"route": ["final": "proxy"]', directory)
+        self.assertIn('outbound["detour"] == nil', directory)
+        self.assertIn('outbound["dns"] == nil', directory)
+        self.assertIn('tls["insecure"] as? Bool != true', directory)
+        self.assertIn('TwinMacNativePing.validatedPublicIP(host)', directory)
+        self.assertIn('domainName', directory)
+        self.assertIn('UUID(uuidString: uuid)', directory)
+        self.assertIn('reviewed["version"] = "5"', directory)
+        self.assertIn('let version = outbound["version"] as? Int', directory)
+        self.assertIn('safeOutboundTLS(tls, server: host)', directory)
+        self.assertIn('"LOCAL_PROFILE_INVALID"', directory)
+        self.assertIn('"SERVER_NOT_ALLOWED"', directory)
+        self.assertIn('"PROTOCOL_NOT_ALLOWED"', directory)
+        self.assertIn('"PROFILES_NOT_READY"', directory)
+
+    def test_connect_reuses_existing_verified_process_control(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        handler = dashboard.split(
+            "@objc private func requestVPNConnection(", 1
+        )[1].split("/// An actual remote HTTPS request", 1)[0]
+        self.assertIn('enabled.contains(selectedProtocol)', handler)
+        self.assertIn('selectedProtocol && $0.configured', handler)
+        self.assertIn('directory.prepareLocalSingBox(', handler)
+        self.assertIn('startVerifiedLocalProxy(', handler)
+        self.assertIn('profile, protocolCode: selectedProtocol', handler)
+        self.assertIn('stopVerifiedLocalProxy()', handler)
+        self.assertIn('self.startVerifiedLocalProxy(', handler)
+        self.assertIn('self.localProxyActive = outcome.0', handler)
+        self.assertNotIn('startVPNTunnel', handler)
 
 
 if __name__ == "__main__":
