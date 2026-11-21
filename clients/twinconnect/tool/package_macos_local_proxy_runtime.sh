@@ -65,6 +65,23 @@ done
 if [[ "$installed" -ne 2 ]]; then
   echo "INCOMPLETE_LOCAL_PROXY_ENGINE_SET" >&2; exit 3
 fi
+# Bundle OpenVPN and its dylib closure if already installed. This ONLY
+# packages an executable; it does not run a VPN or change routes. A failed
+# dependency rewrite must fail packaging rather than produce a broken app.
+openvpn_candidate=""
+for candidate in /usr/local/opt/openvpn/sbin/openvpn /opt/homebrew/opt/openvpn/sbin/openvpn; do
+  if [[ -f "$candidate" && -x "$candidate" ]]; then
+    openvpn_candidate="$candidate"
+    break
+  fi
+done
+if [[ -n "$openvpn_candidate" ]]; then
+  /usr/bin/python3 tool/package_macos_openvpn_cli.py \
+    "$openvpn_candidate" "$stage/macos_native/build/openvpn/$arch" "$host_arch"
+  installed=$((installed + 1))
+else
+  echo "OPENVPN_CLI_NOT_INSTALLED; NOT_PACKAGED"
+fi
 # Repeatable builds: replace only our own previously packaged directory.
 # Keep the previous runtime as rollback until the new copy is in place.
 backup=""
@@ -88,6 +105,10 @@ for family in singbox xray; do
   test -x "$destination/macos_native/build/$family/$arch/$binary" ||
     { echo "PACKAGED_ENGINE_MISSING" >&2; exit 3; }
 done
+if [[ -n "$openvpn_candidate" ]]; then
+  test -x "$destination/macos_native/build/openvpn/$arch/bin/openvpn" ||
+    { echo "PACKAGED_OPENVPN_MISSING" >&2; exit 3; }
+fi
 test -r "$destination/macos_native/standalone_connection_manager.py" ||
   { echo "PACKAGED_MANAGER_MISSING" >&2; exit 3; }
 echo "MACOS_LOCAL_PROXY_RUNTIME_PACKAGED"
