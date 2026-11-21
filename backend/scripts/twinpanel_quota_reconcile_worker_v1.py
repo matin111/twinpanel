@@ -104,8 +104,30 @@ async def _main(*, xray_only: bool = False) -> int:
     return 0
 
 
+async def _xray_loop() -> int:
+    """One single-writer Xray process, with a 30-second start-to-start cadence."""
+    while True:
+        started = asyncio.get_running_loop().time()
+        try:
+            await _main(xray_only=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                "XRAY_FAST_ACCOUNTING_LOOP_ERROR",
+                f"{type(exc).__name__}:{str(exc)[:300]}",
+                flush=True,
+            )
+        elapsed = asyncio.get_running_loop().time() - started
+        await asyncio.sleep(max(3.0, 30.0 - elapsed))
+
+
 if __name__ == "__main__":
     _lower_priority()
-    if any(arg != "--xray-only" for arg in sys.argv[1:]):
+    if any(arg not in {"--xray-only", "--xray-loop"} for arg in sys.argv[1:]):
         raise SystemExit("unsupported quota worker argument")
+    if "--xray-loop" in sys.argv[1:]:
+        if len(sys.argv) != 2:
+            raise SystemExit("xray loop flags conflict")
+        raise SystemExit(asyncio.run(_xray_loop()))
     raise SystemExit(asyncio.run(_main(xray_only="--xray-only" in sys.argv[1:])))
