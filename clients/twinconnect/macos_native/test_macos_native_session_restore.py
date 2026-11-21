@@ -175,7 +175,13 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('out["quic"] = True', backend)
         self.assertIn('if outbound["quic"] as? Bool == true {', directory)
         self.assertIn('reviewed["quic_congestion_control"] = cc', directory)
+        self.assertIn('"enabled": true,', directory)
         self.assertIn('"server_name": sni, "certificate": authority', directory)
+        naive_branch = directory.split('} else if protocolCode == "naive" {', 1)[1]
+        naive_branch = naive_branch.split('} else {\n            guard let password', 1)[0]
+        self.assertIn('reviewed["tls"] = [\n                "enabled": true,', naive_branch)
+        self.assertIn('"server_name": sni, "certificate": authority', naive_branch)
+        self.assertNotIn('"insecure": true', naive_branch)
         self.assertIn('let authority = checkedTLS["certificate"] as? [String]',
                       directory)
         self.assertIn('!authority.isEmpty', directory)
@@ -184,6 +190,20 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('tls["insecure"] as? Bool != true', directory)
         self.assertIn('let checkedTLS = safeOutboundTLS(tls, server: host)',
                       directory)
+
+    def test_naive_tls_enabled_true_and_ca_are_both_required_for_startup(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        naive = directory.split('} else if protocolCode == "naive" {', 1)[1]
+        naive = naive.split('} else {\n            guard let password', 1)[0]
+        self.assertIn('let checkedTLS = safeOutboundTLS(tls, server: host)',
+                      naive)
+        self.assertIn('let authority = checkedTLS["certificate"] as? [String]',
+                      naive)
+        self.assertIn('!authority.isEmpty', naive)
+        self.assertIn('reviewed["tls"] = [\n                "enabled": true,', naive)
+        self.assertIn('"server_name": sni, "certificate": authority', naive)
+        self.assertNotIn('"insecure": true', naive)
+        self.assertNotIn('"disable_sni": true', naive)
 
     def test_bad_node_profile_has_distinct_safe_failure_codes(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
