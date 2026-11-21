@@ -874,7 +874,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
             return
         }
         let supported: Set<String> = [
-            "tuic", "anytls", "socks5", "snell", "naive", "shadowtls"
+            "tuic", "anytls", "socks5", "snell", "naive", "shadowtls", "v2ray"
         ]
         guard supported.contains(protocolCode),
               serverID.range(of: "^[0-9]{1,20}$",
@@ -932,6 +932,21 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         }
                         return false
                     }
+                    if protocolCode == "v2ray" {
+                        // The official Xray feed has multiple live inbounds
+                        // per node; use the same server_groups projection as
+                        // Windows rather than treating one node as one URI.
+                        guard let groups = response["server_groups"] as? [[String: Any]],
+                              groups.count <= 200,
+                              let config = self.reviewedXrayForServer(
+                                groups, serverID: serverID) else {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "XRAY_PROFILE_NOT_READY")))
+                            return
+                        }
+                        completion(.success(config))
+                        return
+                    }
                     guard matches.count == 1,
                           let config = self.reviewedSingBoxProxyConfig(
                             matches[0], protocolCode: protocolCode) else {
@@ -947,6 +962,153 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
 
     // Never execute remote-provided routes, inbounds, local listeners or
     // arbitrary dialer options. Rebuild only known outbound fields.
+    // Conservative Xray client: the first supported real inbound for the
+    // selected entitled node, preferring TCP TLS then WS TLS then XHTTP Reality.
+    // Never use unknown transports, gRPC, custom routes or insecure TLS.
+    private func reviewedXrayForServer(_ groups: [[String: Any]],
+                                       serverID: String) -> Data? {
+        let matching = groups.filter { group in
+            if let id = group["node_id"] as? String { return id == serverID }
+            if let id = group["node_id"] as? Int { return String(id) == serverID }
+            return false
+        }
+        guard matching.count == 1,
+              let profiles = matching[0]["profiles"] as? [[String: Any]],
+              profiles.count <= 8 else { return nil }
+        let priority = ["tcp_tls", "websocket_tls", "xhttp_reality"]
+        for id in priority {
+            for row in profiles where (row["id"] as? String) == id {
+                guard let uri = row["uri"] as? String,
+                      uri.utf8.count <= 8192 else { continue }
+                if let result = reviewedXrayVLESSUri(uri, profileID: id) {
+                    return result
+                }
+            }
+        }
+        return nil
+    }
+
+    private func reviewedXrayVLESSUri(_ raw: String,
+                                      profileID: String) -> Data? {
+        guard let url = URLComponents(string: raw),
+              url.scheme == "vless",
+              let uuid = url.user,
+              UUID(uuidString: uuid) != nil,
+              url.password == nil,
+              let host = url.host, safeProxyRemoteHost(host),
+              host.utf8.count <= 255,
+              let port = url.port, (1...65535).contains(port),
+              let queryItems = url.queryItems, queryItems.count <= 24
+        else { return nil }
+        var params = [String: String]()
+        for item in queryItems {
+            guard params[item.name] == nil, let value = item.value,
+                  item.name.utf8.count <= 32,
+                  value.utf8.count <= 2048 else { return nil }
+            params[item.name] = value
+        }
+        guard let transport = params["type"],
+              let security = params["security"],
+              let sni = params["sni"], !sni.isEmpty,
+              sni.utf8.count <= 255, !sni.contains("/"),
+              !sni.contains(" "), !sni.contains("@"),
+              ["chrome", "firefox", "safari", "edge"].contains(params["fp"] ?? "chrome")
+        else { return nil }
+        let expected: (String, String)?
+        switch profileID {
+        case "tcp_tls": expected = ("tcp", "tls")
+        case "websocket_tls": expected = ("ws", "tls")
+        case "xhttp_reality": expected = ("xhttp", "reality")
+        default: expected = nil
+        }
+        guard let required = expected,
+              transport == required.0, security == required.1 else { return nil }
+        var stream: [String: Any] = [
+            "network": transport, "security": security
+        ]
+        let fingerprint = params["fp"] ?? "chrome"
+        if security == "tls" {
+            var tls: [String: Any] = [
+                "serverName": sni, "fingerprint": fingerprint,
+                "allowInsecure": false
+            ]
+            if let alpn = params["alpn"], !alpn.isEmpty {
+                let values = alpn.split(separator: ",").map(String.init)
+                guard values.count <= 8,
+                      values.allSatisfy({ !$0.isEmpty && $0.count <= 48 })
+                else { return nil }
+                tls["alpn"] = values
+            }
+            stream["tlsSettings"] = tls
+        } else {
+            guard let pub = params["pbk"],
+                  pub.utf8.count >= 40, pub.utf8.count <= 48,
+                  pub.range(of: "^[A-Za-z0-9_-]+$",
+                            options: .regularExpression) != nil,
+                  let sid = params["sid"],
+                  sid.utf8.count <= 16,
+                  sid.range(of: "^[A-Fa-f0-9]*$",
+                            options: .regularExpression) != nil else { return nil }
+            var reality: [String: Any] = [
+                "serverName": sni, "fingerprint": fingerprint,
+                "publicKey": pub, "shortId": sid
+            ]
+            if let spider = params["spx"], !spider.isEmpty {
+                guard spider.hasPrefix("/"), spider.utf8.count <= 1024
+                else { return nil }
+                reality["spiderX"] = spider
+            }
+            stream["realitySettings"] = reality
+        }
+        if transport == "ws" || transport == "xhttp" {
+            guard let path = params["path"],
+                  path.hasPrefix("/"), path.utf8.count <= 1024,
+                  !path.contains("\r"), !path.contains("\n") else { return nil }
+            let hostHeader = params["host"] ?? ""
+            guard hostHeader.utf8.count <= 255,
+                  !hostHeader.contains("/"), !hostHeader.contains("\r"),
+                  !hostHeader.contains("\n") else { return nil }
+            if transport == "ws" {
+                var ws: [String: Any] = ["path": path]
+                if !hostHeader.isEmpty {
+                    ws["headers"] = ["Host": hostHeader]
+                }
+                stream["wsSettings"] = ws
+            } else {
+                let mode = params["mode"] ?? "stream-one"
+                guard ["stream-one", "stream-up", "packet-up"].contains(mode)
+                else { return nil }
+                var http: [String: Any] = [
+                    "path": path, "mode": mode
+                ]
+                if !hostHeader.isEmpty { http["host"] = hostHeader }
+                stream["xhttpSettings"] = http
+            }
+        }
+        let config: [String: Any] = [
+            "log": ["loglevel": "warning"],
+            "inbounds": [[
+                "tag": "twinconnect-loopback",
+                "listen": "127.0.0.1", "port": 17089,
+                "protocol": "socks", "settings": [
+                    "auth": "noauth", "udp": false
+                ]
+            ]],
+            "outbounds": [[
+                "tag": "proxy", "protocol": "vless",
+                "settings": ["vnext": [[
+                    "address": host, "port": port,
+                    "users": [[
+                        "id": uuid, "encryption": "none"
+                    ]]
+                ]]],
+                "streamSettings": stream
+            ]],
+            "routing": ["domainStrategy": "AsIs", "rules": []]
+        ]
+        return try? JSONSerialization.data(withJSONObject: config)
+    }
+
     private func reviewedSingBoxProxyConfig(_ item: [String: Any],
                                             protocolCode: String) -> Data? {
         if protocolCode == "shadowtls" {
