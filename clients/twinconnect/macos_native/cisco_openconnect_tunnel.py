@@ -17,10 +17,12 @@ import signal
 import subprocess
 import sys
 
+from cisco_network_recovery import snapshot as snapshot_network, restore as restore_network
 from cisco_openconnect_auth import validate, binary
 
 SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
 ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/bin/openconnect"
+NETWORK_GUARD = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_network_recovery.py"
 CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
 
 
@@ -165,12 +167,28 @@ def run(profile: dict, management_ip: str) -> int:
         gateway, _ = management_route(management_ip)
     protected = False
     child = None
+    checkpointed = False
     def requested_stop(_signum, _frame):
         raise KeyboardInterrupt
 
     previous_term = signal.signal(signal.SIGTERM, requested_stop)
     previous_int = signal.signal(signal.SIGINT, requested_stop)
     try:
+        # Capture the original primary network service configuration before
+        # either the management-route edit or vpnc-script can change it.
+        snapshot_network()
+        checkpointed = True
+        if not trusted_root_owned_path(NETWORK_GUARD):
+            raise ValueError("CISCO_NETWORK_GUARD_UNTRUSTED")
+        # Independent root watchdog outlives a crashed GUI or launcher.
+        # The 120s console trial gets a 135s hard recovery deadline.
+        watchdog = subprocess.Popen(
+            ["/usr/bin/python3", NETWORK_GUARD, "watch", str(os.getpid()),
+             "135" if console_trial else "600"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True)
+        if watchdog.poll() is not None:
+            raise ValueError("CISCO_NETWORK_WATCHDOG_UNAVAILABLE")
         if not local_desktop:
             route_add = subprocess.run(
                 [ROUTE, "-n", "add", "-host", management_ip, gateway],
@@ -217,10 +235,16 @@ def run(profile: dict, management_ip: str) -> int:
             except subprocess.TimeoutExpired:
                 child.kill()
                 child.wait()
-        if protected:
-            subprocess.run([ROUTE, "-n", "delete", "-host", management_ip, gateway],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           timeout=5, check=False)
+        try:
+            if protected:
+                subprocess.run([ROUTE, "-n", "delete", "-host", management_ip, gateway],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               timeout=5, check=False)
+        finally:
+            if checkpointed:
+                # Keep the checkpoint if restore fails; detached watchdog
+                # makes another attempt rather than silently losing recovery.
+                restore_network()
 
 
 def main() -> int:
