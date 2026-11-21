@@ -392,6 +392,7 @@ class StandaloneManagerTests(unittest.TestCase):
                        "psk": "secret-credentials"}),
         ]:
             with self.subTest(protocol=protocol):
+                outbound = {**outbound, "tag": "proxy"}
                 conf = self.config({
                     "inbounds": [{
                         "type": "mixed", "listen": "127.0.0.1",
@@ -414,6 +415,28 @@ class StandaloneManagerTests(unittest.TestCase):
                         "external_controller"], f"127.0.0.1:{port}")
                     manager.cleanup_runtime_config(
                         {"managed_profile": str(managed)})
+
+    def test_new_protocols_reject_direct_fallback(self):
+        main = {"type": "tuic", "tag": "proxy"}
+        local = {"type": "mixed", "listen": "127.0.0.1",
+                 "listen_port": 17089}
+        for bad in [
+            {"inbounds": [local], "outbounds": [main],
+             "route": {"final": "direct"}},
+            {"inbounds": [local], "outbounds": [main, {
+                "type": "direct", "tag": "direct"}],
+             "route": {"final": "proxy"}},
+            {"inbounds": [local], "outbounds": [main],
+             "route": {"final": "proxy", "rules": [
+                 {"action": "route", "outbound": "direct"}]}},
+            {"inbounds": [local], "outbounds": [main],
+             "route": {"final": "proxy"},
+             "dns": {"servers": [{"tag": "local", "type": "local"}]}},
+        ]:
+            with self.subTest(bad=bad):
+                conf = self.config(bad)
+                with self.assertRaises(ValueError):
+                    manager.validate("tuic", conf)
 
     def test_new_protocols_never_accept_system_tun(self):
         for protocol, outbound in [
