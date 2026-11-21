@@ -635,6 +635,18 @@ def apply_store_order_discount(
 
     db.flush()
 
+    # Subscription renewal orders share StoreOrder with ordinary purchases.
+    # Use the actual renewal relationship, not an untrusted client flag,
+    # when checking a coupon's purchase/renewal scope.
+    from ..renewal_models import SubscriptionRenewalOrder
+
+    is_renewal = (
+        db.query(SubscriptionRenewalOrder.id)
+        .filter(SubscriptionRenewalOrder.order_id == order.id)
+        .first()
+        is not None
+    )
+
     result = evaluate_discount(
         db,
         owner_type="central",
@@ -643,7 +655,7 @@ def apply_store_order_discount(
         code=payload.code,
         plan_id=order.plan_id,
         base_amount_toman=base_amount,
-        purpose="purchase",
+        purpose="renewal" if is_renewal else "purchase",
     )
 
     discount_id = int(
