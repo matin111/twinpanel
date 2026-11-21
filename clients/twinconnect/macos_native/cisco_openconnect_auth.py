@@ -36,8 +36,9 @@ def reject(reason: str) -> None:
 def public_host(value: str) -> bool:
     if not isinstance(value, str) or not 3 <= len(value) <= 253:
         return False
-    if any(char in value for char in "@:/\\%?&# 	
-"):
+    if any(char.isspace() for char in value):
+        return False
+    if any(char in value for char in "@:/\\%?&#"):
         return False
     try:
         return ipaddress.ip_address(value).is_global
