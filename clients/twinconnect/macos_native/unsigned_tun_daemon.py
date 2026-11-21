@@ -15,6 +15,7 @@ from pathlib import Path
 import platform
 import pwd
 import secrets
+import select
 import signal
 import socket
 import stat
@@ -29,6 +30,7 @@ from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
 APPROVAL = TRUSTED_ROOT / "local-console-approval"
+WATCHDOG = TRUSTED_ROOT / "unsigned_tun_watchdog.py"
 MAX_REQUEST = 262144
 MAX_SESSION = 600
 
@@ -53,6 +55,8 @@ def daemon_preflight() -> None:
         raise ValueError("REMOTE_SESSION_REFUSED")
     if not trusted_root_file(ENGINE) or not os.access(ENGINE, os.X_OK):
         raise ValueError("TRUSTED_ENGINE_NOT_INSTALLED")
+    if not trusted_root_file(WATCHDOG):
+        raise ValueError("TRUSTED_WATCHDOG_NOT_INSTALLED")
     if not trusted_root_file(APPROVAL):
         raise ValueError("LOCAL_CONSOLE_APPROVAL_MISSING")
     if APPROVAL.read_text(encoding="ascii").strip() != "LOCAL_MAC_WITH_RECOVERY":
@@ -68,6 +72,7 @@ class Session:
     def __init__(self) -> None:
         self.lock = threading.RLock()
         self.process: subprocess.Popen | None = None
+        self.watchdog: subprocess.Popen | None = None
         self.config: Path | None = None
         self.owner: int | None = None
         self.started: float | None = None
@@ -99,6 +104,7 @@ class Session:
                 if self.config is not None:
                     self.config.unlink(missing_ok=True)
                 self.process = None
+                self.watchdog = None
                 self.config = None
                 self.owner = None
                 self.started = None
@@ -107,6 +113,8 @@ class Session:
         with self.lock:
             if self.process is not None:
                 if self.process.poll() is not None or (
+                    self.watchdog is not None and self.watchdog.poll() is not None
+                ) or (
                     self.started is not None and
                     time.monotonic() - self.started > MAX_SESSION
                 ) or not self.console_owner_present():
@@ -145,13 +153,30 @@ class Session:
                 self.config = path
                 self.owner = uid
                 self.started = time.monotonic()
+                # Engine must never run without independent daemon-death
+                # supervision. Wait for the watchdog to install its Darwin
+                # NOTE_EXIT kqueue filter before replying success.
+                watcher = subprocess.Popen(
+                    [sys.executable, str(WATCHDOG), "--parent",
+                     str(os.getpid()), "--engine", str(child.pid),
+                     "--seconds", str(MAX_SESSION)],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True)
+                self.watchdog = watcher
+                ready, _, _ = select.select([watcher.stdout], [], [], 3.0)
+                if not ready or watcher.stdout.readline() != b"WATCHDOG_READY\\n":
+                    self.cleanup()
+                    raise ValueError("TUN_WATCHDOG_START_FAILED")
+                watcher.stdout.close()
                 if child.poll() is not None:
                     self.cleanup()
                     raise ValueError("TUN_ENGINE_EXITED_EARLY")
                 return self.status()
             except BaseException:
-                if self.process is None:
-                    path.unlink(missing_ok=True)
+                self.cleanup()
+                path.unlink(missing_ok=True)
                 raise
 
     def stop(self, uid: int) -> dict:
