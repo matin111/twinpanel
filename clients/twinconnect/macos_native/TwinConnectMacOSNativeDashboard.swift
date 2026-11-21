@@ -579,6 +579,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingRedrawScheduled = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
+    private let proxyAttemptQueue = DispatchQueue(
+        label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
     private var localProxyActive = false
     // This is set only after a successful HTTPS probe and is independent
     // of the protocol currently highlighted in the location picker.
@@ -3188,6 +3190,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    // Only fixed diagnostic identifiers are persisted; never credentials,
+    // profile content, hostnames or network endpoints.
+    private func recordProxyAttempt(_ protocolCode: String, _ reason: String) {
+        let allowed: Set<String> = [
+            "hysteria2", "tuic", "anytls", "socks5",
+            "snell", "naive", "shadowtls", "v2ray"
+        ]
+        guard allowed.contains(protocolCode) else { return }
+        let safeCode = reason.range(
+            of: "^[A-Z][A-Z0-9_]{2,63}$",
+            options: .regularExpression) != nil ?
+            reason : "PROFILE_REQUEST_FAILED"
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        proxyAttemptQueue.async { [weak self] in
+            guard let self = self else { return }
+            _ = self.runLocalManager(
+                ["record-attempt", protocolCode, safeCode], root: root)
+        }
+    }
+
     private func runLocalManager(_ args: [String], root: String)
         -> (Int32, String, String) {
         let program = Process()
@@ -3237,6 +3259,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 "Connection unavailable: select a server and protocol in Locations." :
                 "Connection unavailable: this protocol needs a supported, entitled proxy profile."
             localProxyStatus = status
+            if let code = activeProtocol {
+                recordProxyAttempt(code, "SELECTION_NOT_READY")
+            }
             view = build()
             return
         }
@@ -3244,6 +3269,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         localProxyGeneration += 1
         let generation = localProxyGeneration
         status = "Checking authorized " + selectedProtocol + " profile…"
+        recordProxyAttempt(selectedProtocol, "CONNECT_REQUESTED")
         localProxyStatus = status
         view = build()
         directory.prepareLocalSingBox(
@@ -3264,6 +3290,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 // denied profiles never start an engine, so CLI diagnose
                 // cannot explain them after the fact.
                 self.localProxyStatus = self.status
+                let safeCode = reason.range(
+                    of: "^[A-Z][A-Z0-9_]{2,63}$",
+                    options: .regularExpression) != nil ?
+                    reason : "PROFILE_REQUEST_FAILED"
+                self.recordProxyAttempt(selectedProtocol, safeCode)
                 self.view = self.build()
             case .success(let profile):
                 self.status = "Verifying " + selectedProtocol + " HTTPS exit…"
@@ -3329,12 +3360,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 withIntermediateDirectories: false,
                 attributes: [.posixPermissions: 0o700])
         } catch {
+            recordProxyAttempt(protocolCode, "PRIVATE_PROFILE_DIRECTORY_FAILED")
             return (false, "Local proxy cannot create its private profile directory.", nil)
         }
         defer { try? FileManager.default.removeItem(at: folder) }
         let profile = folder.appendingPathComponent("client.json")
         guard FileManager.default.createFile(atPath: profile.path, contents: config,
                                             attributes: [.posixPermissions: 0o600]) else {
+            recordProxyAttempt(protocolCode, "PRIVATE_PROFILE_WRITE_FAILED")
             return (false, "Local proxy could not prepare its profile.", nil)
         }
         let started = runLocalManager([
@@ -3352,6 +3385,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                            category == "ENGINE_LOG_UNAVAILABLE" ||
                            category == "UNKNOWN_PROXY_FAILURE" ?
                 "" : " · " + category
+            recordProxyAttempt(protocolCode,
+                               specific.isEmpty ? reason : category)
             return (false, "Local proxy startup failed: " +
                 reason + specific, nil)
         }
@@ -3363,6 +3398,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
            result["state"] as? String == "proxy_egress_reachable",
            let exitIP = result["egress_ip"] as? String,
            TwinMacNativePing.validatedPublicIP(exitIP) != nil {
+            recordProxyAttempt(protocolCode, "PROXY_EGRESS_VERIFIED")
             return (true, protocolCode.uppercased() + " proxy verified: " +
                 exitIP + " — SOCKS 127.0.0.1:17089", exitIP)
         }
@@ -3371,6 +3407,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let remote = safeManagerReason(diagnosis.1)
         let stopped = runLocalManager(["stop"], root: root)
         let cleanup = stopped.0 == 0 ? "" : " · STOP_PROXY_MANUALLY"
+        recordProxyAttempt(protocolCode,
+            remote != "ENGINE_FAILURE_NOT_CLASSIFIED" &&
+            remote != "ENGINE_LOG_UNAVAILABLE" &&
+            remote != "UNKNOWN_PROXY_FAILURE" ? remote :
+            (why == "UNKNOWN_PROXY_FAILURE" ? "PROXY_EGRESS_FAILED" : why))
         return (false, "Local proxy failed: " + why + " · " + remote +
             cleanup, nil)
     }
