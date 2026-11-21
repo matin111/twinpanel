@@ -2815,7 +2815,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             _ = self.runLocalManager(
-                ["stop"], root: NSHomeDirectory() + "/twinpanel/clients/twinconnect")
+                ["stop"], root: localRuntimeRoot())
         }
         localProxyStatus = ""
         snapshot = nil
@@ -2964,7 +2964,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         localProxyBusy = true
         localProxyGeneration += 1
         let generation = localProxyGeneration
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         status = "Stopping local proxy…"
         view = build()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -3193,7 +3193,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func runCiscoAuthenticationOnly(_ profile: Data) -> String {
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         let script = root + "/macos_native/cisco_openconnect_auth.py"
         guard profile.count > 0, profile.count <= 16384,
               FileManager.default.isReadableFile(atPath: script) else {
@@ -3312,8 +3312,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     /// local SOCKS process and cleans up test credentials even on failure.
     private func oneShotLocalProxyProbe(_ config: Data,
                                         protocolCode: String) -> String {
-        let root = NSHomeDirectory() +
-            "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         let manager = root + "/macos_native/standalone_connection_manager.py"
         #if arch(arm64)
         let archName = "arm64"
@@ -3444,7 +3443,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         trafficPollBusy = true
         let generation = localProxyGeneration
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         // Query is a local, authenticated sing-box counter, not a network
         // speed test. Keep subprocess and JSON parsing off AppKit's main UI.
         DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -3536,12 +3535,27 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             of: "^[A-Z][A-Z0-9_]{2,63}$",
             options: .regularExpression) != nil ?
             reason : "PROFILE_REQUEST_FAILED"
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         proxyAttemptQueue.async { [weak self] in
             guard let self = self else { return }
             _ = self.runLocalManager(
                 ["record-attempt", protocolCode, safeCode], root: root)
         }
+    }
+
+    // Prefer a packaged runtime in a distributable app. Source checkout
+    // fallback exists only for developer builds, not as a release contract.
+    private func localRuntimeRoot() -> String {
+        if let resources = Bundle.main.resourceURL {
+            let packaged = resources.appendingPathComponent(
+                "twinconnect-runtime", isDirectory: true)
+            let manager = packaged.appendingPathComponent(
+                "macos_native/standalone_connection_manager.py")
+            if FileManager.default.isReadableFile(atPath: manager.path) {
+                return packaged.path
+            }
+        }
+        return NSHomeDirectory() + "/twinpanel/clients/twinconnect"
     }
 
     private func runLocalManager(_ args: [String], root: String)
@@ -3656,8 +3670,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             if outcome.0 {
                                 DispatchQueue.global(qos: .utility).async {
                                     _ = self.runLocalManager(
-                                        ["stop"], root: NSHomeDirectory() +
-                                        "/twinpanel/clients/twinconnect")
+                                        ["stop"], root: self.localRuntimeRoot())
                                 }
                             }
                             return
@@ -3694,7 +3707,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func startVerifiedLocalProxy(_ config: Data,
                                          protocolCode: String = "hysteria2")
         -> (Bool, String, String?) {
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("twinconnect-live-" + UUID().uuidString,
                                     isDirectory: true)
@@ -3831,7 +3844,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     /// Config never reaches a shell. Private temporary data is removed on all
     /// exits; no system route, DNS, or proxy is modified.
     private func checkUnroutedTUNProfile(_ profile: Data) -> Bool {
-        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        let root = localRuntimeRoot()
         #if arch(arm64)
         let architecture = "arm64"
         #else
