@@ -41,6 +41,23 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('no credentials included', dashboard)
         self.assertNotIn('profile or entitlement unavailable.', dashboard)
 
+    def test_connect_button_is_primary_and_preflight_is_in_settings(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        home = dashboard.split("private func connectPage() -> NSView {", 1)[1].split(
+            "private func networkMetric(", 1)[0]
+        settings = dashboard.split("private func settingsPage() -> NSView {", 1)[1].split(
+            "private func expiryText(", 1)[0]
+        self.assertIn('button("ϟ    Connect     ›"', home)
+        self.assertIn('action: #selector(requestVPNConnection(_:))', home)
+        self.assertNotIn('Check TUN readiness', home)
+        self.assertIn('"Check TUN readiness"', settings)
+        self.assertIn('action: #selector(unavailableConnect(_:))', settings)
+        handler = dashboard.split(
+            "@objc private func requestVPNConnection(", 1
+        )[1].split("@objc private func unavailableConnect(", 1)[0]
+        self.assertNotIn("prepareUnroutedHysteria2TUN", handler)
+        self.assertIn("No VPN was started.", handler)
+
 
 if __name__ == "__main__":
     unittest.main()
