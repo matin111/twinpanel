@@ -74,9 +74,10 @@ def run(profile: dict, management_ip: str) -> int:
     if exe is None or not trusted_script(SCRIPT):
         raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
     script = SCRIPT
-    # "desktop" is an explicit installer-authorized mode for a locally
-    # controlled Mac. It is never selected automatically on a remote Mac.
-    local_desktop = management_ip == "desktop"
+    # Console trial is explicitly provisioned by the administrator.
+    # Automatically stop after two minutes, even if the app disappears.
+    console_trial = management_ip == "console-test"
+    local_desktop = management_ip == "desktop" or console_trial
     gateway = ""
     if not local_desktop:
         gateway, _ = management_route(management_ip)
@@ -114,6 +115,13 @@ def run(profile: dict, management_ip: str) -> int:
         print(json.dumps({"state": "cisco_tunnel_starting",
                           "vpn_connected": False}), flush=True)
         try:
+            if console_trial:
+                try:
+                    return child.wait(timeout=120)
+                except subprocess.TimeoutExpired:
+                    print(json.dumps({"state": "cisco_console_trial_timeout",
+                                      "vpn_connected": False}), flush=True)
+                    return 0
             return child.wait()
         except KeyboardInterrupt:
             return 0
