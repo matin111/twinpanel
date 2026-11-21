@@ -24,6 +24,15 @@ if [[ "${found:-}" != 1 ]] || { [[ ! -f /usr/local/etc/vpnc/vpnc-script ]] && [[
   echo "CISCO_ENGINE_REQUIREMENTS_MISSING: install OpenConnect and vpnc-script first." >&2
   exit 1
 fi
+# Always install an administrator-owned copy of vpnc-script. Never execute
+# a user-owned Homebrew script as root when connecting Cisco.
+vpn_source=""
+for candidate in /usr/local/etc/vpnc/vpnc-script /opt/homebrew/etc/vpnc/vpnc-script; do
+  if [[ -f "$candidate" && ! -L "$candidate" ]]; then vpn_source="$candidate"; break; fi
+done
+[[ -n "$vpn_source" ]] || { echo "CISCO_VPN_SCRIPT_NOT_FOUND" >&2; exit 1; }
+install -o root -g wheel -m 0755 "$vpn_source" "$base/vpnc-script"
+stat -f '%Su %Sp %N' "$base/vpnc-script"
 # Validate the exact included sudoers syntax before installing a drop-in.
 grep -Eq '^[[:space:]]*(#includedir|@includedir)[[:space:]]+(/private)?/etc/sudoers.d' /etc/sudoers || {
   echo "CISCO_SUDOERS_INCLUDE_NOT_CONFIRMED" >&2; exit 1;
