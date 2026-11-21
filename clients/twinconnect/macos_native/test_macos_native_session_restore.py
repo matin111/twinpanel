@@ -208,6 +208,27 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('safeProxyRemoteHost(host)', directory)
         self.assertIn('case "v2ray": return "V2Ray"', dashboard)
 
+    def test_appkit_records_pre_engine_failure_for_terminal_without_secrets(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        self.assertIn("private func recordProxyAttempt(", dashboard)
+        self.assertIn('["record-attempt", protocolCode, safeCode]', dashboard)
+        self.assertIn('label: "com.twinconnect.macos.proxy-attempt"', dashboard)
+        handler = dashboard.split("@objc private func requestVPNConnection(", 1)[1]
+        handler = handler.split("/// An actual remote HTTPS request", 1)[0]
+        self.assertIn('recordProxyAttempt(selectedProtocol, "CONNECT_REQUESTED")',
+                      handler)
+        self.assertIn('recordProxyAttempt(code, "SELECTION_NOT_READY")',
+                      handler)
+        self.assertIn('self.recordProxyAttempt(selectedProtocol, safeCode)',
+                      handler)
+        run = dashboard.split("private func startVerifiedLocalProxy(", 1)[1]
+        run = run.split("/// Separate read-only diagnostic", 1)[0]
+        self.assertIn('"PRIVATE_PROFILE_DIRECTORY_FAILED"', run)
+        self.assertIn('"PRIVATE_PROFILE_WRITE_FAILED"', run)
+        self.assertIn('recordProxyAttempt(protocolCode,', run)
+        self.assertIn('"PROXY_EGRESS_VERIFIED"', run)
+        self.assertNotIn('"record-attempt", protocolCode, config', dashboard)
+
     def test_failed_profile_fetch_is_visible_without_engine_process(self):
         dashboard = DASHBOARD.read_text(encoding="utf-8")
         handler = dashboard.split(
