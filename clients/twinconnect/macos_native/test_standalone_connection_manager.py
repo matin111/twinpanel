@@ -438,6 +438,54 @@ class StandaloneManagerTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     manager.validate("tuic", conf)
 
+    def test_naive_and_shadowtls_are_strict_loopback_only(self):
+        naive = {
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 17089}],
+            "outbounds": [{"type": "naive", "tag": "proxy",
+                           "server": "example.com", "server_port": 443,
+                           "username": "u", "password": "p",
+                           "tls": {"enabled": True, "server_name": "example.com"}}],
+            "route": {"final": "proxy"}
+        }
+        shadow = {
+            "inbounds": naive["inbounds"],
+            "outbounds": [
+                {"type": "shadowsocks", "tag": "proxy",
+                 "method": "aes-128-gcm", "password": "ss-key",
+                 "detour": "shadowtls-transport"},
+                {"type": "shadowtls", "tag": "shadowtls-transport",
+                 "version": 3, "server": "example.com", "server_port": 443,
+                 "password": "transport-key",
+                 "tls": {"enabled": True, "server_name": "example.com"}}
+            ],
+            "route": {"final": "proxy"}
+        }
+        for code, profile in (("naive", naive), ("shadowtls", shadow)):
+            with self.subTest(protocol=code):
+                config = self.config(profile)
+                self.assertEqual(manager.validate(code, config), 17089)
+                with mock.patch.object(manager, "STATE", self.root / code):
+                    runtime, port, secret = manager.measured_runtime_config(
+                        code, config)
+                    self.assertTrue(runtime.is_file())
+                    self.assertIsInstance(port, int)
+                    self.assertGreaterEqual(len(secret), 32)
+                    generated = json.loads(runtime.read_text())
+                    self.assertEqual(generated["outbounds"], profile["outbounds"])
+                    manager.cleanup_runtime_config({"managed_profile": str(runtime)})
+        direct = dict(shadow)
+        direct["outbounds"] = [*shadow["outbounds"], {
+            "type": "direct", "tag": "direct"}]
+        with self.assertRaises(ValueError):
+            manager.validate("shadowtls", self.config(direct))
+        wrongDetour = dict(shadow)
+        wrongDetour["outbounds"] = [dict(shadow["outbounds"][0]),
+                                    shadow["outbounds"][1]]
+        wrongDetour["outbounds"][0]["detour"] = "direct"
+        with self.assertRaises(ValueError):
+            manager.validate("shadowtls", self.config(wrongDetour))
+
     def test_new_protocols_never_accept_system_tun(self):
         for protocol, outbound in [
             ("tuic", {"type": "tuic"}),
