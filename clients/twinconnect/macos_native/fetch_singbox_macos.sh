@@ -7,7 +7,14 @@ version="1.14.4"
 base="https://github.com/SagerNet/sing-box/releases/download/v${version}"
 dest="$root/macos_native/build/singbox"
 mkdir -p "$dest"
-for arch in arm64 amd64; do
+# Install only the current CPU's binary; Intel cloud Macs cannot execute the
+# arm64 binary that the former installer tried as its final verification.
+case "$(uname -m)" in
+  x86_64) arch="amd64" ;;
+  arm64) arch="arm64" ;;
+  *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+for arch in "$arch"; do
   case "$arch" in
     arm64) digest="0d8c7f5ed5d587b0f1a5e9772a708ec3bfa4ac4c9329604b01d8d9c2ba406838";;
     amd64) digest="eae86b9b033bba50b7c44ab719e4bfac0aca05efd28483390ed3aa510f32db25";;
@@ -23,4 +30,4 @@ for arch in arm64 amd64; do
   chmod +x "$dest/$arch/sing-box"
   file "$dest/$arch/sing-box"
 done
-"$dest/arm64/sing-box" version
+"$dest/$arch/sing-box" version
