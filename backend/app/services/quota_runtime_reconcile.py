@@ -17,6 +17,7 @@ from ..quota_models import QuotaSession
 from ..quota_schemas import SessionCloseIn, SessionOpenIn, UsageEventIn
 from ..quota_service import close_session
 from ..routers.provision import ssh_connect_saved
+from .accounting_device_map_batch_v1 import build_accounting_devices_by_node
 from .quota_node_sync import (
     _credential_node_ids,
     _legacy_subscription_node_ids,
@@ -622,9 +623,12 @@ async def _disconnect_excess_cisco_sessions(node: Node, db, session_ids: list[st
     return results
 
 
-def _apply_xray_stats(db, node: Node, epoch: str, observed: list[dict]) -> dict:
+def _apply_xray_stats(
+    db, node: Node, epoch: str, observed: list[dict],
+    *, precomputed_devices: dict[str, dict] | None = None,
+) -> dict:
     node_id = int(node.id)
-    devices = _device_map(db, node_id, "xray")
+    devices = precomputed_devices if precomputed_devices is not None else _device_map(db, node_id, "xray")
     now_aware = datetime.now(timezone.utc)
     sequence_base = int(time.time_ns() // 1_000_000)
     matched = 0
@@ -804,6 +808,25 @@ async def reconcile_quota_runtime_once(
             .all()
         )
 
+        # Batch-decode Xray credentials once for the entire fast pass.
+        # The previous per-node lookup decrypted every credential repeatedly,
+        # often exceeding the fast subprocess timeout under production load.
+        xray_device_maps: dict[int, dict[str, dict]] = {}
+        if include_xray:
+            xray_ids = {int(node.id) for node in nodes if bool(getattr(node, "enable_v2ray", False))}
+            if xray_ids:
+                mapped = build_accounting_devices_by_node(
+                    db, selected_node_ids=xray_ids, source_protocols={"v2ray"},
+                )
+                xray_device_maps = {
+                    int(node_id): {
+                        str(item.get("identity") or ""): item
+                        for item in devices
+                        if item.get("protocol") == "xray" and item.get("identity")
+                    }
+                    for node_id, devices in mapped.items()
+                }
+
         for node in nodes:
             node_id = int(node.id)
 
@@ -843,7 +866,10 @@ async def reconcile_quota_runtime_once(
                 ok, epoch, observed, error = await _collect_xray_users(node, db)
                 if ok:
                     try:
-                        result = _apply_xray_stats(db, node, epoch, observed)
+                        result = _apply_xray_stats(
+                            db, node, epoch, observed,
+                            precomputed_devices=xray_device_maps.get(node_id, {}),
+                        )
                         db.commit()
                         results.append({"ok": True, **result})
                     except Exception as exc:
