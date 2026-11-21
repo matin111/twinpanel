@@ -178,30 +178,50 @@ def install() -> None:
             await asyncio.sleep(max(3.0, 30.0 - elapsed))
 
     async def _fast_xray_accounting_worker() -> None:
-        """Collect Xray's authoritative per-user counters independently of L2TP.
+        """Supervise one persistent, low-priority Xray ledger process.
 
-        The slow quota subprocess is deliberately Cisco/L2TP-only: running
-        two Xray writers would race cumulative cursor updates. Each fast
-        invocation finishes (or is terminated) before another is started.
+        Keep interpreter startup out of the 30-second accounting cadence.
+        The slow L2TP/Cisco worker never writes Xray counters. A heartbeat
+        timeout terminates and restarts a stalled Xray subprocess safely.
         """
-        interval_seconds = 30.0
         while True:
-            started = asyncio.get_running_loop().time()
+            env = dict(os.environ)
+            env["TWINPANEL_QUOTA_WORKER_V1"] = "1"
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, str(WORKER), "--xray-loop",
+                cwd=str(WORKER.parents[1]),
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
             try:
-                result = await _run_quota_reconcile_process(xray_only=True)
-                changed = result.get("changed") or []
-                activations = sum(
-                    int(item.get("activated") or 0)
-                    for item in changed if item.get("collector") == "xray"
-                )
-                failures = result.get("errors") or []
-                if activations or failures:
-                    print(
-                        "XRAY_FAST_ACCOUNTING",
-                        {"activations": activations, "errors": failures[:10]},
-                        flush=True,
+                assert process.stdout is not None
+                while True:
+                    line = await asyncio.wait_for(
+                        process.stdout.readline(), timeout=120.0,
                     )
+                    if not line:
+                        raise RuntimeError(
+                            f"xray_accounting_process_exited:{process.returncode}"
+                        )
+                    text = line.decode("utf-8", errors="replace").strip()
+                    if not text.startswith(RESULT_PREFIX):
+                        continue
+                    result = json.loads(text[len(RESULT_PREFIX):])
+                    changed = result.get("changed") or []
+                    activations = sum(
+                        int(item.get("activated") or 0)
+                        for item in changed if item.get("collector") == "xray"
+                    )
+                    failures = result.get("errors") or []
+                    if activations or failures:
+                        print(
+                            "XRAY_FAST_ACCOUNTING",
+                            {"activations": activations, "errors": failures[:10]},
+                            flush=True,
+                        )
             except asyncio.CancelledError:
+                await _terminate_process(process)
                 raise
             except Exception as exc:
                 print(
@@ -209,8 +229,8 @@ def install() -> None:
                     f"{type(exc).__name__}:{str(exc)[:300]}",
                     flush=True,
                 )
-            elapsed = asyncio.get_running_loop().time() - started
-            await asyncio.sleep(max(3.0, interval_seconds - elapsed))
+                await _terminate_process(process)
+            await asyncio.sleep(5.0)
 
     async def _process_isolated_quota_runtime_worker() -> None:
         if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
