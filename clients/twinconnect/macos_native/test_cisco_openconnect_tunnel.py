@@ -38,6 +38,26 @@ class CiscoTunnelTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "CISCO_MANAGEMENT_ROUTE_UNKNOWN"):
                 tun.management_route("8.8.8.8")
 
+    def test_desktop_mode_skips_management_route(self):
+        # Locally approved desktop connections have no SSH/VNC management IP.
+        with mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
+             mock.patch.object(tun.os.path, "isfile", return_value=True), \
+             mock.patch.object(tun, "management_route") as route, \
+             mock.patch.object(tun.subprocess, "run") as change_route, \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            child = launch.return_value
+            child.stdin = mock.Mock()
+            child.wait.return_value = 0
+            child.poll.return_value = 0
+            profile = {"host": "vpn.example.com", "port": 443,
+                       "username": "alice", "password": "example",
+                       "servercert": "sha256:" + "a" * 64}
+            self.assertEqual(tun.run(profile, "desktop"), 0)
+            route.assert_not_called()
+            change_route.assert_not_called()
+
+
     def test_no_root_means_no_network_changes(self):
         with mock.patch.object(tun.os, "geteuid", return_value=501), \
              mock.patch.object(tun.subprocess, "run") as route, \
