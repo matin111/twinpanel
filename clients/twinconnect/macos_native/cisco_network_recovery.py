@@ -142,6 +142,47 @@ def read_checkpoint() -> dict:
     return value
 
 
+def record_tunnel_pid(pid: int) -> None:
+    """Atomically attach the privileged child PID to the root-only checkpoint."""
+    if os.geteuid() != 0 or type(pid) is not int or pid <= 1:
+        raise ValueError("CISCO_NETWORK_PID_INVALID")
+    state = read_checkpoint()
+    state["tunnel_pid"] = pid
+    import tempfile
+    fd, tmp = tempfile.mkstemp(prefix=".cisco-state-", dir=BASE)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump(state, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp, CHECKPOINT)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def stop_orphaned_tunnel() -> None:
+    """Only signal the exact installed OpenConnect binary if still running."""
+    import signal
+    state = read_checkpoint()
+    pid = state.get("tunnel_pid")
+    if type(pid) is not int or pid <= 1:
+        return
+    p = subprocess.run(
+        ["/bin/ps", "-p", str(pid), "-o", "command="],
+        capture_output=True, text=True, timeout=5, check=False)
+    if p.returncode != 0:
+        return
+    runtime = str(BASE / "openconnect-runtime/bin/openconnect")
+    if not p.stdout.strip().startswith(runtime + " "):
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+
+
 def restore() -> None:
     if os.geteuid() != 0:
         raise ValueError("CISCO_ROOT_REQUIRED")
@@ -217,7 +258,12 @@ def watch(parent_pid: int, deadline_seconds: int) -> None:
         pass
     time.sleep(3)
     if CHECKPOINT.exists():
-        restore()
+        # The launcher may have been SIGKILLed and left a root tunnel orphan.
+        # Only stop a process verified to be our private OpenConnect binary.
+        stop_orphaned_tunnel()
+        time.sleep(2)
+        if CHECKPOINT.exists():
+            restore()
 
 
 def main():
