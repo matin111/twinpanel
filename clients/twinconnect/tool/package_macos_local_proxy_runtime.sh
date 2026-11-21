@@ -16,8 +16,12 @@ if [[ "$signing" != *"code object is not signed at all"* ]]; then
   echo "SIGNED_APP_BUNDLE_REFUSED_USE_UNSIGNED_DEBUG_BUILD" >&2; exit 2
 fi
 destination="$app/Contents/Resources/twinconnect-runtime"
-if [[ -L "$destination" || -e "$destination" ]]; then
-  echo "RUNTIME_ALREADY_PRESENT_OR_SYMLINK" >&2; exit 2
+if [[ -L "$destination" ]]; then
+  echo "UNSAFE_RUNTIME_SYMLINK" >&2; exit 2
+fi
+if [[ -e "$destination" &&
+      ! -f "$destination/macos_native/standalone_connection_manager.py" ]]; then
+  echo "UNRECOGNIZED_EXISTING_RUNTIME_REFUSED" >&2; exit 2
 fi
 for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py; do
   if [[ ! -f "$source" || -L "$source" ]]; then
@@ -44,8 +48,8 @@ for family in singbox xray; do
     echo "UNSAFE_ENGINE_SYMLINK: $source" >&2; exit 2
   fi
   if [[ ! -f "$source" || ! -x "$source" ]]; then
-    echo "ENGINE_SKIPPED_NOT_INSTALLED: $family/$arch/$binary"
-    continue
+    echo "REQUIRED_ENGINE_NOT_INSTALLED: $family/$arch/$binary" >&2
+    exit 3
   fi
   if ! /usr/bin/lipo -archs "$source" 2>/dev/null | tr ' ' '\n' |
        grep -Fxq "$host_arch"; then
@@ -56,11 +60,34 @@ for family in singbox xray; do
   echo "ENGINE_PACKAGED: $family/$arch/$binary"
   installed=$((installed + 1))
 done
-if [[ "$installed" -eq 0 ]]; then
-  echo "NO_LOCAL_PROXY_ENGINES_INSTALLED; BUNDLE_NOT_MODIFIED" >&2; exit 3
+if [[ "$installed" -ne 2 ]]; then
+  echo "INCOMPLETE_LOCAL_PROXY_ENGINE_SET" >&2; exit 3
 fi
-mv "$stage" "$destination"
+# Repeatable builds: replace only our own previously packaged directory.
+# Keep the previous runtime as rollback until the new copy is in place.
+backup=""
+if [[ -d "$destination" ]]; then
+  backup="$app/Contents/Resources/.twinconnect-runtime-backup"
+  if [[ -e "$backup" || -L "$backup" ]]; then
+    echo "RUNTIME_BACKUP_ALREADY_EXISTS" >&2; exit 3
+  fi
+  mv "$destination" "$backup"
+fi
+if ! mv "$stage" "$destination"; then
+  if [[ -n "$backup" ]]; then mv "$backup" "$destination"; fi
+  echo "RUNTIME_PACKAGING_FAILED" >&2
+  exit 3
+fi
 trap - EXIT
+if [[ -n "$backup" ]]; then rm -rf -- "$backup"; fi
+# Offline verification: exact packaged paths and executable bits.
+for family in singbox xray; do
+  if [[ "$family" == "singbox" ]]; then binary="sing-box"; else binary="xray"; fi
+  test -x "$destination/macos_native/build/$family/$arch/$binary" ||
+    { echo "PACKAGED_ENGINE_MISSING" >&2; exit 3; }
+done
+test -r "$destination/macos_native/standalone_connection_manager.py" ||
+  { echo "PACKAGED_MANAGER_MISSING" >&2; exit 3; }
 echo "MACOS_LOCAL_PROXY_RUNTIME_PACKAGED"
 echo "Runtime: $destination"
 echo "Engines: $installed"
