@@ -166,7 +166,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
 
     def test_naive_tcp_panel_profile_keeps_ca_and_ignores_inert_quic_tuning(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
-        backend = (DIRECTORY.parents[2] / "backend" / "app" /
+        backend = (DIRECTORY.parents[3] / "backend" / "app" /
                    "singbox_subscription_accounts.py").read_text(encoding="utf-8")
         self.assertIn('"quic_congestion_control": str(inbound.get(', backend)
         self.assertIn('"quic_congestion_control") or "bbr"', backend)
