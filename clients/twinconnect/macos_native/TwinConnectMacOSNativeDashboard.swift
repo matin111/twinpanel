@@ -3190,7 +3190,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.localProxyStatus = outcome.1
                         self.status = outcome.1
                         self.view = self.build()
-                        if outcome.0 { self.refreshTrafficMetrics() }
+                        if outcome.0 {
+                            self.refreshTrafficMetrics()
+                            // Measure the selected public server address once.
+                            // ICMP is from this Mac, not a fabricated VPN ping.
+                            if let selected = self.snapshot?.servers.first(where: {
+                                $0.id == serverID
+                            }), selected.probeIP != nil {
+                                self.beginNodePing(selected)
+                            }
+                        }
                     }
                 }
             }
