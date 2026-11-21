@@ -1229,10 +1229,12 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                   outbound["extra_headers"] == nil else { return nil }
             reviewed["username"] = user
             reviewed["password"] = password
-            // Naive TLS supports only server_name, certificate,
-            // certificate_path and ECH. Do not send the general sing-box
-            // tls.enabled field or trust-bypass flags to this outbound.
+            // sing-box NaiveOutbound.NewOutbound rejects TLS unless
+            // tls.enabled is explicitly true (ErrTLSRequired). Other
+            // generic TLS options are not permitted by NaiveProxy.
+            // Preserve the verified tenant CA and hostname; never bypass TLS.
             reviewed["tls"] = [
+                "enabled": true,
                 "server_name": sni, "certificate": authority
             ]
             reviewed["insecure_concurrency"] = 0
