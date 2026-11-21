@@ -104,6 +104,10 @@ def build():
                   + Path(p).suffix) for p in files if p != resolved_exe}
     staging = Path(tempfile.mkdtemp(prefix=".openconnect-stage-", dir=BASE))
     try:
+        # mkdtemp defaults to 0700. The final root-owned runtime must be
+        # traversable by the signed-in user for version/signature diagnostics.
+        # Ownership of all binaries and libraries remains root:wheel.
+        os.chmod(staging, 0o755)
         bindir = staging / "bin"
         libdir = staging / "lib"
         bindir.mkdir(mode=0o755)
