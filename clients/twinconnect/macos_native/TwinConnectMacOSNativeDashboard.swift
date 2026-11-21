@@ -411,6 +411,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingAllBusy = false
     private var pingGeneration = 0
     private var didAutoPing = false
+    private var pingRedrawScheduled = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
     private var cliTunCheckBusy = false
@@ -1415,6 +1416,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             self.nodePingBusy.remove(server.id)
             self.nodePingResults[server.id] = result
             if self.pingAllBusy { self.startNextNodePings() }
+            self.schedulePingRedraw()
+        }
+    }
+
+    // Coalesce ping redraws to keep low-powered remote AppKit desktops responsive.
+    private func schedulePingRedraw() {
+        guard !pingRedrawScheduled else { return }
+        pingRedrawScheduled = true
+        let generation = pingGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            self.pingRedrawScheduled = false
+            guard self.pingGeneration == generation, self.accountSession != nil,
+                  self.tab == 0 || self.tab == 1 else { return }
             self.view = self.build()
         }
     }
@@ -2376,15 +2391,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.nodePingResults = self.nodePingResults.filter {
                     validIDs.contains($0.key)
                 }
-                // Like the Windows client, automatically probe up to 24
-                // public node addresses without delaying authenticated UI.
-                if !self.didAutoPing {
-                    self.didAutoPing = true
-                    let targets = Array(data.servers.filter {
-                        $0.probeIP != nil
-                    }.prefix(24))
-                    self.pingNodes(targets)
-                }
+                // Avoid automatic ICMP subprocess bursts while signing in.
+                // Users can explicitly request Ping all on the Locations tab.
             }
             if data.sectionsLoaded.contains("protocols"),
                let selected = self.activeProtocol,
