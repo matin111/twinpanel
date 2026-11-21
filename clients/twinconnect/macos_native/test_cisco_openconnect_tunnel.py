@@ -26,7 +26,7 @@ class CiscoTunnelTests(unittest.TestCase):
         self.addCleanup(enabled.stop)
         # Offline unit tests must never touch or save real macOS network state.
         for method in ("snapshot_network", "restore_network",
-                       "start_network_watchdog"):
+                       "start_network_watchdog", "record_tunnel_pid"):
             patcher = mock.patch.object(tun, method)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -48,6 +48,7 @@ class CiscoTunnelTests(unittest.TestCase):
             self.assertEqual(tun.run(profile, "console-test"), 0)
             tun.snapshot_network.assert_called_once_with()
             tun.start_network_watchdog.assert_called_once_with(True)
+            tun.record_tunnel_pid.assert_called_once_with(child.pid)
             tun.restore_network.assert_called_once_with()
 
     def test_production_interlock_blocks_tunnel_before_network_changes(self):
