@@ -863,6 +863,275 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Mac proxy mode shares one strictly validated sing-box launcher. Every
+    // profile is fetched on demand from the current authenticated tenant and
+    // must belong to the selected server. Hysteria2 keeps its existing path.
+    func prepareLocalSingBox(_ session: TwinMacNativeSession,
+                             serverID: String, protocolCode: String,
+                             completion: @escaping (Result<Data, Error>) -> Void) {
+        if protocolCode == "hysteria2" {
+            prepareLocalHysteria2(session, serverID: serverID, completion: completion)
+            return
+        }
+        let supported: Set<String> = ["tuic", "anytls", "socks5", "snell"]
+        guard supported.contains(protocolCode),
+              serverID.range(of: "^[0-9]{1,20}$",
+                             options: .regularExpression) != nil else {
+            completion(.failure(TwinMacNativeError.failure(
+                "LOCAL_PROTOCOL_NOT_SUPPORTED")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] response in
+            guard let self = self else { return }
+            guard case .success(let catalog) = response,
+                  self.validEnvelope(catalog, session.namespace),
+                  let rows = catalog["protocols"] as? [[String: Any]],
+                  rows.count <= 16,
+                  rows.filter({
+                      ($0["code"] as? String) == protocolCode &&
+                      ($0["selected"] as? Bool) == true &&
+                      ($0["config_record_present"] as? Bool) == true
+                  }).count == 1 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "PROTOCOL_NOT_ALLOWED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventory in
+                guard case .success(let nodes) = inventory,
+                      self.validEnvelope(nodes, session.namespace),
+                      let servers = nodes["servers"] as? [[String: Any]],
+                      servers.filter({
+                          ($0["id"] as? String) == serverID
+                      }).count == 1 else {
+                    completion(.failure(TwinMacNativeError.failure(
+                        "SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": protocolCode], bearer: token,
+                             maxBytes: 1048576) { profiles in
+                    guard case .success(let response) = profiles,
+                          self.validEnvelope(response, session.namespace),
+                          (response["protocol"] as? String) == protocolCode,
+                          let items = response["items"] as? [[String: Any]],
+                          items.count <= 200 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let matches = items.filter { item in
+                        if let id = item["node_id"] as? String { return id == serverID }
+                        if let id = item["node_id"] as? Int {
+                            return String(id) == serverID
+                        }
+                        return false
+                    }
+                    guard matches.count == 1,
+                          let config = self.reviewedSingBoxProxyConfig(
+                            matches[0], protocolCode: protocolCode) else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "LOCAL_PROFILE_INVALID")))
+                        return
+                    }
+                    completion(.success(config))
+                }
+            }
+        }
+    }
+
+    // Never execute remote-provided routes, inbounds, local listeners or
+    // arbitrary dialer options. Rebuild only known outbound fields.
+    private func reviewedSingBoxProxyConfig(_ item: [String: Any],
+                                            protocolCode: String) -> Data? {
+        var source: Any? = item["outbound"] ??
+            item["singbox_outbound"] ?? item["config"]
+        if let text = source as? String, text.utf8.count < 131072 {
+            source = try? JSONSerialization.jsonObject(
+                with: Data(text.utf8))
+        }
+        if let wrapped = source as? [String: Any],
+           let all = wrapped["outbounds"] as? [[String: Any]] {
+            guard all.count == 1 else { return nil }
+            source = all[0]
+        }
+        guard let outbound = source as? [String: Any],
+              let type = outbound["type"] as? String,
+              type == (protocolCode == "socks5" ? "socks" : protocolCode),
+              outbound["detour"] == nil, outbound["dialer"] == nil,
+              outbound["route"] == nil, outbound["dns"] == nil,
+              outbound["inbounds"] == nil, outbound["multiplex"] == nil,
+              let host = outbound["server"] as? String,
+              host.count >= 3, host.utf8.count <= 255,
+              !host.contains("/"), !host.contains(" "),
+              !host.contains("@"), !host.contains("%"),
+              let port = outbound["server_port"] as? Int,
+              (1...65535).contains(port) else { return nil }
+        // A literal loopback or private IP must not be used as a remote
+        // credential-bearing proxy. DNS names are rechecked by the OS.
+        if host == "localhost" || host.hasSuffix(".localhost") ||
+            host == "0.0.0.0" || host == "::1" { return nil }
+        if host.contains(":") || host.first?.isNumber == true {
+            // For IP literals, force globally routable addresses; for valid
+            // DNS names containing digits, allow only a conservative charset.
+            if TwinMacNativePing.validatedPublicIP(host) == nil &&
+                host.range(of: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$",
+                           options: .regularExpression) == nil { return nil }
+        }
+        var reviewed: [String: Any] = [
+            "type": type, "tag": "proxy",
+            "server": host, "server_port": port
+        ]
+        if protocolCode == "socks5" {
+            if let version = outbound["version"] as? String {
+                guard version == "5" else { return nil }
+            }
+            reviewed["version"] = "5"
+            let username = outbound["username"] as? String
+            let password = outbound["password"] as? String
+            guard (username == nil) == (password == nil) else { return nil }
+            if let name = username, let pass = password {
+                guard !name.isEmpty, !pass.isEmpty,
+                      name.utf8.count <= 512, pass.utf8.count <= 2048
+                else { return nil }
+                reviewed["username"] = name
+                reviewed["password"] = pass
+            }
+        } else if protocolCode == "snell" {
+            guard let version = outbound["version"] as? Int,
+                  [4, 6].contains(version),
+                  let psk = outbound["psk"] as? String,
+                  !psk.isEmpty, psk.utf8.count <= 255,
+                  version == 4 || psk.utf8.count >= 12 else { return nil }
+            reviewed["version"] = version
+            reviewed["psk"] = psk
+            if let userkey = outbound["userkey"] as? String {
+                guard userkey.utf8.count <= 512 else { return nil }
+                reviewed["userkey"] = userkey
+            }
+            if let reuse = outbound["reuse"] as? Bool {
+                reviewed["reuse"] = reuse
+            }
+            if version == 4 {
+                if let obfs = outbound["obfs_mode"] as? String {
+                    guard ["none", "http"].contains(obfs) else { return nil }
+                    reviewed["obfs_mode"] = obfs
+                }
+                if let obfsHost = outbound["obfs_host"] as? String {
+                    guard !obfsHost.isEmpty, obfsHost.utf8.count <= 255,
+                          !obfsHost.contains("\n"), !obfsHost.contains("\r")
+                    else { return nil }
+                    reviewed["obfs_host"] = obfsHost
+                }
+            } else if let mode = outbound["mode"] as? String {
+                guard ["default", "unshaped", "unsafe-raw"].contains(mode)
+                else { return nil }
+                reviewed["mode"] = mode
+            }
+        } else {
+            guard let password = outbound["password"] as? String,
+                  !password.isEmpty, password.utf8.count <= 4096,
+                  let tls = outbound["tls"] as? [String: Any],
+                  let checkedTLS = safeOutboundTLS(tls, server: host)
+            else { return nil }
+            reviewed["password"] = password
+            reviewed["tls"] = checkedTLS
+            if protocolCode == "tuic" {
+                guard let uuid = outbound["uuid"] as? String,
+                      UUID(uuidString: uuid) != nil else { return nil }
+                reviewed["uuid"] = uuid
+                if let cc = outbound["congestion_control"] as? String {
+                    guard ["cubic", "bbr", "new_reno"].contains(cc)
+                    else { return nil }
+                    reviewed["congestion_control"] = cc
+                }
+                if let udpMode = outbound["udp_relay_mode"] as? String {
+                    guard ["native", "quic"].contains(udpMode),
+                          outbound["udp_over_stream"] == nil else { return nil }
+                    reviewed["udp_relay_mode"] = udpMode
+                }
+                if let uos = outbound["udp_over_stream"] as? Bool {
+                    reviewed["udp_over_stream"] = uos
+                }
+            } else if protocolCode == "anytls" {
+                for key in ["idle_session_check_interval",
+                            "idle_session_timeout"] {
+                    if let value = outbound[key] as? String {
+                        guard value.range(
+                            of: "^[1-9][0-9]{0,3}(s|m|h)$",
+                            options: .regularExpression) != nil
+                        else { return nil }
+                        reviewed[key] = value
+                    }
+                }
+                if let idle = outbound["min_idle_session"] as? Int {
+                    guard (0...100).contains(idle) else { return nil }
+                    reviewed["min_idle_session"] = idle
+                }
+            }
+        }
+        let config: [String: Any] = [
+            "log": ["level": "error"],
+            "inbounds": [[
+                "type": "mixed", "tag": "local-proxy",
+                "listen": "127.0.0.1", "listen_port": 17089
+            ]],
+            "outbounds": [reviewed],
+            "route": ["final": "proxy"]
+        ]
+        return try? JSONSerialization.data(withJSONObject: config)
+    }
+
+    private func safeOutboundTLS(_ tls: [String: Any],
+                                 server: String) -> [String: Any]? {
+        guard tls["enabled"] as? Bool == true,
+              tls["insecure"] as? Bool != true,
+              tls["disable_sni"] as? Bool != true,
+              tls["utls"] == nil, tls["reality"] == nil,
+              tls["certificate_path"] == nil,
+              tls["client_key"] == nil,
+              tls["client_key_path"] == nil else { return nil }
+        let sni = (tls["server_name"] as? String) ?? server
+        guard !sni.isEmpty, sni.utf8.count <= 255,
+              !sni.contains("/"), !sni.contains(" ") else { return nil }
+        var checked: [String: Any] = [
+            "enabled": true, "server_name": sni
+        ]
+        if let alpn = tls["alpn"] as? [String] {
+            guard alpn.count <= 8, alpn.allSatisfy({
+                !$0.isEmpty && $0.utf8.count <= 48
+            }) else { return nil }
+            checked["alpn"] = alpn
+        }
+        if let ca = tls["certificate"] {
+            let entries: [String]
+            if let text = ca as? String { entries = [text] }
+            else if let list = ca as? [String] { entries = list }
+            else { return nil }
+            guard !entries.isEmpty, entries.count <= 8,
+                  entries.allSatisfy({
+                      $0.utf8.count <= 16384 &&
+                      $0.contains("-----BEGIN CERTIFICATE-----") &&
+                      $0.contains("-----END CERTIFICATE-----") &&
+                      !$0.contains("PRIVATE KEY")
+                  }) else { return nil }
+            checked["certificate"] = entries
+        }
+        if let pins = tls["certificate_public_key_sha256"] as? [String] {
+            guard !pins.isEmpty, pins.count <= 8,
+                  pins.allSatisfy({
+                      Data(base64Encoded: $0)?.count == 32
+                  }) else { return nil }
+            checked["certificate_public_key_sha256"] = pins
+        } else if tls["certificate_public_key_sha256"] != nil {
+            return nil
+        }
+        return checked
+    }
+
     // Prepare an un-routed TUN configuration from the already reviewed,
     // account-entitled Hysteria2 outbound. This does NOT start a VPN.
     // Keeping auto_route false is essential on remote/cloud macOS hosts.
