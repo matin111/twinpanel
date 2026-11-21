@@ -43,6 +43,7 @@ class CiscoTunnelTests(unittest.TestCase):
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
              mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=True), \
              mock.patch.object(tun, "management_route") as route, \
              mock.patch.object(tun.subprocess, "run") as change_route, \
              mock.patch.object(tun.subprocess, "Popen") as launch:
@@ -58,6 +59,18 @@ class CiscoTunnelTests(unittest.TestCase):
             change_route.assert_not_called()
 
 
+    def test_refuses_writable_openconnect_dependencies(self):
+        with mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=False), \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            with self.assertRaisesRegex(
+                ValueError, "CISCO_UNTRUSTED_OPENCONNECT_DEPENDENCIES"
+            ):
+                tun.run({}, "console-test")
+            launch.assert_not_called()
+
     def test_refuses_untrusted_vpn_script(self):
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
@@ -71,6 +84,7 @@ class CiscoTunnelTests(unittest.TestCase):
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
              mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=True), \
              mock.patch.object(tun, "management_route") as route, \
              mock.patch.object(tun.subprocess, "run") as change_route, \
              mock.patch.object(tun.subprocess, "Popen") as launch:
@@ -102,6 +116,7 @@ class CiscoTunnelTests(unittest.TestCase):
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun, "binary", return_value="/usr/local/bin/openconnect"), \
              mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=True), \
              mock.patch.object(tun, "management_route", return_value=("192.168.0.1", "en0")), \
              mock.patch.object(tun.subprocess, "run", return_value=failed), \
              mock.patch.object(tun.subprocess, "Popen") as launch:
