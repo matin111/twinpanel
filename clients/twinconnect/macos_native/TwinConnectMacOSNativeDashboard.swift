@@ -3000,7 +3000,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             encoding: .utf8)
         let mgmt = configured?.trimmingCharacters(in: .whitespacesAndNewlines)
             ?? ""
-        guard mgmt == "desktop" || mgmt.range(of:
+        guard mgmt == "desktop" || mgmt == "console-test" || mgmt.range(of:
             "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
             options: .regularExpression) != nil else {
             ciscoTunnelStatus = "CISCO_MANAGEMENT_ROUTE_NOT_CONFIGURED"
@@ -3060,7 +3060,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if self.ciscoTunnelGeneration == generation {
                     self.ciscoTunnelTask = task
                     self.ciscoTunnelBusy = false
-                    self.ciscoTunnelStatus = "Cisco starting; VPN not verified."
+                    self.ciscoTunnelStatus = managementIP == "console-test" ?
+                        "Cisco console trial: automatic stop after 120s; VPN unverified." :
+                        "Cisco starting; VPN not verified."
                     self.view = self.build()
                 } else { task.terminate() }
             }
