@@ -91,13 +91,41 @@ if [[ -n "$openvpn_candidate" ]]; then
   # Keep an identical unprivileged build artifact available for subsequent
   # administrator-controlled local-console installation. No sudo here.
   helper_build="macos_native/build/openvpn/$arch"
-  if [[ -e "$helper_build" || -L "$helper_build" ]]; then
-    echo "OPENVPN_HELPER_BUILD_ALREADY_EXISTS; REBUILD_REFUSED" >&2
-    # Packaging the app itself remains possible on repeated builds.
+  helper_parent="$(dirname "$helper_build")"
+  mkdir -p "$helper_parent"
+  if [[ -L "$helper_build" || ( -e "$helper_build" && ! -d "$helper_build" ) ]]; then
+    echo "UNSAFE_OPENVPN_HELPER_BUILD_PATH" >&2; exit 3
+  fi
+  helper_source="$stage/macos_native/build/openvpn/$arch"
+  if [[ -d "$helper_build" ]] &&
+     /usr/bin/diff -qr "$helper_source" "$helper_build" >/dev/null 2>&1; then
+    echo "OPENVPN_HELPER_BUILD_CURRENT"
   else
-    mkdir -p "$(dirname "$helper_build")"
-    cp -R "$stage/macos_native/build/openvpn/$arch" "$helper_build"
-    echo "OPENVPN_PRIVILEGED_INSTALL_CANDIDATE_PREPARED"
+    # Prepare a complete candidate in the same filesystem. Keep the previous
+    # version until replacement is ready; recover it if the final rename fails.
+    helper_next="$(mktemp -d "$helper_parent/.openvpn-next.XXXXXXXX")"
+    if ! cp -R "$helper_source/." "$helper_next/"; then
+      rm -rf -- "$helper_next"
+      echo "OPENVPN_HELPER_STAGING_FAILED" >&2; exit 3
+    fi
+    helper_previous=""
+    if [[ -d "$helper_build" ]]; then
+      helper_previous="$(mktemp -d "$helper_parent/.openvpn-prev.XXXXXXXX")"
+      rmdir "$helper_previous"
+      if ! mv "$helper_build" "$helper_previous"; then
+        rm -rf -- "$helper_next"
+        echo "OPENVPN_HELPER_BACKUP_FAILED" >&2; exit 3
+      fi
+    fi
+    if ! mv "$helper_next" "$helper_build"; then
+      if [[ -n "$helper_previous" ]]; then
+        mv "$helper_previous" "$helper_build" || true
+      fi
+      rm -rf -- "$helper_next"
+      echo "OPENVPN_HELPER_REPLACE_FAILED" >&2; exit 3
+    fi
+    if [[ -n "$helper_previous" ]]; then rm -rf -- "$helper_previous"; fi
+    echo "OPENVPN_HELPER_BUILD_REFRESHED"
   fi
   installed=$((installed + 1))
 else
