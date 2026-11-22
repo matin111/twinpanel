@@ -198,7 +198,14 @@ def worker() -> int:
     try:
         with open(LOG, "ab", buffering=0) as log:
             child = subprocess.Popen([
-                str(engine), "--config", str(source), "--route-nopull",
+                str(engine), "--config", str(source),
+                # OpenVPN 2.7 emits option-context errors for pushed DNS and
+                # redirect-gateway when route-nopull alone is used. Filter
+                # them explicitly BEFORE option import. This engine remains
+                # unrouted; the independent watchdog owns any route trials.
+                "--pull-filter", "ignore", "redirect-gateway",
+                "--pull-filter", "ignore", "dhcp-option",
+                "--route-nopull", "--route-noexec",
                 "--script-security", "1", "--auth-nocache", "--verb", "3"
             ], stdin=subprocess.DEVNULL, stdout=log,
                 stderr=subprocess.STDOUT, start_new_session=True)
