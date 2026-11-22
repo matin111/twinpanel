@@ -139,7 +139,8 @@ def main() -> int:
         fd = os.open(config, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, "wb") as handle:
             handle.write(prepared)
-        with open(Path(folder) / "engine.log", "w+b") as output:
+        log_path = Path(folder) / "engine.log"
+        with open(log_path, "ab", buffering=0) as output:
             command = [str(engine), "--config", str(config),
                        "--route-nopull", "--script-security", "1",
                        "--auth-nocache", "--verb", "3"]
@@ -154,9 +155,10 @@ def main() -> int:
                     if current_default_route() != before:
                         changed = True
                         break
-                    output.flush()
-                    output.seek(0)
-                    logs = output.read(1024 * 1024)
+                    # Read via a separate descriptor; never seek on the
+                    # descriptor inherited by OpenVPN as stdout/stderr.
+                    with open(log_path, "rb") as reader:
+                        logs = reader.read(1024 * 1024)
                     if SUCCESS.encode() in logs:
                         handshake = True
                         break
@@ -170,9 +172,8 @@ def main() -> int:
                 if child is not None:
                     exit_code = child.poll()
                     stop_group(child)
-                output.flush()
-                output.seek(0)
-                logs = output.read(1024 * 1024)
+                with open(log_path, "rb") as reader:
+                    logs = reader.read(1024 * 1024)
     after = current_default_route()
     if changed or before != after:
         print("OPENVPN_DEFAULT_ROUTE_CHANGED_STOPPED")
