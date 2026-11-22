@@ -156,6 +156,34 @@ class CiscoManagementGuardTests(unittest.TestCase):
         self.assertTrue(host_calls)
         self.assertLess(dns_calls[0], host_calls[0])
 
+    def test_stop_recovers_network_before_signalling_verified_process(self):
+        events = []
+        def fake_run(*args):
+            events.append("ps")
+            return ok(guard.OPENCONNECT_BIN + " --protocol=anyconnect")
+        def fake_rollback():
+            events.append("restore")
+            return "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED"
+        with patch.object(guard, "load", return_value={"worker_pid": 4321}), \
+             patch.object(guard, "rollback", side_effect=fake_rollback), \
+             patch.object(guard, "run", side_effect=fake_run), \
+             patch.object(guard.os, "kill",
+                          side_effect=lambda *args: events.append("kill")):
+            self.assertEqual(guard.stop_system(), "CISCO_SYSTEM_DISCONNECTED")
+        self.assertEqual(events, ["restore", "ps", "kill"])
+
+    def test_heartbeat_rejects_changed_cisco_server_without_extending_lease(self):
+        lease = {"mode": "leased", "worker_pid": 4321,
+                 "endpoint": "185.211.58.12", "deadline": 9999999999}
+        with patch.object(guard, "load", return_value=lease), \
+             patch.object(guard, "openconnect_endpoint",
+                          return_value="198.51.100.2"), \
+             patch.object(guard.os, "kill", return_value=None), \
+             patch.object(guard, "store") as saved:
+            self.assertEqual(guard.heartbeat(4321),
+                             "CISCO_TRANSPORT_ENDPOINT_CHANGED")
+            saved.assert_not_called()
+
     def test_full_guard_refuses_unverified_engine_pid_without_routes(self):
         with patch.object(guard, "openconnect_endpoint",
                           return_value=None), \
