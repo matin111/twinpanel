@@ -1405,7 +1405,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
             localProxyActive ? "◉  " + connectedProtocolTitle + " active" :
-                               "◌  Offline",
+            (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"),
             color: localProxyActive ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
@@ -1574,7 +1574,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
-                               "Disconnected",
+            (fullTunActive ? "TUN running · unverified" : "Disconnected"),
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
