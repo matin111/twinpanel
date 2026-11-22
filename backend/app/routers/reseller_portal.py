@@ -2893,14 +2893,13 @@ def reseller_delete_subscription(
             detail="اشتراک متعلق به این نمایندگی نیست",
         )
 
-    # استفاده از حذف امن مرکزی Twin Panel:
-    # canceled + revoke server access + disable credentials
-    from .subscriptions import (
-        delete_subscription
-        as central_safe_delete_subscription,
-    )
+    # Invoke the canonical hard-delete service after verifying reseller ownership.
+    # Soft deletion only marks CANCELED, leaving a visible admin subscription.
+    # The canonical path queues server revocation and removes the subscription
+    # and dependent credentials in one transaction.
+    from .subscription_hard_delete_v1 import hard_delete_subscription
 
-    return central_safe_delete_subscription(
+    return hard_delete_subscription(
         subscription_id=subscription_id,
         db=db,
     )
