@@ -83,14 +83,16 @@ def rollback() -> str:
     # Preserve state until every owned split route has been removed.
     for network in SPLITS:
         successful = delete_if_owned(network, interface) and successful
-    pinned = d.get("pinned")
-    if pinned:
+    # Only remove a host bypass route if its creation was positively
+    # recorded. A failed add must never delete a pre-existing route.
+    if d.get("pin_committed") is True:
         endpoint = d.get("endpoint")
         gateway = d.get("gateway")
         if not endpoint or not gateway:
             return "INVALID_STATE_MANUAL_RECOVERY_REQUIRED"
         current = get_route(endpoint)
-        if current.get("gateway") == gateway and current.get("interface") == d.get("original_interface"):
+        if (current.get("gateway") == gateway and
+                current.get("interface") == d.get("original_interface")):
             removed = run(ROUTE, "-n", "delete", "-host", endpoint, gateway)
             successful = removed.returncode == 0 and successful
     if not successful:
@@ -159,14 +161,17 @@ def trial(endpoint: str) -> str:
     if v6.returncode == 0 and "interface:" in v6.stdout:
         return "IPV6_DEFAULT_PRESENT_REFUSED"
     # State first, then changes. launchd daemon expires these even if CLI dies.
-    store({"interface": interface, "endpoint": endpoint, "gateway": gateway,
-           "original_interface": default["interface"], "pinned": True,
-           "worker_pid": worker_pid,
-           "deadline": time.time() + TTL})
+    state = {"interface": interface, "endpoint": endpoint, "gateway": gateway,
+             "original_interface": default["interface"], "pin_committed": False,
+             "worker_pid": worker_pid, "deadline": time.time() + TTL}
+    store(state)
     pin = run(ROUTE, "-n", "add", "-host", endpoint, gateway)
     if pin.returncode:
+        # We never claim ownership of a route which we failed to add.
         rollback()
         return "ENDPOINT_PIN_FAILED"
+    state["pin_committed"] = True
+    store(state)
     for net in SPLITS:
         added = run(ROUTE, "-n", "add", "-net", net, "-interface", interface)
         if added.returncode:
