@@ -20,6 +20,8 @@ ROOT = Path("/private/var/run/twinconnect-cisco-route-guard")
 STATE = ROOT / "state.json"
 LOCK = ROOT / "lock"
 TTL = 30
+PROBE_DEST = "1.1.1.1"
+PROBE_SECONDS = 22
 ROUTE = "/sbin/route"
 NETSTAT = "/usr/sbin/netstat"
 
@@ -139,6 +141,25 @@ def rollback() -> str:
         return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
     if not isinstance(interface, str) or not re.fullmatch(r"en[0-9]{1,3}", interface):
         return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
+    # Remove a single temporary HTTPS test route first. The baseline
+    # default and the service's DNS/IP settings are never modified.
+    if data.get("probe_dest") is not None:
+        if data.get("probe_dest") != PROBE_DEST or not re.fullmatch(
+                r"utun[0-9]{1,4}", data.get("probe_interface", "")):
+            return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
+        probe_interface = data["probe_interface"]
+        exact = exact_routes()
+        if exact is None:
+            return "CISCO_MANAGEMENT_ROUTE_OBSERVATION_FAILED"
+        if PROBE_DEST in exact:
+            observed = route(PROBE_DEST)
+            if observed.get("interface") != probe_interface:
+                return "CISCO_PROBE_ROUTE_OWNERSHIP_CHANGED"
+            run(ROUTE, "-n", "delete", "-host", PROBE_DEST,
+                "-interface", probe_interface)
+            after = exact_routes()
+            if after is None or PROBE_DEST in after:
+                return "CISCO_PROBE_ROUTE_ROLLBACK_FAILED"
     for peer in peers:
         if verified_public(peer) is None:
             return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
@@ -208,6 +229,44 @@ def trial() -> str:
     return "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS"
 
 
+def probe_host(interface: str) -> str:
+    """Route ONLY 1.1.1.1 through an established Cisco utun for 22 seconds.
+
+    Requires independent watchdog and active Termalin. The default gateway,
+    DNS, physical interface and all other destinations remain untouched.
+    Only the root-owned Cisco helper may request this fixed destination.
+    """
+    if not re.fullmatch(r"utun[0-9]{1,4}", interface):
+        return "CISCO_PROBE_INTERFACE_INVALID"
+    result, peers, gateway, original_interface = preflight()
+    if result != "CISCO_MANAGEMENT_PRECHECK_READY":
+        return result
+    devices = run("/sbin/ifconfig", "-l")
+    if devices.returncode or interface not in devices.stdout.split():
+        return "CISCO_PROBE_INTERFACE_NOT_FOUND"
+    info = run("/sbin/ifconfig", interface)
+    if info.returncode or not re.search(
+            r"(?m)^\\s*inet\\s+(?:10\\.|172\\.|192\\.168\\.)", info.stdout):
+        return "CISCO_PROBE_TUNNEL_NOT_CONFIGURED"
+    base_route = route(PROBE_DEST)
+    if (base_route.get("interface") != original_interface or
+            base_route.get("gateway") != gateway):
+        return "CISCO_PROBE_NOT_ON_BASELINE"
+    exact = exact_routes()
+    if exact is None or PROBE_DEST in exact:
+        return "CISCO_PROBE_EXISTING_ROUTE_REFUSED"
+    # Persist restoration intent before the routing socket is modified.
+    state = {"peers": [], "gateway": gateway, "interface": original_interface,
+             "deadline": time.time() + PROBE_SECONDS,
+             "probe_dest": PROBE_DEST, "probe_interface": interface}
+    store(state)
+    applied = run(ROUTE, "-n", "add", "-host", PROBE_DEST,
+                  "-interface", interface)
+    if applied.returncode or route(PROBE_DEST).get("interface") != interface:
+        return "CISCO_PROBE_ADD_FAILED_" + rollback()
+    return "CISCO_HOST_EGRESS_TRIAL_ACTIVE"
+
+
 def service() -> None:
     while True:
         with LOCK.open("a+") as stream:
@@ -237,6 +296,8 @@ def main() -> int:
             result = preflight()[0]
         elif sys.argv[1:] == ["trial"]:
             result = trial()
+        elif len(sys.argv) == 3 and sys.argv[1] == "probe-host":
+            result = probe_host(sys.argv[2])
         elif sys.argv[1:] == ["rollback"]:
             result = rollback()
         else:
@@ -246,6 +307,7 @@ def main() -> int:
         "CISCO_MANAGEMENT_PIN_IDLE", "CISCO_MANAGEMENT_PRECHECK_READY",
         "CISCO_MANAGEMENT_PIN_ACTIVE",
         "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS",
+        "CISCO_HOST_EGRESS_TRIAL_ACTIVE",
         "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED") else 1
 
 
