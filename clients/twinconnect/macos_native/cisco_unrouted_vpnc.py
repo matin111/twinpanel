@@ -20,8 +20,10 @@ TUN_NAME = re.compile(r"utun[0-9]{1,3}\Z")
 
 def validated_env(env: dict[str, str]) -> tuple[str, str, str, int]:
     reason = env.get("reason", "")
-    if reason not in ("connect", "disconnect", "reconnect", "attempt-reconnect"):
+    if reason not in ("pre-init", "connect", "disconnect", "reconnect", "attempt-reconnect"):
         raise ValueError("CISCO_TUN_REASON_UNSUPPORTED")
+    if reason in ("pre-init", "disconnect", "attempt-reconnect"):
+        return reason, "", "", 0
     name = env.get("TUNDEV", "")
     if not TUN_NAME.fullmatch(name):
         raise ValueError("CISCO_TUN_INTERFACE_INVALID")
@@ -40,7 +42,7 @@ def validated_env(env: dict[str, str]) -> tuple[str, str, str, int]:
 
 def execute(env: dict[str, str]) -> str:
     reason, name, address, mtu = validated_env(env)
-    if reason in ("disconnect", "attempt-reconnect"):
+    if reason in ("pre-init", "disconnect", "attempt-reconnect"):
         # Mac/OpenConnect owns the utun lifetime. Never delete a physical
         # address or network service, and don't modify routes or DNS.
         return "CISCO_UTUN_NO_SYSTEM_ROUTES"
