@@ -8,15 +8,36 @@ runner="$root/tool/test_macos_openvpn_handshake.py"
 sudoers="/private/etc/sudoers.d/twinconnect-openvpn-probe"
 case "${1:-}" in
   check)
-    [[ -f "$runner" ]] && echo "APP_OPENVPN_PROBE_STAGED" || echo "APP_OPENVPN_PROBE_NOT_STAGED"
+    [[ -r "$runner" ]] && echo "APP_OPENVPN_PROBE_STAGED" || echo "APP_OPENVPN_PROBE_NOT_STAGED"
     [[ -f "$sudoers" ]] && echo "APP_OPENVPN_PROBE_AUTH_CONFIG_PRESENT" || echo "APP_OPENVPN_PROBE_AUTH_MISSING"
     exit 0;;
-  install|remove) action="$1";;
-  *) echo "Usage: bash tool/install_macos_openvpn_app_probe.sh {check|install|remove}" >&2; exit 2;;
+  install|remove|repair) action="$1";;
+  *) echo "Usage: bash tool/install_macos_openvpn_app_probe.sh {check|install|repair|remove}" >&2; exit 2;;
 esac
 [[ "$(uname -s)" == "Darwin" ]] || { echo "MACOS_ONLY" >&2; exit 2; }
 [[ "$(id -u)" == "0" ]] || { echo "ROOT_REQUIRED: use sudo" >&2; exit 2; }
 [[ -t 0 && -t 1 ]] || { echo "INTERACTIVE_ADMIN_REQUIRED" >&2; exit 2; }
+if [[ "$action" == repair ]]; then
+  # Older installs created root-owned directories mode 0700, hiding the
+  # runner from the unprivileged app even though sudoers was installed.
+  # Require the exact existing root-owned non-symlink directories/files.
+  for directory in "$root" "$root/tool" "$root/macos_native"; do
+    [[ -d "$directory" && ! -L "$directory" &&
+       "$(/usr/bin/stat -f '%u' "$directory")" == "0" ]] ||
+      { echo "UNTRUSTED_INSTALL_DIRECTORY"; exit 3; }
+  done
+  for file in "$runner" "$root/macos_native/openvpn_profile_review.py"; do
+    [[ -f "$file" && ! -L "$file" &&
+       "$(/usr/bin/stat -f '%u' "$file")" == "0" ]] ||
+      { echo "UNTRUSTED_INSTALL_FILE"; exit 3; }
+  done
+  [[ -f "$sudoers" && ! -L "$sudoers" ]] ||
+    { echo "APP_OPENVPN_PROBE_AUTH_MISSING"; exit 3; }
+  /bin/chmod 0755 "$root" "$root/tool" "$root/macos_native"
+  /bin/chmod 0644 "$runner" "$root/macos_native/openvpn_profile_review.py"
+  echo "APP_OPENVPN_PROBE_PERMISSIONS_REPAIRED"
+  exit 0
+fi
 if [[ "$action" == remove ]]; then
   /bin/rm -f "$sudoers"
   if [[ -d "$root" && ! -L "$root" ]]; then
@@ -35,8 +56,8 @@ read -r -p 'Type ENABLE-OPENVPN-APP-TEST to opt in: ' confirm
 [[ ! -e "$root" && ! -L "$root" ]] || { echo "EXISTING_ROOT_REFUSED"; exit 2; }
 [[ ! -e "$sudoers" && ! -L "$sudoers" ]] || { echo "EXISTING_SUDOERS_REFUSED"; exit 2; }
 [[ -f tool/test_macos_openvpn_handshake.py && -f macos_native/openvpn_profile_review.py ]] || exit 2
-/bin/mkdir -m 0700 "$root"
-/bin/mkdir -m 0700 "$root/tool" "$root/macos_native"
+/bin/mkdir -m 0755 "$root"
+/bin/mkdir -m 0755 "$root/tool" "$root/macos_native"
 /usr/bin/install -o root -g wheel -m 0644 tool/test_macos_openvpn_handshake.py "$runner"
 /usr/bin/install -o root -g wheel -m 0644 macos_native/openvpn_profile_review.py "$root/macos_native/openvpn_profile_review.py"
 # The fixed command alone, only for the installing account. No shell wildcard.
