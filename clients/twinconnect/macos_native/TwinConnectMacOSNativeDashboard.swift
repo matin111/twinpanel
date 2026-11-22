@@ -1387,7 +1387,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
                "◉  OpenVPN · Tunnel only") :
              (ciscoTunnelTask != nil ?
-              "◉  Cisco · Tunnel test" :
+              "◌  Connecting…" :
               (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))),
             color: (localProxyActive || openVPNAppSessionActive ||
                     ciscoTunnelTask != nil) ? sea : muted))
@@ -1431,7 +1431,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             activeProtocol == "openvpn" && !fullTunServicePresent() ?
             "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
-            "Safe, time-limited Cisco utun-only test. No system routing or DNS changes." :
+            "Connect to the selected Cisco server." :
             (fullTunActive ? "TUN engine started; network egress NOT verified." :
                 (fullTunServicePresent() ? "Experimental local-console TUN service." :
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
@@ -1479,16 +1479,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     lessThanOrEqualTo: main.widthAnchor).isActive = true
             }
         }
-        if activeProtocol == "cisco" {
-            let message = ciscoTunnelStatus.isEmpty ?
-                "Cisco test mode only · system VPN not enabled" :
-                ciscoTunnelStatus
-            let feedback = text(message, size: 12, color: muted)
-            main.addArrangedSubview(feedback)
-            feedback.widthAnchor.constraint(
-                lessThanOrEqualTo: main.widthAnchor).isActive = true
-        }
-        // Diagnostics, emergency shutdown and technical warnings belong
+         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
         // Errors and technical details belong in Settings and Diagnostics,
@@ -1595,7 +1586,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
-             (ciscoTunnelTask != nil ? "Cisco · Tunnel test" :
+             (ciscoTunnelTask != nil ? "Connecting…" :
               (fullTunActive ? "TUN running · unverified" : "Disconnected"))),
             color: (localProxyActive || openVPNSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
@@ -3145,10 +3136,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.ciscoTunnelTask = task
                     self.ciscoTunnelBusy = false
                     self.ciscoTunnelStatus = managementIP == "unrouted-probe" ?
-                        "Cisco TUN test (60s) · system VPN not enabled" :
+                        "Connecting…" :
                         (managementIP == "console-test" ?
-                         "Cisco console trial: automatic stop after 120s; VPN unverified." :
-                         "Cisco starting; VPN not verified.")
+                         "Connecting…" : "Connecting…")
                     self.view = self.build()
                 } else { task.terminate() }
             }
