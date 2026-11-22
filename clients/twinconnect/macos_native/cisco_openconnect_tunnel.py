@@ -316,6 +316,34 @@ def cisco_tun_interfaces() -> dict[str, str]:
     return found
 
 
+def cisco_tun_counters(interface: str) -> tuple[int, int] | None:
+    """Read actual tunnel interface byte counters, never physical en0 traffic."""
+    if not re.fullmatch(r"utun[0-9]{1,4}", interface):
+        return None
+    try:
+        output = subprocess.run(
+            ["/usr/sbin/netstat", "-ibn", "-I", interface],
+            capture_output=True, text=True, timeout=5, check=False)
+        if output.returncode:
+            return None
+        rows = [line.split() for line in output.stdout.splitlines()]
+        head = next((row for row in rows if "Name" in row and
+                     "Ibytes" in row and "Obytes" in row), None)
+        if head is None:
+            return None
+        inbound, outbound = head.index("Ibytes"), head.index("Obytes")
+        values = []
+        for row in rows:
+            if row and row[0] == interface and len(row) > max(inbound, outbound):
+                try:
+                    values.append((int(row[inbound]), int(row[outbound])))
+                except ValueError:
+                    continue
+        return max(values) if values else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 def cisco_verified_probe(baseline_interfaces: dict[str, str]) -> str:
     """One-destination HTTPS egress test; independent guard owns restoration."""
     if not trusted_root_owned_path(CISCO_HOST_GUARD):
@@ -344,12 +372,21 @@ def cisco_verified_probe(baseline_interfaces: dict[str, str]) -> str:
         if trial.returncode or trial.stdout.strip() != "CISCO_HOST_EGRESS_TRIAL_ACTIVE":
             return "CISCO_EGRESS_ROUTE_GUARD_REFUSED"
         try:
+            counters_before = cisco_tun_counters(interface)
             tunnel = subprocess.run(
                 ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
                  "--connect-timeout", "3", "--max-time", "8",
                  "https://1.1.1.1/cdn-cgi/trace"],
                 capture_output=True, text=True, timeout=10, check=False)
+            counters_after = cisco_tun_counters(interface)
             if tunnel.returncode:
+                if counters_before and counters_after:
+                    received = max(0, counters_after[0] - counters_before[0])
+                    sent = max(0, counters_after[1] - counters_before[1])
+                    if sent == 0:
+                        return "CISCO_TUN_NO_OUTBOUND_PACKETS"
+                    if received == 0:
+                        return "CISCO_TUN_NO_RETURN_PACKETS"
                 return "CISCO_EGRESS_HTTPS_FAILED"
             result = re.search(r"(?m)^ip=([0-9.]+)$", tunnel.stdout)
             if not result or result.group(1) == original.group(1):
