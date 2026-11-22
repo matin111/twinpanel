@@ -68,6 +68,36 @@ class GuardTests(unittest.TestCase):
                 guard, "run", return_value=reply("")):
             self.assertFalse(guard.delete_if_owned("0.0.0.0/1", "utun4"))
 
+    def test_network_service_and_dns_restore_backup(self) -> None:
+        order = ("An asterisk (*) denotes disabled services.\n"
+                 "(1) Ethernet\n(Hardware Port: Ethernet, Device: en0)\n")
+        def fake_run(*args: str) -> subprocess.CompletedProcess[str]:
+            if "-listnetworkserviceorder" in args:
+                return reply(order)
+            if "-getdnsservers" in args:
+                return reply("185.236.39.19\n")
+            return reply("", 1)
+        with patch.object(guard, "run", side_effect=fake_run):
+            self.assertEqual(guard.network_service_for_interface("en0"), "Ethernet")
+            self.assertEqual(guard.read_dns("Ethernet"), ["185.236.39.19"])
+
+    def test_heartbeat_rejects_new_management_peer(self) -> None:
+        state = {"mode": "leased", "deadline": 99999999999,
+                 "worker_pid": 222, "interface": "utun4",
+                 "endpoint": "185.211.58.12", "original_interface": "en0",
+                 "management_pin_committed": ["188.114.97.3"]}
+        def route(dest: str) -> dict[str, str]:
+            return {"interface": "utun4" if dest in
+                    ("1.0.0.1", "129.0.0.1") else "en0"}
+        with (patch.object(guard, "load", return_value=state),
+              patch.object(guard, "get_route", side_effect=route),
+              patch.object(guard, "termalin_control_peers",
+                           return_value=["188.114.97.3", "8.8.8.8"]),
+              patch.object(guard.os, "kill", return_value=None),
+              patch.object(guard, "store") as store):
+            self.assertEqual(guard.heartbeat(), "MANAGEMENT_PEER_CHANGED")
+            store.assert_not_called()
+
     def test_no_ssh_fails_without_installing_routes(self) -> None:
         # Pretend that a valid tunnel, daemon, baseline gateway and
         # transport endpoint exist; management peer gate still blocks.
