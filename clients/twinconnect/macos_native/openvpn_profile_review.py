@@ -9,6 +9,8 @@ from __future__ import annotations
 import ipaddress
 import re
 import shlex
+import json
+import sys
 
 MAX_PROFILE_BYTES = 65536
 MAX_LINES = 512
@@ -133,3 +135,24 @@ def review(text: str) -> dict:
     return {"state": "reviewed_unrouted_candidate",
             "directives": cleaned, "inline": inline, "remotes": remotes,
             "connected": False, "route_changed": False}
+
+def main() -> int:
+    """Review a private stdin profile. Print no credentials or destinations."""
+    raw = sys.stdin.buffer.read(MAX_PROFILE_BYTES + 1)
+    if not raw or len(raw) > MAX_PROFILE_BYTES:
+        print(json.dumps({"state": "rejected"}))
+        return 1
+    try:
+        reviewed = review(raw.decode("utf-8", errors="strict"))
+    except (ValueError, UnicodeError):
+        print(json.dumps({"state": "rejected"}))
+        return 1
+    print(json.dumps({
+        "state": reviewed["state"], "connected": False,
+        "route_changed": False, "remotes": reviewed["remotes"]
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
