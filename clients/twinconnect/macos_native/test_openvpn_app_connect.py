@@ -61,6 +61,18 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn('sys.argv[1] not in (', script)
         ast.parse(script)
 
+    def test_https_egress_probe_is_bound_only_to_openvpn_utun(self):
+        script = (ROOT / "macos_native/openvpn_app_session.py").read_text()
+        self.assertIn('"/usr/bin/curl", "--interface", "if!" + interface', script)
+        self.assertIn('added = sorted(utun_interfaces() - before_utun)', script)
+        self.assertIn("len(added) == 1", script)
+        self.assertIn("tunnel_egress_verified_unrouted", script)
+        self.assertIn('default_route() != before', script)
+        self.assertIn('"--route-nopull"', script)
+        self.assertIn("system_vpn_verified", script)
+        self.assertIn("tunnel HTTPS verified; system internet is NOT routed.", DASHBOARD)
+        ast.parse(script)
+
     def test_sudoers_rule_uses_separate_fixed_action_commands(self):
         self.assertIn("upgrade)", INSTALLER)
         self.assertIn("APP_OPENVPN_SESSION_INSTALLED", INSTALLER)
