@@ -28,14 +28,14 @@ class GuardTests(unittest.TestCase):
             self.assertEqual(guard.management_peers(), ["8.8.8.8"])
 
     def test_termalin_outbound_control_peer_is_pinned(self) -> None:
-        sample = ("COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\\n"
+        sample = ("COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\n"
                   "termalin-agent 77 root 13u IPv4 0t0 TCP "
-                  "185.236.39.36:54006->188.114.97.3:443 (ESTABLISHED)\\n"
+                  "185.236.39.36:54006->188.114.97.3:443 (ESTABLISHED)\n"
                   "termalin-agent 77 root 14u IPv4 0t0 TCP "
-                  "127.0.0.1:54007->127.0.0.1:22 (ESTABLISHED)\\n")
+                  "127.0.0.1:54007->127.0.0.1:22 (ESTABLISHED)\n")
         def fake_run(*args: str) -> subprocess.CompletedProcess[str]:
             if "pgrep" in args[0]:
-                return reply("77\\n")
+                return reply("77\n")
             if "lsof" in args[0]:
                 return reply(sample)
             return reply("", 1)
