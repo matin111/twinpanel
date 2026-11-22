@@ -43,8 +43,8 @@ if [[ "$action" == upgrade ]]; then
   /usr/sbin/chown root:wheel "$tmp"
   [[ "$SUDO_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] ||
     { echo "INVALID_INSTALL_USER"; exit 3; }
-  /usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status\n' \
-    "$SUDO_USER" "$runner" "$session" "$session" "$session" > "$tmp"
+  /usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status, /usr/bin/python3 %s connect\n' \
+    "$SUDO_USER" "$runner" "$session" "$session" "$session" "$session" > "$tmp"
   /usr/sbin/visudo -c -f "$tmp" ||
     { echo "INVALID_SUDOERS_RULE"; exit 3; }
   /bin/mv "$tmp" "$sudoers"
@@ -104,7 +104,7 @@ tmp="$(/usr/bin/mktemp /private/etc/sudoers.d/.tc-openvpn.XXXXXXXX)"
 trap '/bin/rm -f "$tmp"' EXIT
 /bin/chmod 0440 "$tmp"
 /usr/sbin/chown root:wheel "$tmp"
-/usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status\n' "$SUDO_USER" "$runner" "$session" "$session" "$session" > "$tmp"
+/usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status, /usr/bin/python3 %s connect\n' "$SUDO_USER" "$runner" "$session" "$session" "$session" "$session" > "$tmp"
 /usr/sbin/visudo -c -f "$tmp" || { echo "INVALID_SUDOERS_RULE"; exit 3; }
 /bin/mv "$tmp" "$sudoers"
 trap - EXIT
