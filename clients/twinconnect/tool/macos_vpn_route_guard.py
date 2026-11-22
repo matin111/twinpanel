@@ -71,14 +71,27 @@ def rollback() -> str:
     # Only remove our own exact destination when still on the same interface.
     current = get_route()
     if current is not None and current[0] == interface:
-        command([ROUTE, "-n", "delete", "-host", DEST, "-interface", interface])
+        deleted = command([ROUTE, "-n", "delete", "-host",
+                           DEST, "-interface", interface])
+        after = get_route()
+        if deleted.returncode != 0 or (after and after[0] == interface):
+            return "ROUTE_ROLLBACK_FAILED"
     STATE.unlink(missing_ok=True)
-    return "ROUTE_ROLLBACK_REQUESTED"
+    return "ROUTE_ROLLBACK_VERIFIED"
 
 
 def trial(interface: str) -> str:
     if not re.fullmatch(r"utun[0-9]{1,4}", interface) or interface not in active_interfaces():
         return "INVALID_UTUN"
+    # The rollback service must already be loaded and running BEFORE trial.
+    try:
+        service_info = command(["/bin/launchctl", "print",
+                                "system/com.twinconnect.route-guard"])
+    except (OSError, subprocess.TimeoutExpired):
+        return "ROLLBACK_DAEMON_NOT_READY"
+    if (service_info.returncode != 0 or
+            "state = running" not in service_info.stdout):
+        return "ROLLBACK_DAEMON_NOT_READY"
     if load():
         return "TRIAL_ALREADY_EXISTS"
     route_before = get_route()
@@ -135,7 +148,7 @@ def main() -> int:
             result = "USAGE_TRIAL_UTUN_OR_ROLLBACK_OR_STATUS"
     print(result, flush=True)
     return 0 if result in ("TRIAL_ROUTE_ACTIVE_60_SECONDS",
-                            "ROUTE_ROLLBACK_REQUESTED", "TRIAL_ACTIVE",
+                            "ROUTE_ROLLBACK_VERIFIED", "TRIAL_ACTIVE",
                             "NO_TRIAL", "NO_OWNED_ROUTE") else 1
 
 
