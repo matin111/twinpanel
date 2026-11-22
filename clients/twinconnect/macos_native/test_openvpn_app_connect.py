@@ -42,6 +42,32 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn('summary = outcomes.first(where:', section)
         self.assertIn('self.fullTunActive = false', section)
 
+    def test_persistent_start_stop_from_real_connect_button(self):
+        section = DASHBOARD.split("@objc private func requestVPNConnection(", 1)[1]
+        self.assertIn("if openVPNAppSessionActive {", section)
+        self.assertIn("stopPersistentOpenVPN()", section)
+        self.assertIn("if openVPNAppSessionInstalled() {", section)
+        self.assertIn("startPersistentOpenVPN(session, serverID: serverID)", section)
+        self.assertIn("refreshOpenVPNAppSession()", DASHBOARD)
+        self.assertIn("OpenVPN: tunnel active; system internet is NOT routed.", DASHBOARD)
+
+    def test_persistent_script_has_route_guard_and_auto_expiry(self):
+        script = (ROOT / "macos_native/openvpn_app_session.py").read_text()
+        self.assertIn("MAX_SESSION_SECONDS = 900", script)
+        self.assertIn('"--route-nopull"', script)
+        self.assertIn("default_route() != before", script)
+        self.assertIn("stop_openvpn(child)", script)
+        self.assertIn("os.O_NOFOLLOW", script)
+        self.assertIn('sys.argv[1] not in (', script)
+        ast.parse(script)
+
+    def test_sudoers_rule_uses_separate_fixed_action_commands(self):
+        self.assertIn("upgrade)", INSTALLER)
+        self.assertIn("APP_OPENVPN_SESSION_INSTALLED", INSTALLER)
+        self.assertIn(" %s start", INSTALLER)
+        self.assertIn(" %s stop", INSTALLER)
+        self.assertIn(" %s status", INSTALLER)
+
     def test_root_probe_uses_fixed_path_and_bounded_runtime(self):
         self.assertIn("/Library/PrivilegedHelperTools/TwinConnectOpenVPN", INSTALLER)
         self.assertIn("NOPASSWD: /usr/bin/python3 %s --stdin", INSTALLER)
