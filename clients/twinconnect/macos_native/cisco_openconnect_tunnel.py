@@ -338,8 +338,8 @@ def cisco_verified_probe(baseline_interfaces: dict[str, str]) -> str:
         return "CISCO_EGRESS_TEST_UNAVAILABLE"
 
 
-def probe_unrouted(profile: dict) -> int:
-    """One-minute Cisco tunnel experiment WITHOUT changing system routes.
+def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
+    """Connect through isolated Cisco TUN, then verify data before full IPv4.
 
     The only privileged child network edit is the root-owned utun-only
     vpnc script. This does not certify full-device VPN, and the production
@@ -391,7 +391,7 @@ def probe_unrouted(profile: dict) -> int:
         print(json.dumps({"state": "cisco_unrouted_probe_started",
                           "vpn_connected": False}), flush=True)
         import time
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 90
         egress_reason = None
         while time.monotonic() < deadline:
             if child.poll() is not None:
@@ -414,12 +414,49 @@ def probe_unrouted(profile: dict) -> int:
             time.sleep(1)
         if egress_reason is None:
             raise ValueError("CISCO_UNROUTED_TUNNEL_TIMEOUT")
-        return 0 if egress_reason == "CISCO_EGRESS_VERIFIED" else 1
+        if egress_reason != "CISCO_EGRESS_VERIFIED":
+            return 1
+        if not system_vpn:
+            return 0
+        # Only after actual HTTPS egress is proven do we attempt guarded
+        # /1 routes. The launchd watchdog restores routes and DNS on failure.
+        created = [name for name, address in cisco_tun_interfaces().items()
+                   if initial_interfaces.get(name) != address]
+        if len(created) != 1:
+            raise ValueError("CISCO_EGRESS_TUN_NOT_IDENTIFIED")
+        guard = ["/usr/bin/python3", CISCO_HOST_GUARD]
+        activated = subprocess.run([*guard, "activate-full", created[0],
+                                    str(child.pid)], capture_output=True,
+                                   text=True, timeout=29, check=False)
+        if activated.returncode or activated.stdout.strip() != "CISCO_SYSTEM_IPV4_CONNECTED":
+            raise ValueError("CISCO_SYSTEM_ROUTE_ACTIVATION_FAILED")
+        print(json.dumps({"state": "connected",
+                          "reason": "CISCO_SYSTEM_IPV4_CONNECTED",
+                          "vpn_connected": True}), flush=True)
+        # The privileged worker, not the GUI, renews the independent lease.
+        # If its loop crashes, root launchd recovers routes within 45 seconds.
+        while child.poll() is None:
+            time.sleep(12)
+            response = subprocess.run([*guard, "heartbeat", str(child.pid)],
+                                      capture_output=True, text=True,
+                                      timeout=12, check=False)
+            if response.returncode or response.stdout.strip() != "CISCO_SYSTEM_IPV4_CONNECTED":
+                raise ValueError("CISCO_SYSTEM_ROUTE_LEASE_LOST")
+        raise ValueError("CISCO_ENGINE_EXITED")
     except KeyboardInterrupt:
         print(json.dumps({"state": "cisco_unrouted_probe_stopped",
                           "vpn_connected": False}), flush=True)
         return 0
     finally:
+        # Restore route and DNS before tearing down the interface, including
+        # on SIGTERM, loss of engine or an exception inside the lease.
+        if system_vpn:
+            try:
+                subprocess.run(["/usr/bin/python3", CISCO_HOST_GUARD,
+                                "rollback"], capture_output=True,
+                               text=True, timeout=12, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                pass  # independent watchdog still owns recovery
         signal.signal(signal.SIGTERM, previous_term)
         signal.signal(signal.SIGINT, previous_int)
         if child.poll() is None:
@@ -439,7 +476,7 @@ def probe_unrouted(profile: dict) -> int:
 
 def main() -> int:
     try:
-        if sys.argv[1:] != ["probe"] and (
+        if sys.argv[1:] not in (["probe"], ["system"]) and (
                 len(sys.argv) != 3 or sys.argv[1] != "connect"):
             raise ValueError("CISCO_INVALID_ACTION")
         # Validation before any privileged network operation.
@@ -448,6 +485,8 @@ def main() -> int:
             raise ValueError("CISCO_PIN_REQUIRED_FOR_TUNNEL")
         if sys.argv[1:] == ["probe"]:
             return probe_unrouted(profile)
+        if sys.argv[1:] == ["system"]:
+            return probe_unrouted(profile, system_vpn=True)
         return run(profile, sys.argv[2])
     except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
         code = str(exc)
