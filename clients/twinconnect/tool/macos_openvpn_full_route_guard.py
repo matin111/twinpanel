@@ -161,6 +161,7 @@ def trial(endpoint: str) -> str:
     # State first, then changes. launchd daemon expires these even if CLI dies.
     store({"interface": interface, "endpoint": endpoint, "gateway": gateway,
            "original_interface": default["interface"], "pinned": True,
+           "worker_pid": worker_pid,
            "deadline": time.time() + TTL})
     pin = run(ROUTE, "-n", "add", "-host", endpoint, gateway)
     if pin.returncode:
@@ -183,8 +184,22 @@ def service() -> int:
         with open(LOCK, "a+") as fd:
             fcntl.flock(fd, fcntl.LOCK_EX)
             d = load()
-            if d and time.time() >= d.get("deadline", 0):
-                rollback()
+            if d:
+                worker = d.get("worker_pid")
+                worker_alive = isinstance(worker, int) and worker > 1
+                if worker_alive:
+                    try:
+                        os.kill(worker, 0)
+                    except OSError:
+                        worker_alive = False
+                interface = d.get("interface")
+                interfaces = run("/sbin/ifconfig", "-l")
+                tunnel_alive = (isinstance(interface, str) and
+                                interfaces.returncode == 0 and
+                                interface in interfaces.stdout.split())
+                if (time.time() >= d.get("deadline", 0) or
+                        not worker_alive or not tunnel_alive):
+                    rollback()
         time.sleep(1)
 
 
