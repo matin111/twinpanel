@@ -15,9 +15,10 @@ MAX_LINES = 512
 MAX_INLINE_BYTES = 32768
 # Keep runtime-specific route and credentials out of supplied client options.
 ALLOWED_SINGLE = {"client", "nobind", "persist-key", "persist-tun",
-                  "auth-nocache", "remote-cert-tls", "remote-random",
+                  "auth-nocache", "remote-random",
                   "pull", "float"}
 ALLOWED_VALUE = {
+    "remote-cert-tls": {"server"},
     "proto": {"udp", "tcp", "tcp-client", "udp4", "tcp4-client"},
     "dev": {"tun"},
     "auth": {"SHA256", "SHA384", "SHA512"},
