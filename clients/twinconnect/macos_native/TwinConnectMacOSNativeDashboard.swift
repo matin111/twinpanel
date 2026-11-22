@@ -1327,7 +1327,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let summary = stack(spacing: 5)
         summary.addArrangedSubview(text(accountSession?.username ?? "",
                                         size: 11, weight: .semibold))
-        summary.addArrangedSubview(text("Signed in", size: 10, color: muted))
         let identity = card([summary], radius: 18, padding: 12)
         content.addArrangedSubview(identity)
         identity.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -1376,7 +1375,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
             localProxyActive ? "◉  " + connectedProtocolTitle + " proxy active" :
-            (openVPNAppSessionActive ? "◉  OpenVPN tunnel · NOT a full VPN" :
+            (openVPNAppSessionActive ? "◉  OpenVPN · Tunnel only" :
              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")),
             color: (localProxyActive || openVPNAppSessionActive) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
@@ -1448,24 +1447,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // OpenVPN's app-test result must be visible at the Connect button.
-        // Previously it was assigned to 'status' but hidden in Settings;
-        // clicking Connect appeared to do nothing.
+        // Keep the home page quiet: connection type is already in the pill.
+        // Show only ongoing work or actionable errors beside Connect.
         if activeProtocol == "openvpn" {
-            let feedback = fullTunBusy ?
-                "OpenVPN: checking connection…" :
-                (openVPNAppSessionActive ?
-                  "OpenVPN tunnel is running. System-wide traffic is not routed." :
-                  (status.hasPrefix("OpenVPN") ? status :
-                    "OpenVPN: select a server to start a tunnel (not full VPN)."))
-            let connectionFeedback = text(feedback, size: 12,
-                                          color: status.contains("FAILED") ||
-                                                 status.contains("REJECTED") ||
-                                                 status.contains("NOT_INSTALLED") ?
-                                                 amber : muted)
-            main.addArrangedSubview(connectionFeedback)
-            connectionFeedback.widthAnchor.constraint(
-                lessThanOrEqualTo: main.widthAnchor).isActive = true
+            let failed = status.contains("FAILED") ||
+                         status.contains("REJECTED") ||
+                         status.contains("UNAVAILABLE") ||
+                         status.contains("NOT_INSTALLED") ||
+                         status.contains("not verified")
+            if fullTunBusy || (!openVPNAppSessionActive && failed) {
+                let feedback = fullTunBusy ? "Connecting…" : status
+                let connectionFeedback = text(feedback, size: 12,
+                                              color: failed ? amber : muted)
+                main.addArrangedSubview(connectionFeedback)
+                connectionFeedback.widthAnchor.constraint(
+                    lessThanOrEqualTo: main.widthAnchor).isActive = true
+            }
         }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
@@ -1570,7 +1567,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
-            (openVPNAppSessionActive ? "OpenVPN tunnel · no system routing" :
+            (openVPNAppSessionActive ? "Tunnel only" :
              (fullTunActive ? "TUN running · unverified" : "Disconnected")),
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
