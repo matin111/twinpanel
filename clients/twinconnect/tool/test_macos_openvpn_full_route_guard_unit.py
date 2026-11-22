@@ -42,6 +42,32 @@ class GuardTests(unittest.TestCase):
         with patch.object(guard, "run", side_effect=fake_run):
             self.assertEqual(guard.termalin_control_peers(), ["188.114.97.3"])
 
+    def test_split_route_rollback_uses_interior_probe(self) -> None:
+        observed = {"1.0.0.1": "utun4", "129.0.0.1": "utun4"}
+        commands = []
+        def route(destination: str) -> dict[str, str]:
+            return {"interface": observed.get(destination, "en0")}
+        def command(*args: str) -> subprocess.CompletedProcess[str]:
+            commands.append(args)
+            if "0.0.0.0/1" in args:
+                observed["1.0.0.1"] = "en0"
+            if "128.0.0.0/1" in args:
+                observed["129.0.0.1"] = "en0"
+            return reply("")
+        with patch.object(guard, "get_route", side_effect=route), patch.object(
+                guard, "run", side_effect=command):
+            self.assertTrue(guard.delete_if_owned("0.0.0.0/1", "utun4"))
+            self.assertTrue(guard.delete_if_owned("128.0.0.0/1", "utun4"))
+        self.assertEqual(len(commands), 2)
+        self.assertIn("0.0.0.0/1", commands[0])
+        self.assertIn("128.0.0.0/1", commands[1])
+
+    def test_split_route_rollback_detects_still_routed(self) -> None:
+        with patch.object(guard, "get_route",
+                          return_value={"interface": "utun4"}), patch.object(
+                guard, "run", return_value=reply("")):
+            self.assertFalse(guard.delete_if_owned("0.0.0.0/1", "utun4"))
+
     def test_no_ssh_fails_without_installing_routes(self) -> None:
         # Pretend that a valid tunnel, daemon, baseline gateway and
         # transport endpoint exist; management peer gate still blocks.
