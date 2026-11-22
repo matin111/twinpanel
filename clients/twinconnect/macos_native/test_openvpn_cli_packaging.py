@@ -67,6 +67,16 @@ class OpenVPNPackagingTests(unittest.TestCase):
         self.assertIn('bin/openvpn" --version', script)
         self.assertIn('macos_native/openvpn_profile_review.py', script)
 
+    def test_repeat_build_refreshes_stale_helper_candidate(self):
+        script = APP_PACKAGER.read_text()
+        self.assertIn("OPENVPN_HELPER_BUILD_CURRENT", script)
+        self.assertIn("OPENVPN_HELPER_BUILD_REFRESHED", script)
+        self.assertIn('diff -qr "$helper_source" "$helper_build"', script)
+        self.assertIn('mv "$helper_next" "$helper_build"', script)
+        self.assertIn('mv "$helper_previous" "$helper_build"', script)
+        self.assertIn("UNSAFE_OPENVPN_HELPER_BUILD_PATH", script)
+        self.assertNotIn("OPENVPN_HELPER_BUILD_ALREADY_EXISTS; REBUILD_REFUSED", script)
+
     def test_does_not_launch_openvpn(self):
         packager = PACKAGER.read_text()
         self.assertNotIn('openvpn --config', packager)
