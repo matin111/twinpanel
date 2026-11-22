@@ -102,6 +102,37 @@ def management_peers() -> list[str]:
     return sorted(peers)
 
 
+def termalin_control_peers() -> list[str]:
+    """Protect the remote-management Connector's active outbound TCP peer.
+
+    The SSH socket seen by this connector is loopback. Its actual transport
+    to the management service is a separate public TCP connection, so pinning
+    only inbound SSH peers would disconnect our remote control.
+    """
+    processes = run("/usr/bin/pgrep", "-f", "^/usr/local/bin/termalin-agent run$")
+    if processes.returncode:
+        return []
+    result: set[str] = set()
+    for raw_pid in processes.stdout.split():
+        if not raw_pid.isdecimal():
+            continue
+        sockets = run("/usr/sbin/lsof", "-nP", "-a", "-p", raw_pid,
+                      "-iTCP", "-sTCP:ESTABLISHED")
+        if sockets.returncode:
+            continue
+        for row in sockets.stdout.splitlines():
+            match = re.search(r"TCP\\s+[0-9.]+:[0-9]+->([0-9.]+):[0-9]+\\s+\\(ESTABLISHED\\)", row)
+            if not match:
+                continue
+            try:
+                ip = ipaddress.IPv4Address(match.group(1))
+            except ipaddress.AddressValueError:
+                continue
+            if ip.is_global:
+                result.add(str(ip))
+    return sorted(result)
+
+
 def exact_host_routes() -> set[str] | None:
     r = run("/usr/sbin/netstat", "-rn", "-f", "inet")
     if r.returncode:
@@ -218,9 +249,14 @@ def trial(endpoint: str) -> str:
     # Require at least one *observed* inbound SSH session and pin all
     # active clients through the baseline interface before installing /1s.
     # No SSH session means no safe remote-management proof: fail closed.
-    peers = management_peers()
-    if not peers:
-        return "ESTABLISHED_SSH_MANAGEMENT_REQUIRED"
+    ssh_peers = management_peers()
+    connector_peers = termalin_control_peers()
+    if not ssh_peers and not connector_peers:
+        return "REMOTE_MANAGEMENT_PEER_REQUIRED"
+    # Pin all observed remote control transports, not only the SSH socket.
+    # Without Connector's public peer a remotely managed Mac becomes
+    # unreachable even though its localhost SSH socket stays established.
+    peers = sorted(set(ssh_peers + connector_peers))
     if endpoint in peers:
         return "SERVER_AND_MANAGEMENT_PEER_CONFLICT"
     existing = exact_host_routes()
