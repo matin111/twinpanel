@@ -117,7 +117,9 @@ def status() -> str:
 
 def cleanup(*, preserve_state: bool = False) -> None:
     # State directory is root-owned and never accessible to the app.
-    for p in ((CONFIG, LOG, STOP) if preserve_state else
+    # Keep the last root-only diagnostic log after a failed session. It is
+    # removed on the next start; never keep the private .ovpn profile.
+    for p in ((CONFIG, STOP) if preserve_state else
               (CONFIG, LOG, STOP, STATE)):
         try:
             p.unlink()
@@ -207,17 +209,21 @@ def worker() -> int:
                     state_write("OPENVPN_ROUTE_CHANGED_STOPPED",
                                 os.getpid(), deadline)
                     return 2
-                if child.poll() is not None:
-                    state_write("OPENVPN_ENGINE_EXITED",
-                                os.getpid(), deadline)
-                    return 2
-                # Read only fixed-size tail; no raw log is exposed to app.
+                # Read the log even if OpenVPN has already exited. Some
+                # profile/option errors terminate before the first poll.
+                # Root-only diagnostic log survives teardown for investigation.
                 try:
                     with open(LOG, "rb") as f:
                         f.seek(max(0, f.seek(0, os.SEEK_END) - 65536))
                         log_bytes = f.read()
                 except OSError:
                     log_bytes = b""
+                if child.poll() is not None and SUCCESS not in log_bytes:
+                    reason = next((reason for pattern, reason in FAILURES
+                                   if pattern.encode() in log_bytes),
+                                  "OPENVPN_ENGINE_EXITED")
+                    state_write(reason, os.getpid(), deadline)
+                    return 2
                 if not handshake:
                     if SUCCESS in log_bytes:
                         handshake = True
