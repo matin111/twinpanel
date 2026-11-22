@@ -86,6 +86,8 @@ def management_peers() -> list[str]:
         parts = row.split()
         if len(parts) < 6 or parts[-1] != "ESTABLISHED":
             continue
+        # macOS netstat -an -f inet -p tcp:
+        # Proto Recv-Q Send-Q Local Address Foreign Address (state)
         local, remote = parts[3], parts[4]
         # netstat displays IPv4 TCP ports as dotted suffixes on macOS.
         if not local.endswith(".22"):
@@ -135,6 +137,8 @@ def rollback() -> str:
                 current.get("interface") == d.get("original_interface")):
             removed = run(ROUTE, "-n", "delete", "-host", endpoint, gateway)
             successful = removed.returncode == 0 and successful
+        # If the host route is already gone it was cleaned by the OS,
+        # and must not be touched a second time.
     for peer in d.get("management_pin_committed", []):
         if not isinstance(peer, str):
             return "INVALID_STATE_MANUAL_RECOVERY_REQUIRED"
