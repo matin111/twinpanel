@@ -246,7 +246,7 @@ def probe_host(interface: str) -> str:
         return "CISCO_PROBE_INTERFACE_NOT_FOUND"
     info = run("/sbin/ifconfig", interface)
     if info.returncode or not re.search(
-            r"(?m)^\\s*inet\\s+(?:10\\.|172\\.|192\\.168\\.)", info.stdout):
+            r"(?m)^\s*inet\s+(?:10\.|172\.|192\.168\.)", info.stdout):
         return "CISCO_PROBE_TUNNEL_NOT_CONFIGURED"
     base_route = route(PROBE_DEST)
     if (base_route.get("interface") != original_interface or
