@@ -1,8 +1,8 @@
 {
-  "version": "1.1.9",
-  "source_sha": "cc8c85d4fd46b853a96318ef2d5aa0ae23c182eb",
+  "version": "1.1.10",
+  "source_sha": "17711d0d6c60c240e3e4755b532b9f745dc7d341",
   "notes": {
-    "fa": "اصلاح کامل متن مراحل تمدید در ربات: تمدید اکانت‌های معمولی و انتقالی پس از تأیید پرداخت رزرو می‌شود و پس از اتمام زمان یا حجم دوره فعلی فعال خواهد شد؛ متن خرید جدید جدا و فعال‌سازی خرید جدید بدون رزرو حفظ شده است. شامل اصلاحات کد تخفیف تمدید و حسابداری سریع Xray.",
-    "en": "Corrected normal and imported renewal checkout messaging: renewals reserve the next period until current quota or validity ends; new purchases retain distinct immediate provisioning messages. Includes renewal coupon and fast Xray accounting improvements."
+    "fa": "اصلاح خطای ذخیره ویرایش اشتراک، مرتب‌سازی گزارش ارسال همگانی ربات با آمار جداگانه، و حذف کامل اکانت نماینده با استفاده از مسیر حذف مرکزی و ثبت فرمان لغو دسترسی سرورها.",
+    "en": "Fix subscription admin edit runtime override, readable Telegram broadcast reports, and reseller subscription hard-deletion through the canonical server revocation path."
   }
 }
