@@ -43,7 +43,7 @@ if [[ "$action" == upgrade ]]; then
   /usr/sbin/chown root:wheel "$tmp"
   [[ "$SUDO_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] ||
     { echo "INVALID_INSTALL_USER"; exit 3; }
-  /usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status\\n' \
+  /usr/bin/printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s --stdin, /usr/bin/python3 %s start, /usr/bin/python3 %s stop, /usr/bin/python3 %s status\n' \
     "$SUDO_USER" "$runner" "$session" "$session" "$session" > "$tmp"
   /usr/sbin/visudo -c -f "$tmp" ||
     { echo "INVALID_SUDOERS_RULE"; exit 3; }
