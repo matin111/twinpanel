@@ -321,7 +321,13 @@ def readiness() -> dict:
     # OpenVPN and Cisco must not own the same system routing concurrently.
     vpn_guard = Path(
         "/private/var/run/twinconnect-full-route-guard/state.json")
-    if vpn_guard.exists():
+    try:
+        occupied = vpn_guard.exists()
+    except OSError:
+        # Privileged state directories are not visible to ordinary users.
+        # Unknown ownership of a network route is a hard preflight block.
+        occupied = True
+    if occupied:
         issues.append("CISCO_CONCURRENT_VPN_ROUTE_REFUSED")
     # Inform the caller that network recovery works, not that production
     # Cisco is authorized to modify the VPS network.
