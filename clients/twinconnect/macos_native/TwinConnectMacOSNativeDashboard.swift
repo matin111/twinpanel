@@ -1439,7 +1439,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             (activeProtocol != "cisco" || ciscoTunnelTask != nil)
-        connect.toolTip = activeProtocol == "cisco" ?
+        connect.toolTip = activeProtocol == "openvpn" && !fullTunServicePresent() ?
+            "Run a bounded 35-second OpenVPN handshake inside the app; no system VPN." :
+            activeProtocol == "cisco" ?
             "Disabled after macOS network configuration loss; network recovery must be verified first." :
             (fullTunActive ? "TUN engine started; network egress NOT verified." :
                 (fullTunServicePresent() ? "Experimental local-console TUN service." :
@@ -3648,6 +3650,93 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         } catch { return false }
     }
 
+    // A bounded end-to-end diagnostic initiated by the app's actual Connect
+    // button. Never claim this temporary handshake is a system-wide VPN.
+    // A separately installed root-owned, narrow sudo rule is mandatory.
+    private func startOpenVPNAppProbe(_ session: TwinMacNativeSession,
+                                     serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "OpenVPN app test: fetching your authorized profile…"
+        view = build()
+        directory.prepareOpenVPNProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                self.fullTunBusy = false
+                let reason = error.localizedDescription
+                self.status = "OpenVPN app test: " + (
+                    reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    reason : "PROFILE_UNAVAILABLE")
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let reviewed = self.reviewOpenVPNProfile(profile)
+                    var code: Int32 = 1
+                    var summary = "OPENVPN_PROFILE_REJECTED"
+                    if reviewed {
+                        let helper = "/Library/PrivilegedHelperTools/" +
+                            "TwinConnectOpenVPN/tool/test_macos_openvpn_handshake.py"
+                        if FileManager.default.isReadableFile(atPath: helper) {
+                            let task = Process()
+                            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                            task.arguments = ["-n", "/usr/bin/python3",
+                                              helper, "--stdin"]
+                            let input = Pipe()
+                            let output = Pipe()
+                            task.standardInput = input
+                            task.standardOutput = output
+                            task.standardError = FileHandle.nullDevice
+                            do {
+                                try task.run()
+                                input.fileHandleForWriting.write(profile)
+                                input.fileHandleForWriting.closeFile()
+                                task.waitUntilExit()
+                                code = task.terminationStatus
+                                let data = output.fileHandleForReading
+                                    .readDataToEndOfFile()
+                                let publicOutput = String(data: data,
+                                                          encoding: .utf8) ?? ""
+                                let resultCodes = publicOutput
+                                    .components(separatedBy: .newlines)
+                                    .filter { $0.range(
+                                        of: "^[A-Z0-9_]{4,80}$",
+                                        options: .regularExpression) != nil }
+                                summary = resultCodes.first(where: {
+                                    $0 == "OPENVPN_HANDSHAKE_VERIFIED" ||
+                                    $0.hasPrefix("OPENVPN_")
+                                }) ?? "OPENVPN_TEST_FAILED"
+                            } catch {
+                                summary = "OPENVPN_APP_PROBE_LAUNCH_FAILED"
+                            }
+                        } else {
+                            summary = "OPENVPN_APP_PROBE_NOT_INSTALLED"
+                        }
+                    }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self,
+                              self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.fullTunBusy = false
+                        self.fullTunActive = false
+                        if code == 0 &&
+                           summary == "OPENVPN_HANDSHAKE_VERIFIED" {
+                            self.status = "OpenVPN handshake verified in app; " +
+                                "test stopped. System VPN not connected."
+                        } else {
+                            self.status = "OpenVPN app test: " + summary
+                        }
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
     private func startOpenVPN(_ session: TwinMacNativeSession,
                               serverID: String) {
         fullTunBusy = true
@@ -3876,7 +3965,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 view = build()
                 return
             }
-            startOpenVPN(session, serverID: serverID)
+            if fullTunServicePresent() {
+                startOpenVPN(session, serverID: serverID)
+            } else {
+                startOpenVPNAppProbe(session, serverID: serverID)
+            }
             return
         }
         let enabled: Set<String> = [
