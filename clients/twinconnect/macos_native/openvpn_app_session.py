@@ -242,7 +242,21 @@ def worker() -> int:
                             os.getpid(), deadline)
         return 0
     finally:
+        # On expiry, engine failure and user-requested stop alike, ask the
+        # independent privileged route guard to restore its owned routes
+        # BEFORE removing the utun. This also covers GUI crashes.
         if child is not None:
+            guard_state = Path(
+                "/private/var/run/twinconnect-full-route-guard/state.json")
+            if guard_state.exists():
+                rollback_routes_before_stop()
+                # The independent watchdog may need another pass. Keep the
+                # transport alive briefly rather than destroying the interface
+                # before its routes have been rolled back.
+                recovery_deadline = time.monotonic() + 65
+                while guard_state.exists() and time.monotonic() < recovery_deadline:
+                    time.sleep(1)
+                    rollback_routes_before_stop()
             stop_openvpn(child)
         cleanup(preserve_state=True)
 
