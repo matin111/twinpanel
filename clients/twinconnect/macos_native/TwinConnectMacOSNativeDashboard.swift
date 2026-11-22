@@ -594,6 +594,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var fullTunActive = false
     private var openVPNAppSessionActive = false
     private var openVPNSystemRouteVerified = false
+    private var openVPNExitIP: String?
+    private var openVPNPing: Double?
+    private weak var openVPNPingText: NSTextField?
+    private weak var openVPNIPText: NSTextField?
+    private var openVPNTelemetryBusy = false
+    private var openVPNTelemetryAt = Date.distantPast
+    private var openVPNLastTraffic: (download: Int64, upload: Int64, at: Date)?
     private var openVPNAppStatusPollAt = Date.distantPast
     private var fullTunBusy = false
     private var fullTunStatusPollBusy = false
@@ -1534,6 +1541,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         number.toolTip = value
         content.addArrangedSubview(number)
         if title == "Download" { downloadSpeedText = number }
+        if title == "Ping" { openVPNPingText = number }
+        if title == "IP Address" { openVPNIPText = number }
         if title == "Upload" { uploadSpeedText = number }
         if !subtitle.isEmpty {
             let subtitleText = text(subtitle, size: 10, color: muted)
@@ -1580,10 +1589,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
-        if localProxyActive {
-            // Proxy diagnostics only; never claim system-wide VPN traffic.
+        if localProxyActive || openVPNSystemRouteVerified {
+            // Proxy and OpenVPN telemetry use separate verified sources.
             let timing = stack(.horizontal, spacing: 8)
-            let uptime = text("◷  " + connectedProtocolTitle + " proxy session",
+            let uptime = text(openVPNSystemRouteVerified ?
+                              "◷  OpenVPN system session" :
+                              "◷  " + connectedProtocolTitle + " proxy session",
                               size: 12, color: muted)
             proxyUptimeText = uptime
             timing.addArrangedSubview(uptime)
@@ -1595,9 +1606,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
-                value: pingText(selected), valueColor: pingColor(selected)))
+                value: openVPNSystemRouteVerified ?
+                    openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—" :
+                    pingText(selected),
+                valueColor: openVPNSystemRouteVerified ? sea : pingColor(selected)))
             network.addArrangedSubview(networkMetric("IP Address",
-                value: localProxyExitIP ?? "—"))
+                value: openVPNSystemRouteVerified ? (openVPNExitIP ?? "—") :
+                    (localProxyExitIP ?? "—")))
             content.addArrangedSubview(network)
             network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             let traffic = stack(.horizontal, spacing: 10)
@@ -3416,6 +3431,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func resetTrafficMetrics() {
+        openVPNExitIP = nil
+        openVPNPing = nil
+        openVPNLastTraffic = nil
+        openVPNTelemetryAt = .distantPast
         localProxyStartedAt = nil
         lastTraffic = nil
         recentTraffic.removeAll()
@@ -3454,6 +3473,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func refreshTrafficMetrics() {
         refreshFullTunStatus()
         refreshOpenVPNAppSession()
+        refreshOpenVPNTelemetry()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         if let startedAt = localProxyStartedAt {
             let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
@@ -3539,6 +3559,79 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.downloadedTotal
                 self.uploadedTotalText?.stringValue = "Total: " +
                     self.uploadedTotal
+            }
+        }
+    }
+
+    // Real network metrics: read utun interface counters, actual IPv4 exit,
+    // and a real ICMP latency probe. Never synthesize readings.
+    private func refreshOpenVPNTelemetry() {
+        guard tab == 0, openVPNSystemRouteVerified, !openVPNTelemetryBusy,
+              Date().timeIntervalSince(openVPNTelemetryAt) >= 5 else { return }
+        openVPNTelemetryBusy = true
+        openVPNTelemetryAt = Date()
+        let generation = localProxyGeneration
+        let script = localRuntimeRoot() +
+            "/macos_native/openvpn_traffic_telemetry.py"
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            task.arguments = [script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var data = Data()
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                data = pipe.fileHandleForReading.readDataToEndOfFile()
+            }
+            let metrics = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any]
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.openVPNTelemetryBusy = false
+                guard self.openVPNSystemRouteVerified,
+                      self.localProxyGeneration == generation else { return }
+                guard metrics?["state"] as? String == "measured",
+                      let down = (metrics?["download_bytes"] as? NSNumber)?.int64Value,
+                      let up = (metrics?["upload_bytes"] as? NSNumber)?.int64Value,
+                      down >= 0, up >= 0 else { return }
+                let now = Date()
+                if let previous = self.openVPNLastTraffic,
+                   now.timeIntervalSince(previous.at) > 0.1,
+                   down >= previous.download, up >= previous.upload {
+                    let seconds = now.timeIntervalSince(previous.at)
+                    let downRate = Double(down - previous.download) / seconds
+                    let upRate = Double(up - previous.upload) / seconds
+                    self.downloadSpeed = self.transferRate(downRate)
+                    self.uploadSpeed = self.transferRate(upRate)
+                    self.downloadHistory.append(downRate)
+                    self.uploadHistory.append(upRate)
+                    if self.downloadHistory.count > 36 { self.downloadHistory.removeFirst() }
+                    if self.uploadHistory.count > 36 { self.uploadHistory.removeFirst() }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
+                } else {
+                    self.downloadSpeed = "0 B/s"
+                    self.uploadSpeed = "0 B/s"
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.openVPNLastTraffic = (down, up, now)
+                self.downloadedTotal = self.transferTotal(down)
+                self.uploadedTotal = self.transferTotal(up)
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " + self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " + self.uploadedTotal
+                self.openVPNExitIP = metrics?["ip"] as? String
+                self.openVPNPing = (metrics?["ping_ms"] as? NSNumber)?.doubleValue
+                self.openVPNIPText?.stringValue = self.openVPNExitIP ?? "—"
+                self.openVPNPingText?.stringValue = self.openVPNPing.map {
+                    String(format: "%.0f ms", $0)
+                } ?? "—"
             }
         }
     }
@@ -3750,6 +3843,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.openVPNSystemRouteVerified =
                             result.0 == 0 && result.1 == "connected"
                         self.openVPNAppSessionActive = self.openVPNSystemRouteVerified
+                        self.resetTrafficMetrics()
                         self.status = self.openVPNSystemRouteVerified ?
                             "Connected · OpenVPN" : "OpenVPN: " + result.1
                         self.view = self.build()
@@ -3773,6 +3867,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if result.0 == 0 && result.1 == "stopped" {
                     self.openVPNAppSessionActive = false
                     self.openVPNSystemRouteVerified = false
+                    self.resetTrafficMetrics()
                     self.status = "OpenVPN: disconnected."
                 } else {
                     self.status = "OpenVPN: " + result.1
@@ -3804,6 +3899,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if active != self.openVPNAppSessionActive ||
                    routed != self.openVPNSystemRouteVerified ||
                    self.status != nextStatus {
+                    if self.openVPNSystemRouteVerified && !routed {
+                        self.resetTrafficMetrics()
+                    }
                     self.openVPNAppSessionActive = active
                     self.openVPNSystemRouteVerified = routed
                     self.status = nextStatus
