@@ -80,7 +80,7 @@ case "$arch" in
 esac
 [[ -f "$engine" && -x "$engine" && ! -L "$engine" ]] ||
   { echo "SINGBOX_ENGINE_MISSING" >&2; exit 2; }
-for f in unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py; do
+for f in unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py; do
   [[ -f "macos_native/$f" && ! -L "macos_native/$f" ]] ||
     { echo "MISSING_SAFE_TUN_SOURCE: $f" >&2; exit 2; }
 done
@@ -96,9 +96,25 @@ if [[ "$action" == "stage" ]]; then
   install -o root -g wheel -m 0644 macos_native/unsigned_tun_daemon.py "$root/unsigned_tun_daemon.py"
   install -o root -g wheel -m 0644 macos_native/unsigned_tun_policy.py "$root/unsigned_tun_policy.py"
   install -o root -g wheel -m 0644 macos_native/unsigned_tun_watchdog.py "$root/unsigned_tun_watchdog.py"
+  install -o root -g wheel -m 0644 macos_native/openvpn_profile_review.py "$root/openvpn_profile_review.py"
+  # Previously verified, unprivileged OpenVPN build. No Homebrew executable
+  # is launched with root permissions while staging this runtime.
+  source_dir="macos_native/build/openvpn/$([[ "$arch" == "x86_64" ]] && echo amd64 || echo arm64)"
+  if [[ -d "$source_dir" ]]; then
+    if [[ -x "$source_dir/bin/openvpn" ]] &&
+       [[ -z "$(find "$source_dir" -type l -print -quit)" ]]; then
+      mkdir -m 0700 "$root/openvpn"
+      cp -R "$source_dir/." "$root/openvpn/"
+      chown -R root:wheel "$root/openvpn"
+      chmod -R go-w "$root/openvpn"
+      echo "OPENVPN_LOCAL_HELPER_STAGED"
+    else
+      echo "OPENVPN_HELPER_ARTIFACT_UNSAFE" >&2; exit 2
+    fi
+  fi
 else
   # Never swap helper source behind root ownership on activation.
-  for f in sing-box unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py; do
+  for f in sing-box unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py; do
     [[ -f "$root/$f" && ! -L "$root/$f" && "$(stat -f %u "$root/$f")" == 0 ]] ||
       { echo "TRUSTED_STAGED_FILE_MISSING" >&2; exit 2; }
   done
