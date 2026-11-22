@@ -3060,11 +3060,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let existing = ciscoTunnelTask {
             ciscoTunnelStatus = "Stopping Cisco tunnel…"
             existing.terminate()
+            // Terminating sudo is not sufficient proof that its privileged
+            // child exited. Use a fixed root-owned stop command to restore
+            // DNS/routes and signal only our verified Cisco worker.
+            DispatchQueue.global(qos: .utility).async {
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                if (try? stop.run()) != nil { stop.waitUntilExit() }
+            }
             view = build()
             return
         }
-        // Keep production Cisco gated. The test instead uses a separate
-        // no-route/no-DNS OpenConnect script and never labels it as VPN.
+        // The full system route is enabled only after actual Cisco HTTPS
+        // egress verification by the privileged independent watchdog.
         guard !ciscoTunnelBusy, let session = accountSession,
               let serverID = activeServer,
               snapshot?.protocols.contains(where: {
