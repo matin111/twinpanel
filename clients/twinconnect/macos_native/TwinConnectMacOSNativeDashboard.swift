@@ -3861,6 +3861,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             requestCiscoTunnel(sender)
             return
         }
+        if ciscoTunnelTask != nil || ciscoTunnelBusy {
+            status = "Stop the Cisco process before switching transports."
+            view = build()
+            return
+        }
         if activeProtocol == "openvpn" {
             guard let session = accountSession,
                   let serverID = activeServer,
@@ -3872,11 +3877,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 return
             }
             startOpenVPN(session, serverID: serverID)
-            return
-        }
-        if ciscoTunnelTask != nil || ciscoTunnelBusy {
-            status = "Stop the Cisco process before switching transports."
-            view = build()
             return
         }
         let enabled: Set<String> = [
