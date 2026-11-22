@@ -102,7 +102,7 @@ def renewal_stage_markup(
                     "🔄 <b>انتخاب پلن تمدید</b>\n"
                     f"📂 {escape(category)} | "
                     f"{'نامحدود' if user_count == 0 else user_count} دستگاه\n\n"
-                    "حجم و اعتبار پلن انتخابی پس از پرداخت به همین اکانت اضافه می‌شود."
+                    "پس از تأیید پرداخت، تمدید رزرو می‌شود و پس از پایان زمان یا حجم اشتراک فعلی، به‌صورت خودکار روی همین اکانت فعال می‌شود."
                 )
                 for item in matching[start:start + 12]:
                     rows.append([InlineKeyboardButton(

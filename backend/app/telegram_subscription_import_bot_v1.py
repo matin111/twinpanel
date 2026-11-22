@@ -291,7 +291,7 @@ def install(router, request_fn):
                             "♻️ <b>انتخاب پلن تمدید</b>\n"
                             f"📂 {escape(categories[category_index])} | "
                             f"{'نامحدود' if user_count == 0 else str(user_count)} کاربر\n\n"
-                            "حجم و اعتبار پس از تأیید پرداخت به همین اکانت افزوده می‌شود."
+                            "پس از تأیید پرداخت، تمدید برای دوره بعد رزرو می‌شود. با پایان زمان یا حجم اشتراک فعلی، تمدید به‌صورت خودکار فعال می‌شود."
                         )
                         for p in matching[start:start + 12]:
                             rows.append([InlineKeyboardButton(
@@ -347,7 +347,7 @@ def install(router, request_fn):
                 "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
                 "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
                 f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\n\n"
-                "پس از پرداخت و تأیید، همین اشتراک تمدید می‌شود. "
+                "پس از تأیید پرداخت، تمدید رزرو می‌شود و پس از پایان زمان یا حجم اشتراک فعلی خودکار فعال می‌شود. "
                 "مالکیت اکانت تغییر نمی‌کند.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
