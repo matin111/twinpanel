@@ -34,6 +34,14 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn('status.hasPrefix("OpenVPN")', section)
         self.assertIn('main.addArrangedSubview(connectionFeedback)', section)
 
+    def test_result_parser_ignores_stop_marker_and_prioritizes_handshake(self):
+        section = DASHBOARD.split("private func startOpenVPNAppProbe(", 1)[1]
+        section = section.split("private func startOpenVPN(", 1)[0]
+        self.assertIn('$0 != "OPENVPN_TEST_STOPPED"', section)
+        self.assertIn('$0 == "OPENVPN_HANDSHAKE_VERIFIED"', section)
+        self.assertIn('summary = outcomes.first(where:', section)
+        self.assertIn('self.fullTunActive = false', section)
+
     def test_root_probe_uses_fixed_path_and_bounded_runtime(self):
         self.assertIn("/Library/PrivilegedHelperTools/TwinConnectOpenVPN", INSTALLER)
         self.assertIn("NOPASSWD: /usr/bin/python3 %s --stdin", INSTALLER)
