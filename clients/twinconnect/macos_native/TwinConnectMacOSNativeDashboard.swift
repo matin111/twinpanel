@@ -1331,40 +1331,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let identity = card([summary], radius: 18, padding: 12)
         content.addArrangedSubview(identity)
         identity.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        // Match Windows: language control and settings gear live below
-        // the signed-in identity; sign-out is in Account, not the sidebar.
-        let languageRow = stack(.horizontal, spacing: 0)
-        let languageLeft = NSView()
-        let languageRight = NSView()
-        languageRow.addArrangedSubview(languageLeft)
-        let languageButton = button("◎   EN   ⌄",
-                                    action: #selector(openLanguageSettings(_:)),
-                                    mutedButton: true)
-        languageButton.toolTip = "Language preferences (English is available)"
-        languageButton.widthAnchor.constraint(equalToConstant: 118).isActive = true
-        languageButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
-        languageRow.addArrangedSubview(languageButton)
-        languageRow.addArrangedSubview(languageRight)
-        languageLeft.widthAnchor.constraint(equalTo: languageRight.widthAnchor)
-            .isActive = true
-        content.addArrangedSubview(languageRow)
-        languageRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-
-        let settingsRow = stack(.horizontal, spacing: 0)
-        let settingsLeft = NSView()
-        let settingsRight = NSView()
-        settingsRow.addArrangedSubview(settingsLeft)
-        let gear = button("⚙", action: #selector(openLanguageSettings(_:)),
-                          mutedButton: true)
-        gear.widthAnchor.constraint(equalToConstant: 39).isActive = true
-        gear.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        gear.toolTip = "Settings"
-        settingsRow.addArrangedSubview(gear)
-        settingsRow.addArrangedSubview(settingsRight)
-        settingsLeft.widthAnchor.constraint(equalTo: settingsRight.widthAnchor)
-            .isActive = true
-        content.addArrangedSubview(settingsRow)
-        settingsRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        // Settings already has its own navigation tab. Avoid duplicate gear
+        // and a language-looking control that only redirected to Settings.
+        // Keep account identity; no functional navigation is removed.
         // Independent vertical safe-areas match the Windows navigation:
         // branding starts below the title bar; the language/gear controls
         // float above the bottom edge rather than touching the window.
