@@ -133,8 +133,9 @@ def store(data: dict) -> None:
 
 def status() -> str:
     data = load()
-    return ("CISCO_MANAGEMENT_PIN_ACTIVE" if data else
-            "CISCO_MANAGEMENT_PIN_IDLE")
+    return ("CISCO_SYSTEM_IPV4_CONNECTED" if data.get("mode") == "leased" else
+            ("CISCO_MANAGEMENT_PIN_ACTIVE" if data else
+             "CISCO_MANAGEMENT_PIN_IDLE"))
 
 
 def rollback() -> str:
