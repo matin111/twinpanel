@@ -972,6 +972,98 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // OpenVPN: retrieve a profile only for the current authenticated tenant,
+    // entitled protocol and selected node. Never trust a remote-supplied
+    // executable command, file path or routing instruction.
+    func prepareOpenVPNProfile(_ session: TwinMacNativeSession,
+                               serverID: String,
+                               completion: @escaping (Result<Data, Error>) -> Void) {
+        guard serverID.range(of: "^[0-9]{1,20}$",
+                             options: .regularExpression) != nil else {
+            completion(.failure(TwinMacNativeError.failure("INVALID_SERVER_ID")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] catalogResult in
+            guard let self = self else { return }
+            guard case .success(let catalog) = catalogResult,
+                  self.validEnvelope(catalog, session.namespace),
+                  let protocols = catalog["protocols"] as? [[String: Any]],
+                  protocols.count <= 16,
+                  protocols.filter({
+                      $0["code"] as? String == "openvpn" &&
+                      $0["selected"] as? Bool == true &&
+                      $0["config_record_present"] as? Bool == true
+                  }).count == 1 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "OPENVPN_PROTOCOL_NOT_ALLOWED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventoryResult in
+                guard case .success(let inventory) = inventoryResult,
+                      self.validEnvelope(inventory, session.namespace),
+                      let servers = inventory["servers"] as? [[String: Any]],
+                      servers.filter({
+                          ($0["id"] as? String) == serverID
+                      }).count == 1 else {
+                    completion(.failure(TwinMacNativeError.failure(
+                        "OPENVPN_SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": "openvpn"], bearer: token,
+                             maxBytes: 1048576) { responseResult in
+                    guard case .success(let response) = responseResult,
+                          self.validEnvelope(response, session.namespace),
+                          response["protocol"] as? String == "openvpn",
+                          let items = response["items"] as? [[String: Any]],
+                          items.count <= 200 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "OPENVPN_PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let candidates = items.filter { item in
+                        if let id = item["node_id"] as? String {
+                            return id == serverID
+                        }
+                        if let id = item["node_id"] as? Int {
+                            return String(id) == serverID
+                        }
+                        return false
+                    }
+                    guard candidates.count == 1,
+                          let raw = self.reviewedOpenVPNText(candidates[0]) else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "OPENVPN_PROFILE_INVALID")))
+                        return
+                    }
+                    completion(.success(raw))
+                }
+            }
+        }
+    }
+
+    private func reviewedOpenVPNText(_ item: [String: Any]) -> Data? {
+        // Schema discovery is deliberately conservative: the API must return
+        // a complete inline .ovpn document; a URL or arbitrary JSON is not
+        // converted into an executable OpenVPN command.
+        let candidates = ["ovpn", "ovpn_config", "openvpn_config",
+                          "config_text", "profile_text", "config"]
+        let matches = candidates.compactMap { item[$0] as? String }
+            .filter { !$0.isEmpty }
+        guard matches.count == 1,
+              let data = matches.first?.data(using: .utf8),
+              (1...65536).contains(data.count),
+              data.contains(10),
+              let text = String(data: data, encoding: .utf8),
+              text.contains("remote "),
+              text.contains("<ca>") else { return nil }
+        return data
+    }
+
     // Cisco / AnyConnect has its own OpenConnect engine, not a sing-box
     // outbound. Authenticate only: without a privileged macOS tunnel runtime,
     // success must not be interpreted as VPN traffic flowing.
