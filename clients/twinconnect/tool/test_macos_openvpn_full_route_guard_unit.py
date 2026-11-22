@@ -21,8 +21,8 @@ def reply(stdout: str, code: int = 0) -> subprocess.CompletedProcess[str]:
 
 class GuardTests(unittest.TestCase):
     def test_management_peer_detected_from_established_ssh(self) -> None:
-        data = ("tcp4 0 0 185.236.39.36.22 203.0.113.8.54321 ESTABLISHED\\n"
-                "tcp4 0 0 185.236.39.36.22 8.8.8.8.54321 ESTABLISHED\\n")
+        data = ("tcp4 0 0 185.236.39.36.22 203.0.113.8.54321 ESTABLISHED\n"
+                "tcp4 0 0 185.236.39.36.22 8.8.8.8.54321 ESTABLISHED\n")
         # Documentation-only TEST-NET peer is never treated as a real route.
         with patch.object(guard, "run", return_value=reply(data)):
             self.assertEqual(guard.management_peers(), ["8.8.8.8"])
