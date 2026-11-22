@@ -437,20 +437,23 @@ def install(router, request_fn):
                     "plan_id": plan_id,
                 },
             )
-            method_data = await request_fn("GET", "/v1/payments/methods")
-            methods = method_data.get("methods") or []
-            buttons = [
+            # Imported/share-link accounts create a genuine renewal StoreOrder.
+            # Route them through the SAME coupon step as owned subscriptions;
+            # renewal coupon handlers validate the payer's linked account and
+            # server-side SubscriptionRenewalOrder relation before payment.
+            # Do not jump straight to renewpay/renewwallet: that bypasses
+            # coupons for migrated accounts and makes renewal codes invisible.
+            order_id = int(order["id"])
+            coupon_markup = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="💳 " + str(method.get("title") or method.get("id")),
-                    callback_data=f"renewpay:{int(order['id'])}:{method['id']}",
-                )]
-                for method in methods if method.get("id")
-            ]
-            buttons.append([InlineKeyboardButton(
-                text="💰 پرداخت تمدید از کیف پول",
-                callback_data=f"renewwallet:preview:{int(order['id'])}",
-            )])
-            # Wallet remains available when other gateways are disabled.
+                    text="🎟 کد تخفیف",
+                    callback_data=f"renewcoupon:enter:{order_id}",
+                )],
+                [InlineKeyboardButton(
+                    text="ادامه بدون کد",
+                    callback_data=f"renewcoupon:skip:{order_id}",
+                )],
+            ])
         except Exception as exc:
             if callback.message:
                 await callback.message.answer("❌ " + escape(str(exc)[:180]))
@@ -460,8 +463,8 @@ def install(router, request_fn):
                 "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\n\n"
                 f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
                 f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\n\n"
-                "روش پرداخت را انتخاب کنید:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+                "کد تخفیف دارید؟",
+                reply_markup=coupon_markup,
             )
 
     @router.callback_query(F.data.startswith("subimp:password:"))
