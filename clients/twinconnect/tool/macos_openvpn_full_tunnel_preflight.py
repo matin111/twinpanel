@@ -5,7 +5,6 @@ Never changes routes, DNS, firewall or network configuration.  A passing
 OpenVPN handshake is not sufficient for safe system-wide routing.
 """
 from __future__ import annotations
-import ipaddress
 import json
 import os
 from pathlib import Path
@@ -72,7 +71,7 @@ def check() -> dict:
     ) else "MISSING"
     default = route("default")
     checks["default_route"] = default or "UNAVAILABLE"
-    checks["default_route_safe"] = bool(default and default["interface"] == "en0")
+    checks["default_route_safe"] = bool(default and not default["interface"].startswith("utun"))
     current_test = route(IPV4_TRACE)
     checks["test_route"] = current_test or "UNAVAILABLE"
     checks["ipv6_default"] = route("default", ipv6=True) or "UNAVAILABLE"
