@@ -27,11 +27,14 @@ import urllib.request
 
 from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
                                  validate_full_tun_config)
+from openvpn_profile_review import review as review_openvpn
 
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
 APPROVAL = TRUSTED_ROOT / "local-console-approval"
 WATCHDOG = TRUSTED_ROOT / "unsigned_tun_watchdog.py"
+OPENVPN = TRUSTED_ROOT / "openvpn/bin/openvpn"
+OPENVPN_REVIEW = TRUSTED_ROOT / "openvpn_profile_review.py"
 MAX_REQUEST = 262144
 MAX_SESSION = 600
 
@@ -56,6 +59,8 @@ def daemon_preflight() -> None:
         raise ValueError("REMOTE_SESSION_REFUSED")
     if not trusted_root_file(ENGINE) or not os.access(ENGINE, os.X_OK):
         raise ValueError("TRUSTED_ENGINE_NOT_INSTALLED")
+    if not trusted_root_file(OPENVPN_REVIEW):
+        raise ValueError("TRUSTED_OPENVPN_REVIEW_NOT_INSTALLED")
     if not trusted_root_file(WATCHDOG):
         raise ValueError("TRUSTED_WATCHDOG_NOT_INSTALLED")
     if not trusted_root_file(APPROVAL):
@@ -202,23 +207,46 @@ class Session:
                 raise ValueError("TUN_ALREADY_RUNNING")
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
-            encoded = json.dumps(profile, separators=(",", ":")).encode("utf-8")
+            use_openvpn = profile.get("mode") == "openvpn"
+            if use_openvpn:
+                if set(profile) != {"mode", "profile"} or not isinstance(
+                        profile.get("profile"), str):
+                    raise ValueError("OPENVPN_PROFILE_INVALID")
+                if not trusted_root_file(OPENVPN) or not os.access(OPENVPN, os.X_OK):
+                    raise ValueError("TRUSTED_OPENVPN_NOT_INSTALLED")
+                reviewed = review_openvpn(profile["profile"])
+                lines = list(reviewed["directives"])
+                if "remote-cert-tls server" not in lines:
+                    raise ValueError("OPENVPN_CERTIFICATE_ROLE_REQUIRED")
+                for kind, value in reviewed["inline"].items():
+                    lines.extend(["<" + kind + ">", value.rstrip("\n"),
+                                  "</" + kind + ">"])
+                encoded = ("\n".join(lines) + "\n").encode("utf-8")
+                engine = OPENVPN
+            else:
+                encoded = json.dumps(profile, separators=(",", ":")).encode("utf-8")
+                engine = ENGINE
             if len(encoded) > MAX_REQUEST - 1024:
                 raise ValueError("TUN_CONFIG_TOO_LARGE")
             # Existing utun routes may belong to another VPN: do not mistake
             # that routing for TwinConnect's tunnel.
             if observe_route()["route_state"] == "utun_route_observed_unverified":
                 raise ValueError("EXISTING_TUN_ROUTE_AMBIGUOUS")
-            path = TRUSTED_ROOT / ("active-" + secrets.token_hex(16) + ".json")
+            path = TRUSTED_ROOT / ("active-" + secrets.token_hex(16) + (".ovpn" if use_openvpn else ".json"))
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
             try:
                 with os.fdopen(fd, "wb") as output:
                     output.write(encoded)
-                validate_full_tun_config(path)
-                subprocess.run([str(ENGINE), "check", "-c", str(path)],
-                               check=True, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, timeout=20)
-                child = subprocess.Popen([str(ENGINE), "run", "-c", str(path)],
+                if use_openvpn:
+                    command = [str(engine), "--config", str(path),
+                               "--script-security", "1", "--auth-nocache"]
+                else:
+                    validate_full_tun_config(path)
+                    subprocess.run([str(engine), "check", "-c", str(path)],
+                                   check=True, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, timeout=20)
+                    command = [str(engine), "run", "-c", str(path)]
+                child = subprocess.Popen(command,
                                          stdin=subprocess.DEVNULL,
                                          stdout=subprocess.DEVNULL,
                                          stderr=subprocess.DEVNULL,
