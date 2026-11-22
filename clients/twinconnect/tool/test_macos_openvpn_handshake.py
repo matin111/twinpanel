@@ -106,12 +106,17 @@ def report(log: bytes, exit_code: int | None) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("profile", type=Path)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("profile", nargs="?", type=Path)
+    target.add_argument("--stdin", action="store_true",
+                        help="Read profile securely from stdin for the app")
     args = parser.parse_args()
     if platform.system() != "Darwin" or os.geteuid() != 0:
         print("MACOS_ROOT_REQUIRED")
         return 2
-    if args.profile.is_symlink() or not args.profile.is_file():
+    if not args.stdin and (args.profile is None or
+                           args.profile.is_symlink() or
+                           not args.profile.is_file()):
         print("OPENVPN_PROFILE_MISSING")
         return 2
     engine = next((p for p in ROOTS if p.is_file() and os.access(p, os.X_OK)), None)
@@ -119,7 +124,9 @@ def main() -> int:
         print("OPENVPN_ENGINE_MISSING")
         return 2
     try:
-        prepared = sanitize_profile(args.profile.read_bytes())
+        raw = (sys.stdin.buffer.read(MAX_PROFILE_BYTES + 1) if args.stdin
+               else args.profile.read_bytes())
+        prepared = sanitize_profile(raw)
     except (ValueError, OSError, UnicodeError):
         print("OPENVPN_PROFILE_REJECTED")
         return 2
