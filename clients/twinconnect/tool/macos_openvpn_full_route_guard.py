@@ -146,16 +146,12 @@ def trial(endpoint: str) -> str:
         return "IPV6_DEFAULT_PRESENT_REFUSED"
     # State first, then changes. launchd daemon expires these even if CLI dies.
     store({"interface": interface, "endpoint": endpoint, "gateway": gateway,
-           "original_interface": default["interface"], "pinned": False,
+           "original_interface": default["interface"], "pinned": True,
            "deadline": time.time() + TTL})
     pin = run(ROUTE, "-n", "add", "-host", endpoint, gateway)
     if pin.returncode:
         rollback()
         return "ENDPOINT_PIN_FAILED"
-    d = load()
-    d["pinned"] = True
-    STATE.unlink(missing_ok=True)
-    store(d)
     for net in SPLITS:
         added = run(ROUTE, "-n", "add", "-net", net, "-interface", interface)
         if added.returncode:
