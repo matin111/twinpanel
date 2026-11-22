@@ -1415,8 +1415,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             (ciscoTunnelTask != nil ? "Stop Test" :
-                              (ciscoSafetyHold ? "Test Cisco" : "Connect")) :
+                             (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
                              (localProxyActive || fullTunActive || openVPNAppSessionActive ?
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
