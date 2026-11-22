@@ -22,6 +22,12 @@ LOCK = ROOT / "lock"
 TTL = 30
 PROBE_DEST = "1.1.1.1"
 PROBE_SECONDS = 22
+LEASE_SECONDS = 45
+SPLIT_NETWORKS = ("0.0.0.0/1", "128.0.0.0/1")
+DNS_SERVERS = ("1.1.1.1", "1.0.0.1")
+NETWORKSETUP = "/usr/sbin/networksetup"
+OPENCONNECT_BIN = ("/Library/PrivilegedHelperTools/TwinConnectCisco/"
+                   "openconnect-runtime/bin/openconnect")
 ROUTE = "/sbin/route"
 NETSTAT = "/usr/sbin/netstat"
 
@@ -160,6 +166,26 @@ def rollback() -> str:
             after = exact_routes()
             if after is None or PROBE_DEST in after:
                 return "CISCO_PROBE_ROUTE_ROLLBACK_FAILED"
+    # Recovery of temporary /1 routes must precede the removal of
+    # management and server bypasses; otherwise Termalin could be lost.
+    if data.get("mode") in ("trial-full", "leased"):
+        tun = data.get("full_interface", "")
+        if not re.fullmatch(r"utun[0-9]{1,4}", tun):
+            return "CISCO_FULL_ROUTE_STATE_INVALID"
+        for network, probe in (("0.0.0.0/1", "1.0.0.1"),
+                               ("128.0.0.0/1", "129.0.0.1")):
+            if route(probe).get("interface") == tun:
+                run(ROUTE, "-n", "delete", "-net", network,
+                    "-interface", tun)
+            if route(probe).get("interface") == tun:
+                return "CISCO_FULL_ROUTE_ROLLBACK_FAILED"
+        if data.get("dns_started"):
+            service, original_dns = data.get("dns_service"), data.get("dns_prior")
+            if not isinstance(service, str) or not isinstance(original_dns, list):
+                return "CISCO_DNS_RECOVERY_STATE_INVALID"
+            args = original_dns if original_dns else ["Empty"]
+            if run(NETWORKSETUP, "-setdnsservers", service, *args).returncode:
+                return "CISCO_DNS_ROLLBACK_FAILED"
     for peer in peers:
         if verified_public(peer) is None:
             return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
@@ -174,6 +200,23 @@ def rollback() -> str:
             verify = exact_routes()
             if verify is None or peer in verify:
                 return "CISCO_MANAGEMENT_PIN_ROLLBACK_FAILED"
+    # Restore the authenticated server's bypass only after both /1 routes
+    # have been removed, so its TCP transport never disappears into the VPN.
+    if data.get("endpoint_pinned"):
+        endpoint = data.get("endpoint")
+        if verified_public(endpoint or "") is None:
+            return "CISCO_ENDPOINT_RECOVERY_STATE_INVALID"
+        found = exact_routes()
+        if found is None:
+            return "CISCO_ENDPOINT_ROUTE_OBSERVATION_FAILED"
+        if endpoint in found:
+            observed = route(endpoint)
+            if observed.get("gateway") != gateway or observed.get("interface") != interface:
+                return "CISCO_ENDPOINT_PIN_OWNERSHIP_CHANGED"
+            run(ROUTE, "-n", "delete", "-host", endpoint, gateway)
+            found = exact_routes()
+            if found is None or endpoint in found:
+                return "CISCO_ENDPOINT_PIN_ROLLBACK_FAILED"
     STATE.unlink(missing_ok=True)
     return "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED"
 
@@ -267,13 +310,196 @@ def probe_host(interface: str) -> str:
     return "CISCO_HOST_EGRESS_TRIAL_ACTIVE"
 
 
+def network_service(interface: str) -> str | None:
+    response = run(NETWORKSETUP, "-listnetworkserviceorder")
+    if response.returncode:
+        return None
+    service = None
+    for line in response.stdout.splitlines():
+        match = re.match(r"^\(\d+\) (.+)$", line)
+        if match:
+            service = match.group(1)
+        if re.search(r"Device: " + re.escape(interface) + r"\)", line):
+            return service if service and not service.startswith("*") else None
+    return None
+
+
+def saved_dns(service: str) -> list[str] | None:
+    r = run(NETWORKSETUP, "-getdnsservers", service)
+    if r.returncode:
+        return None
+    raw = [x.strip() for x in r.stdout.splitlines() if x.strip()]
+    if len(raw) == 1 and "aren't any DNS Servers set" in raw[0]:
+        return []
+    if not raw or len(raw) > 8:
+        return None
+    try:
+        for item in raw:
+            ipaddress.ip_address(item)
+    except ValueError:
+        return None
+    return raw
+
+
+def exit_ip() -> str | None:
+    r = subprocess.run(
+        ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+         "--connect-timeout", "3", "--max-time", "8",
+         "https://1.1.1.1/cdn-cgi/trace"],
+        capture_output=True, text=True, timeout=10, check=False)
+    if r.returncode:
+        return None
+    match = re.search(r"(?m)^ip=([0-9.]+)$", r.stdout)
+    return verified_public(match.group(1)) if match else None
+
+
+def openconnect_endpoint(pid: int) -> str | None:
+    """Actual authenticated TCP peer, not a guessed DNS lookup or panel IP."""
+    if not isinstance(pid, int) or pid <= 1:
+        return None
+    process = run("/bin/ps", "-p", str(pid), "-o", "command=")
+    if process.returncode or not process.stdout.strip().startswith(
+            OPENCONNECT_BIN + " "):
+        return None
+    sockets = run("/usr/sbin/lsof", "-nP", "-a", "-p", str(pid),
+                  "-iTCP", "-sTCP:ESTABLISHED")
+    if sockets.returncode:
+        return None
+    peers = set()
+    for line in sockets.stdout.splitlines():
+        match = re.search(
+            r"TCP\s+[0-9.]+:[0-9]+->([0-9.]+):[0-9]+\s+\(ESTABLISHED\)", line)
+        if match:
+            valid = verified_public(match.group(1))
+            if valid:
+                peers.add(valid)
+    return next(iter(peers)) if len(peers) == 1 else None
+
+
+def activate_full(interface: str, pid: int) -> str:
+    """Lease full IPv4 only after the separately checked TUN egress succeeds."""
+    if not re.fullmatch(r"utun[0-9]{1,4}", interface):
+        return "CISCO_FULL_INTERFACE_INVALID"
+    if not isinstance(pid, int) or pid <= 1:
+        return "CISCO_FULL_PID_INVALID"
+    endpoint = openconnect_endpoint(pid)
+    if endpoint is None:
+        return "CISCO_ENDPOINT_NOT_VERIFIED"
+    if load():
+        return "CISCO_ROUTE_ALREADY_OWNED"
+    if Path("/private/var/run/twinconnect-full-route-guard/state.json").exists():
+        return "CISCO_OTHER_VPN_ACTIVE"
+    check, peers, gateway, baseline_interface = preflight()
+    if check != "CISCO_MANAGEMENT_PRECHECK_READY":
+        return check
+    if endpoint in peers:
+        return "CISCO_ENDPOINT_MANAGEMENT_CONFLICT"
+    observed = route(endpoint)
+    if observed.get("gateway") != gateway or observed.get("interface") != baseline_interface:
+        return "CISCO_ENDPOINT_NOT_ON_UPLINK"
+    if any(route(ip).get("interface") != baseline_interface
+           for ip in ("1.0.0.1", "129.0.0.1")):
+        return "CISCO_OTHER_ROUTES_ACTIVE"
+    existing = exact_routes()
+    if existing is None or endpoint in existing or any(peer in existing for peer in peers):
+        return "CISCO_HOST_ROUTE_CONFLICT"
+    devices = run("/sbin/ifconfig", "-l")
+    if devices.returncode or interface not in devices.stdout.split():
+        return "CISCO_FULL_TUN_NOT_FOUND"
+    ipv6 = run(ROUTE, "-n", "get", "-inet6", "default")
+    if ipv6.returncode == 0 and "interface:" in ipv6.stdout:
+        return "CISCO_IPV6_DEFAULT_PRESENT"
+    baseline_ip = exit_ip()
+    if baseline_ip is None:
+        return "CISCO_BASELINE_IP_UNVERIFIED"
+    service = network_service(baseline_interface)
+    dns_prior = saved_dns(service) if service else None
+    if dns_prior is None:
+        return "CISCO_DNS_BACKUP_UNAVAILABLE"
+    # The root-owned launchd daemon owns the rollback state before edits.
+    state = {"mode": "trial-full", "peers": [], "gateway": gateway,
+             "interface": baseline_interface, "full_interface": interface,
+             "endpoint": endpoint, "endpoint_pinned": False,
+             "worker_pid": pid, "dns_started": False,
+             "dns_service": service, "dns_prior": dns_prior,
+             "deadline": time.time() + LEASE_SECONDS}
+    store(state)
+    pin = run(ROUTE, "-n", "add", "-host", endpoint, gateway)
+    if pin.returncode:
+        return "CISCO_ENDPOINT_PIN_FAILED_" + rollback()
+    state["endpoint_pinned"] = True
+    store(state)
+    for peer in peers:
+        state["peers"].append(peer)
+        store(state)
+        pinned = run(ROUTE, "-n", "add", "-host", peer, gateway)
+        if pinned.returncode:
+            return "CISCO_MANAGEMENT_PIN_FAILED_" + rollback()
+    if any(route(p).get("interface") != baseline_interface for p in [endpoint, *peers]):
+        return "CISCO_PIN_VERIFY_FAILED_" + rollback()
+    for network in SPLIT_NETWORKS:
+        added = run(ROUTE, "-n", "add", "-net", network,
+                    "-interface", interface)
+        if added.returncode:
+            return "CISCO_SPLIT_ROUTE_FAILED_" + rollback()
+    if any(route(ip).get("interface") != interface
+           for ip in ("1.0.0.1", "129.0.0.1")):
+        return "CISCO_SPLIT_ROUTE_NOT_VERIFIED_" + rollback()
+    tunneled_ip = exit_ip()
+    if tunneled_ip is None or tunneled_ip == baseline_ip:
+        return "CISCO_FULL_EGRESS_NOT_VERIFIED_" + rollback()
+    state["dns_started"] = True
+    store(state)
+    if run(NETWORKSETUP, "-setdnsservers", service, *DNS_SERVERS).returncode:
+        return "CISCO_DNS_ACTIVATION_FAILED_" + rollback()
+    state["mode"] = "leased"
+    state["deadline"] = time.time() + LEASE_SECONDS
+    store(state)
+    return "CISCO_SYSTEM_IPV4_CONNECTED"
+
+
+def heartbeat(pid: int) -> str:
+    current = load()
+    if current.get("mode") != "leased" or current.get("worker_pid") != pid:
+        return "CISCO_LEASE_UNAVAILABLE"
+    if time.time() >= current.get("deadline", 0):
+        return "CISCO_LEASE_EXPIRED"
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return "CISCO_WORKER_NOT_RUNNING"
+    if any(route(ip).get("interface") != current.get("full_interface")
+           for ip in ("1.0.0.1", "129.0.0.1")):
+        return "CISCO_FULL_ROUTE_LOST"
+    if any(route(peer).get("interface") != current.get("interface")
+           for peer in [current.get("endpoint"), *current.get("peers", [])]):
+        return "CISCO_MANAGEMENT_BYPASS_LOST"
+    connector = connector_peers()
+    if not connector or not set(connector).issubset(set(current.get("peers", []))):
+        return "CISCO_MANAGEMENT_PEER_CHANGED"
+    current["deadline"] = time.time() + LEASE_SECONDS
+    store(current)
+    return "CISCO_SYSTEM_IPV4_CONNECTED"
+
+
 def service() -> None:
     while True:
         with LOCK.open("a+") as stream:
             fcntl.flock(stream, fcntl.LOCK_EX)
             data = load()
-            if data and time.time() >= data.get("deadline", 0):
-                rollback()
+            if data:
+                worker_alive = True
+                if data.get("mode") in ("trial-full", "leased"):
+                    pid = data.get("worker_pid")
+                    if not isinstance(pid, int) or pid <= 1:
+                        worker_alive = False
+                    else:
+                        try:
+                            os.kill(pid, 0)
+                        except OSError:
+                            worker_alive = False
+                if time.time() >= data.get("deadline", 0) or not worker_alive:
+                    rollback()
         time.sleep(1)
 
 
@@ -296,6 +522,12 @@ def main() -> int:
             result = preflight()[0]
         elif sys.argv[1:] == ["trial"]:
             result = trial()
+        elif len(sys.argv) == 4 and sys.argv[1] == "activate-full":
+            result = activate_full(sys.argv[2], int(sys.argv[3]))
+        elif len(sys.argv) == 3 and sys.argv[1] == "heartbeat":
+            result = heartbeat(int(sys.argv[2]))
+            if result != "CISCO_SYSTEM_IPV4_CONNECTED":
+                rollback()
         elif len(sys.argv) == 3 and sys.argv[1] == "probe-host":
             result = probe_host(sys.argv[2])
         elif sys.argv[1:] == ["rollback"]:
@@ -308,6 +540,7 @@ def main() -> int:
         "CISCO_MANAGEMENT_PIN_ACTIVE",
         "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS",
         "CISCO_HOST_EGRESS_TRIAL_ACTIVE",
+        "CISCO_SYSTEM_IPV4_CONNECTED",
         "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED") else 1
 
 
