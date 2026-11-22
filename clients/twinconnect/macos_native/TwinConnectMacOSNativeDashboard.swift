@@ -1406,10 +1406,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let trailingSpace = NSView()
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
-            localProxyActive ? "◉  " + connectedProtocolTitle + " active" :
-            (openVPNAppSessionActive ? "◉  OpenVPN tunnel · unrouted" :
+            localProxyActive ? "◉  " + connectedProtocolTitle + " proxy active" :
+            (openVPNAppSessionActive ? "◉  OpenVPN tunnel · NOT a full VPN" :
              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")),
-            color: localProxyActive ? sea : muted))
+            color: (localProxyActive || openVPNAppSessionActive) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1485,8 +1485,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if activeProtocol == "openvpn" {
             let feedback = fullTunBusy ?
                 "OpenVPN: checking connection…" :
-                (status.hasPrefix("OpenVPN") ? status :
-                  "OpenVPN: choose a server, then press Connect to test.")
+                (openVPNAppSessionActive ?
+                  "OpenVPN tunnel is running. System-wide traffic is not routed." :
+                  (status.hasPrefix("OpenVPN") ? status :
+                    "OpenVPN: select a server to start a tunnel (not full VPN)."))
             let connectionFeedback = text(feedback, size: 12,
                                           color: status.contains("FAILED") ||
                                                  status.contains("REJECTED") ||
@@ -1599,7 +1601,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
-            (fullTunActive ? "TUN running · unverified" : "Disconnected"),
+            (openVPNAppSessionActive ? "OpenVPN tunnel · no system routing" :
+             (fullTunActive ? "TUN running · unverified" : "Disconnected")),
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
