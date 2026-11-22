@@ -24,8 +24,8 @@ dest=/private/etc/sudoers.d/twinconnect-cisco
 tmp=$(mktemp /private/etc/sudoers.d/.twinconnect-cisco-system.XXXXXXXX)
 trap 'rm -f "$tmp"' EXIT
 {
-  printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s system, /usr/bin/python3 %s status\n' \
-    macvps "$helper" "$guard"
+  printf '%s ALL=(root) NOPASSWD: /usr/bin/python3 %s system, /usr/bin/python3 %s status, /usr/bin/python3 %s stop\n' \
+    macvps "$helper" "$guard" "$guard"
 } > "$tmp"
 chown root:wheel "$tmp"
 chmod 0440 "$tmp"
