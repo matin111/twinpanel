@@ -114,9 +114,10 @@ def status() -> str:
     return state
 
 
-def cleanup() -> None:
+def cleanup(*, preserve_state: bool = False) -> None:
     # State directory is root-owned and never accessible to the app.
-    for p in (CONFIG, LOG, STOP, STATE):
+    for p in ((CONFIG, LOG, STOP) if preserve_state else
+              (CONFIG, LOG, STOP, STATE)):
         try:
             p.unlink()
         except FileNotFoundError:
@@ -198,7 +199,7 @@ def worker() -> int:
     finally:
         if child is not None:
             stop_openvpn(child)
-        cleanup()
+        cleanup(preserve_state=True)
 
 
 def start() -> int:
