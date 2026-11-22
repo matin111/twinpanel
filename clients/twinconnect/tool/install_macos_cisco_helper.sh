@@ -12,7 +12,7 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 base="/Library/PrivilegedHelperTools/TwinConnectCisco"
 install -d -o root -g wheel -m 0755 "$base"
-for filename in cisco_openconnect_auth.py cisco_openconnect_tunnel.py cisco_network_recovery.py; do
+for filename in cisco_openconnect_auth.py cisco_openconnect_tunnel.py cisco_network_recovery.py cisco_unrouted_vpnc.py; do
   install -o root -g wheel -m 0755 "macos_native/$filename" "$base/$filename"
 done
 # Always install an administrator-owned copy of vpnc-script. Never execute
