@@ -592,6 +592,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Experimental, separately installed root-owned local-console TUN service.
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
+    private var openVPNAppSessionActive = false
+    private var openVPNAppStatusPollAt = Date.distantPast
     private var fullTunBusy = false
     private var fullTunStatusPollBusy = false
     private var fullTunStatusLastPoll = Date.distantPast
@@ -1405,7 +1407,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
             localProxyActive ? "◉  " + connectedProtocolTitle + " active" :
-            (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"),
+            (openVPNAppSessionActive ? "◉  OpenVPN tunnel · unrouted" :
+             (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")),
             color: localProxyActive ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
@@ -1435,12 +1438,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
                              (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
-                             (localProxyActive || fullTunActive ? "Disconnect" : "Connect"),
+                             (localProxyActive || fullTunActive || openVPNAppSessionActive ?
+                               "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             (activeProtocol != "cisco" || ciscoTunnelTask != nil)
-        connect.toolTip = activeProtocol == "openvpn" && !fullTunServicePresent() ?
-            "Run a bounded 35-second OpenVPN handshake inside the app; no system VPN." :
+        connect.toolTip = activeProtocol == "openvpn" && openVPNAppSessionActive ?
+            "OpenVPN tunnel running without default-route import; Disconnect stops it." :
+            activeProtocol == "openvpn" && !fullTunServicePresent() ?
+            "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
             "Disabled after macOS network configuration loss; network recovery must be verified first." :
             (fullTunActive ? "TUN engine started; network egress NOT verified." :
@@ -2840,6 +2846,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Always request removal of both connection modes on logout.
         // The root daemon independently enforces TUN ownership.
         fullTunActive = false
+        openVPNAppSessionActive = false
         fullTunBusy = false
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
@@ -3467,6 +3474,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func refreshTrafficMetrics() {
         refreshFullTunStatus()
+        refreshOpenVPNAppSession()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         if let startedAt = localProxyStartedAt {
             let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
@@ -3665,6 +3673,149 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return result["state"] as? String == "reviewed_unrouted_candidate" &&
                    result["connected"] as? Bool == false
         } catch { return false }
+    }
+
+    // Root-owned OpenVPN session controller. Each entry point is individually
+    // allowlisted by the existing opt-in sudoers rule (no shell involved).
+    private func openVPNAppSessionInstalled() -> Bool {
+        FileManager.default.isReadableFile(atPath:
+            "/Library/PrivilegedHelperTools/TwinConnectOpenVPN/" +
+            "macos_native/openvpn_app_session.py")
+    }
+
+    private func runOpenVPNAppSession(_ action: String, profile: Data? = nil)
+        -> (Int32, String) {
+        guard ["start", "stop", "status"].contains(action) else {
+            return (1, "OPENVPN_INVALID_ACTION")
+        }
+        let script = "/Library/PrivilegedHelperTools/TwinConnectOpenVPN/" +
+            "macos_native/openvpn_app_session.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (1, "OPENVPN_SESSION_NOT_INSTALLED")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n", "/usr/bin/python3", script, action]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = FileHandle.nullDevice
+        if let profile = profile {
+            let input = Pipe()
+            task.standardInput = input
+            do {
+                try task.run()
+                input.fileHandleForWriting.write(profile)
+                input.fileHandleForWriting.closeFile()
+            } catch {
+                return (1, "OPENVPN_SESSION_LAUNCH_FAILED")
+            }
+        } else {
+            task.standardInput = FileHandle.nullDevice
+            do { try task.run() } catch {
+                return (1, "OPENVPN_SESSION_LAUNCH_FAILED")
+            }
+        }
+        task.waitUntilExit()
+        let output = out.fileHandleForReading.readDataToEndOfFile()
+        let state = ((try? JSONSerialization.jsonObject(with: output))
+            as? [String: Any])?["state"] as? String ??
+            "OPENVPN_SESSION_COMMAND_FAILED"
+        return (task.terminationStatus, state)
+    }
+
+    private func startPersistentOpenVPN(_ session: TwinMacNativeSession,
+                                        serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "OpenVPN: fetching authorized profile…"
+        view = build()
+        directory.prepareOpenVPNProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure:
+                self.fullTunBusy = false
+                self.status = "OpenVPN: PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let valid = self.reviewOpenVPNProfile(profile)
+                    let result = valid ?
+                        self.runOpenVPNAppSession("start", profile: profile) :
+                        (1, "OPENVPN_PROFILE_REJECTED")
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken ==
+                                  session.accessToken else {
+                            if result.0 == 0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runOpenVPNAppSession("stop")
+                                }
+                            }
+                            return
+                        }
+                        self.openVPNAppSessionActive =
+                            result.0 == 0 &&
+                            result.1 == "tunnel_established_unrouted"
+                        self.status = self.openVPNAppSessionActive ?
+                            "OpenVPN: tunnel active; system internet is NOT routed." :
+                            "OpenVPN: " + result.1
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopPersistentOpenVPN() {
+        guard !fullTunBusy else { return }
+        fullTunBusy = true
+        status = "OpenVPN: stopping tunnel…"
+        view = build()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runOpenVPNAppSession("stop")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunBusy = false
+                if result.0 == 0 && result.1 == "stopped" {
+                    self.openVPNAppSessionActive = false
+                    self.status = "OpenVPN: tunnel stopped."
+                } else {
+                    self.status = "OpenVPN: " + result.1
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func refreshOpenVPNAppSession() {
+        guard accountSession != nil, activeProtocol == "openvpn",
+              openVPNAppSessionInstalled(), !fullTunBusy,
+              Date().timeIntervalSince(openVPNAppStatusPollAt) >= 5
+        else { return }
+        openVPNAppStatusPollAt = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runOpenVPNAppSession("status")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.activeProtocol == "openvpn",
+                      !self.fullTunBusy else { return }
+                let active = result.0 == 0 &&
+                    result.1 == "tunnel_established_unrouted"
+                if active != self.openVPNAppSessionActive {
+                    self.openVPNAppSessionActive = active
+                    self.status = active ?
+                        "OpenVPN: tunnel active; system internet is NOT routed." :
+                        "OpenVPN: " + result.1
+                    self.view = self.build()
+                }
+            }
+        }
     }
 
     // A bounded end-to-end diagnostic initiated by the app's actual Connect
@@ -3965,6 +4116,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Do not label a SOCKS listener as a connected system VPN.
     @objc private func requestVPNConnection(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy, !fullTunBusy else { return }
+        if openVPNAppSessionActive {
+            stopPersistentOpenVPN()
+            return
+        }
         if fullTunActive {
             stopFullTun()
             return
@@ -3992,7 +4147,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 view = build()
                 return
             }
-            if fullTunServicePresent() {
+            if openVPNAppSessionInstalled() {
+                startPersistentOpenVPN(session, serverID: serverID)
+            } else if fullTunServicePresent() {
                 startOpenVPN(session, serverID: serverID)
             } else {
                 startOpenVPNAppProbe(session, serverID: serverID)
