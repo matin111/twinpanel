@@ -116,6 +116,55 @@ class CiscoManagementGuardTests(unittest.TestCase):
                              "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED")
         self.assertFalse(guard.STATE.exists())
 
+    def test_full_route_rollback_restores_dns_before_bypass_removal(self):
+        guard.store({"mode": "leased", "full_interface": "utun4",
+                     "interface": "en0", "gateway": "185.236.39.33",
+                     "peers": ["188.114.97.3"], "endpoint": "185.211.58.12",
+                     "endpoint_pinned": True, "dns_started": True,
+                     "dns_service": "Ethernet", "dns_prior": ["185.236.39.19"],
+                     "deadline": 0, "worker_pid": 1122})
+        owned = {"185.211.58.12", "188.114.97.3"}
+        splits = {"1.0.0.1", "129.0.0.1"}
+        commands = []
+        def fake_route(ip):
+            if ip in splits:
+                return {"interface": "utun4"}
+            return {"interface": "en0", "gateway": "185.236.39.33"}
+        def fake_run(*args):
+            commands.append(args)
+            if "delete" in args:
+                if "-net" in args:
+                    ip = ("1.0.0.1" if "0.0.0.0/1" in args
+                          else "129.0.0.1")
+                    splits.remove(ip)
+                if "-host" in args:
+                    owned.remove(args[args.index("-host") + 1])
+            return ok()
+        with patch.object(guard, "route", side_effect=fake_route), \
+             patch.object(guard, "run", side_effect=fake_run), \
+             patch.object(guard, "exact_routes", side_effect=lambda: owned):
+            self.assertEqual(guard.rollback(),
+                             "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED")
+        self.assertFalse(guard.STATE.exists())
+        self.assertEqual(splits, set())
+        self.assertEqual(owned, set())
+        dns_calls = [i for i, cmd in enumerate(commands)
+                     if "-setdnsservers" in cmd]
+        host_calls = [i for i, cmd in enumerate(commands)
+                      if "delete" in cmd and "-host" in cmd]
+        self.assertEqual(len(dns_calls), 1)
+        self.assertTrue(host_calls)
+        self.assertLess(dns_calls[0], host_calls[0])
+
+    def test_full_guard_refuses_unverified_engine_pid_without_routes(self):
+        with patch.object(guard, "openconnect_endpoint",
+                          return_value=None), \
+             patch.object(guard, "run") as commands:
+            self.assertEqual(guard.activate_full("utun4", 1234),
+                             "CISCO_ENDPOINT_NOT_VERIFIED")
+            commands.assert_not_called()
+        self.assertFalse(guard.STATE.exists())
+
     def test_rollback_only_own_matching_host_route(self):
         guard.store({"peers": ["8.8.8.8"], "gateway": "185.236.39.33",
                      "interface": "en0", "deadline": 0})
