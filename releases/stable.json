@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-22T04:15:35Z",
+  "released_at": "2026-11-22T04:27:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7e7e86112d66761ef6f04f87a4cb74afea1019ae",
+  "source_sha": "00c6a652a87ad77199247592cc1038c9fa3a27c7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.11/twinpanel-1.1.11-linux-x86_64.tar.gz",
-    "sha256": "c2cbbf5017a3d18f0099dca9185a589cf6d60c5cb093ceb1ded49edf98c00da4",
-    "size_bytes": 31377992
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.12/twinpanel-1.1.12-linux-x86_64.tar.gz",
+    "sha256": "d8f13d629af258c5d86189d87d1c8bea80064d02568f63c8a807d0054f6a66c5",
+    "size_bytes": 31419555
   },
   "notes": {
-    "fa": "اصلاح شروع اعتبار اشتراک از نخستین اتصال واقعی: تعیین یا افزودن روز به اشتراک فعال‌نشده دیگر تاریخ شروع یا انقضا نمی‌سازد؛ حساب‌های فعال زمان اعتبارشان مطابق روال تمدید می‌شود.",
-    "en": "Fix first-use subscription validity: setting or adding days to a never-connected account does not start the clock; existing active subscription extensions retain their dates."
+    "fa": "رفع نهایی مشکل تاریخ‌سازی هنگام تعیین اعتبار اکانت‌های فعال‌نشده: ویرایش مدت زمان بدون ثبت اولین اتصال واقعی، تاریخ شروع و انقضا تولید نمی‌کند. اصلاح موردی اشتراک mstr500571 روی سرور انجام شده است.",
+    "en": "Harden first-use subscription admin editing: setting a finite duration without an actual activation start no longer fabricates an expiry, including legacy expiry-only rows."
   }
 }
