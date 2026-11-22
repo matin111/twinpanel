@@ -298,6 +298,12 @@ def probe_unrouted(profile: dict) -> int:
     child = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, start_new_session=True)
+    # The UI's Stop Test sends SIGTERM to this privileged command.
+    # Handle it in Python so the child process group is terminated first.
+    def requested_stop(_signum, _frame):
+        raise KeyboardInterrupt
+    previous_term = signal.signal(signal.SIGTERM, requested_stop)
+    previous_int = signal.signal(signal.SIGINT, requested_stop)
     try:
         assert child.stdin is not None
         child.stdin.write((profile["password"] + "\n").encode())
@@ -318,7 +324,13 @@ def probe_unrouted(profile: dict) -> int:
         print(json.dumps({"state": "cisco_unrouted_probe_completed",
                           "vpn_connected": False}), flush=True)
         return 0
+    except KeyboardInterrupt:
+        print(json.dumps({"state": "cisco_unrouted_probe_stopped",
+                          "vpn_connected": False}), flush=True)
+        return 0
     finally:
+        signal.signal(signal.SIGTERM, previous_term)
+        signal.signal(signal.SIGINT, previous_int)
         if child.poll() is None:
             try:
                 os.killpg(child.pid, signal.SIGTERM)
