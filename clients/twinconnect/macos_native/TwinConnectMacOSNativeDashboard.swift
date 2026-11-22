@@ -584,6 +584,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private let ciscoSafetyHold = true // Static-IP recovery not yet verified.
     private var ciscoTunnelBusy = false
     private var ciscoTunnelStatus = ""
+    private var ciscoSystemRouteVerified = false
+    private var ciscoRoutePollBusy = false
+    private var ciscoRouteLastPoll = Date.distantPast
     private var ciscoTunnelTask: Process?
     private var ciscoTunnelGeneration = 0
     private let proxyAttemptQueue = DispatchQueue(
@@ -1386,11 +1389,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
                "◉  OpenVPN · Tunnel only") :
-             (ciscoTunnelTask != nil ?
-              "◌  Connecting…" :
-              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))),
+             (ciscoSystemRouteVerified ? "◉  Connected · Cisco" :
+              (ciscoTunnelTask != nil ?
+               "◌  Connecting…" :
+              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")))),
             color: (localProxyActive || openVPNAppSessionActive ||
-                    ciscoTunnelTask != nil) ? sea : muted))
+                    ciscoSystemRouteVerified) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1400,7 +1404,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let fabric = TwinNativeNetworkFabric(frame:
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
-        fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified
+        fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified ||
+            ciscoSystemRouteVerified
         fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
@@ -1437,7 +1442,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
-        if localProxyActive {
+        if localProxyActive || ciscoSystemRouteVerified {
             // More vivid green state like the shared Windows design, while
             // still representing ONLY a verified SOCKS proxy.
             let mint = NSColor(calibratedRed: 0.07, green: 0.82,
@@ -1586,19 +1591,24 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
-             (ciscoTunnelTask != nil ? "Connecting…" :
-              (fullTunActive ? "TUN running · unverified" : "Disconnected"))),
-            color: (localProxyActive || openVPNSystemRouteVerified) ? sea : muted))
+             (ciscoSystemRouteVerified ? "Connected · Cisco" :
+              (ciscoTunnelTask != nil ? "Connecting…" :
+               (fullTunActive ? "TUN running · unverified" : "Disconnected")))),
+            color: (localProxyActive || openVPNSystemRouteVerified ||
+                    ciscoSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
-        if localProxyActive || openVPNSystemRouteVerified {
-            // Proxy and OpenVPN telemetry use separate verified sources.
+        if localProxyActive || openVPNSystemRouteVerified ||
+           ciscoSystemRouteVerified {
+            // Proxy and VPN telemetry use separate verified sources.
             let timing = stack(.horizontal, spacing: 8)
-            let uptime = text(openVPNSystemRouteVerified ?
-                              "◷  OpenVPN system session" :
-                              "◷  " + connectedProtocolTitle + " proxy session",
+            let uptime = text(ciscoSystemRouteVerified ?
+                              "◷  Cisco" :
+                              (openVPNSystemRouteVerified ?
+                               "◷  OpenVPN" :
+                               "◷  " + connectedProtocolTitle + " proxy session"),
                               size: 12, color: muted)
             proxyUptimeText = uptime
             timing.addArrangedSubview(uptime)
@@ -1610,12 +1620,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
-                value: openVPNSystemRouteVerified ?
+                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
                     openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—" :
                     pingText(selected),
-                valueColor: openVPNSystemRouteVerified ? sea : pingColor(selected)))
+                valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
+                    sea : pingColor(selected)))
             network.addArrangedSubview(networkMetric("IP Address",
-                value: openVPNSystemRouteVerified ? (openVPNExitIP ?? "—") :
+                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
+                    (openVPNExitIP ?? "—") :
                     (localProxyExitIP ?? "—")))
             content.addArrangedSubview(network)
             network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -2820,6 +2832,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ciscoTunnelTask?.terminate()
         ciscoTunnelTask = nil
         ciscoTunnelBusy = false
+        ciscoSystemRouteVerified = false
         ciscoTunnelStatus = ""
         directory.clearSavedSession()
         refreshGeneration += 1
@@ -3119,7 +3132,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         task.arguments = managementIP == "unrouted-probe" ?
-            ["-n", "/usr/bin/python3", helper, "probe"] :
+            ["-n", "/usr/bin/python3", helper, "system"] :
             ["-n", "/usr/bin/python3", helper, "connect", managementIP]
         let input = Pipe()
         let output = Pipe()
@@ -3163,6 +3176,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       self.ciscoTunnelGeneration == generation else { return }
                 self.ciscoTunnelTask = nil
                 self.ciscoTunnelBusy = false
+                self.ciscoSystemRouteVerified = false
+                self.resetTrafficMetrics()
                 self.ciscoTunnelStatus = reason.range(
                     of: "^CISCO_[A-Z0-9_]{3,64}$",
                     options: .regularExpression) != nil ?
@@ -3482,6 +3497,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func refreshTrafficMetrics() {
         refreshFullTunStatus()
         refreshOpenVPNAppSession()
+        refreshCiscoRouteStatus()
         refreshOpenVPNTelemetry()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         if let startedAt = localProxyStartedAt {
@@ -3572,10 +3588,47 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    private func refreshCiscoRouteStatus() {
+        guard (ciscoTunnelTask != nil || ciscoSystemRouteVerified),
+              !ciscoRoutePollBusy,
+              Date().timeIntervalSince(ciscoRouteLastPoll) >= 3 else { return }
+        ciscoRoutePollBusy = true
+        ciscoRouteLastPoll = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/python3",
+                "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                "status"]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var response = ""
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                response = String(data: data.prefix(256), encoding: .utf8) ?? ""
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.ciscoRoutePollBusy = false
+                let verified = self.ciscoTunnelTask != nil &&
+                    response.trimmingCharacters(in: .whitespacesAndNewlines) ==
+                    "CISCO_SYSTEM_IPV4_CONNECTED"
+                guard verified != self.ciscoSystemRouteVerified else { return }
+                self.ciscoSystemRouteVerified = verified
+                self.resetTrafficMetrics()
+                self.view = self.build()
+            }
+        }
+    }
+
     // Real network metrics: read utun interface counters, actual IPv4 exit,
     // and a real ICMP latency probe. Never synthesize readings.
     private func refreshOpenVPNTelemetry() {
-        guard tab == 0, openVPNSystemRouteVerified, !openVPNTelemetryBusy,
+        guard tab == 0, (openVPNSystemRouteVerified || ciscoSystemRouteVerified),
+              !openVPNTelemetryBusy,
               Date().timeIntervalSince(openVPNTelemetryAt) >= 5 else { return }
         openVPNTelemetryBusy = true
         openVPNTelemetryAt = Date()
@@ -3601,7 +3654,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.openVPNTelemetryBusy = false
-                guard self.openVPNSystemRouteVerified,
+                guard (self.openVPNSystemRouteVerified ||
+                       self.ciscoSystemRouteVerified),
                       self.localProxyGeneration == generation else { return }
                 guard metrics?["state"] as? String == "measured",
                       let down = (metrics?["download_bytes"] as? NSNumber)?.int64Value,
