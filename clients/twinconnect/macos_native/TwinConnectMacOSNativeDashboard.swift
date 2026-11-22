@@ -1473,6 +1473,23 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // OpenVPN's app-test result must be visible at the Connect button.
+        // Previously it was assigned to 'status' but hidden in Settings;
+        // clicking Connect appeared to do nothing.
+        if activeProtocol == "openvpn" {
+            let feedback = fullTunBusy ?
+                "OpenVPN: checking connection…" :
+                (status.hasPrefix("OpenVPN") ? status :
+                  "OpenVPN: choose a server, then press Connect to test.")
+            let connectionFeedback = text(feedback, size: 12,
+                                          color: status.contains("FAILED") ||
+                                                 status.contains("REJECTED") ||
+                                                 status.contains("NOT_INSTALLED") ?
+                                                 amber : muted)
+            main.addArrangedSubview(connectionFeedback)
+            connectionFeedback.widthAnchor.constraint(
+                lessThanOrEqualTo: main.widthAnchor).isActive = true
+        }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
