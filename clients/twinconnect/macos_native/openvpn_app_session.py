@@ -142,11 +142,13 @@ def stop_openvpn(child: subprocess.Popen) -> None:
         child.wait(timeout=5)
 
 
-def state_write(state: str, worker_pid: int, deadline: float) -> None:
+def state_write(state: str, worker_pid: int, deadline: float,
+                interface: str | None = None) -> None:
     # Never include profile, tokens, endpoints or private key in status.
-    write_private(STATE, json.dumps({
-        "state": state, "worker_pid": worker_pid, "deadline": deadline
-    }).encode())
+    payload = {"state": state, "worker_pid": worker_pid, "deadline": deadline}
+    if interface is not None:
+        payload["interface"] = interface
+    write_private(STATE, json.dumps(payload).encode())
 
 
 def utun_interfaces() -> set[str]:
@@ -219,8 +221,10 @@ def worker() -> int:
                 if not handshake:
                     if SUCCESS in log_bytes:
                         handshake = True
+                        added = sorted(utun_interfaces() - before_utun)
                         state_write("tunnel_established_unrouted",
-                                    os.getpid(), deadline)
+                                    os.getpid(), deadline,
+                                    added[0] if len(added) == 1 else None)
                     else:
                         for pattern, reason in FAILURES:
                             if pattern.encode() in log_bytes:
@@ -231,7 +235,7 @@ def worker() -> int:
                     added = sorted(utun_interfaces() - before_utun)
                     if len(added) == 1 and tunnel_https_probe(added[0]):
                         state_write("tunnel_egress_verified_unrouted",
-                                    os.getpid(), deadline)
+                                    os.getpid(), deadline, added[0])
                 time.sleep(0.5)
             if not handshake and not STOP.exists():
                 state_write("OPENVPN_HANDSHAKE_TIMEOUT",
