@@ -40,7 +40,7 @@ def test_started_expiry_extends_from_later_of_now_and_expiry():
 
 def test_admin_edit_respects_unstarted_finite_account():
     source = (ROOT / "app/routers/subscription_admin_edit_fast_v1.py").read_text()
-    assert "if not expiry_sent and sub.starts_at is None and sub.expires_at is None:" in source
+    assert "if not expiry_sent and sub.starts_at is None:" in source
     assert "sub.activation_duration_days = new_duration_days" in source
 
 
