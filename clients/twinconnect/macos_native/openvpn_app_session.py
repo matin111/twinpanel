@@ -26,7 +26,7 @@ CONFIG = BASE / "session.ovpn"
 LOG = BASE / "openvpn.log"
 STOP = BASE / "stop"
 LOCK = Path("/private/var/run/twinconnect-openvpn-app.lock")
-MAX_SESSION_SECONDS = 900
+MAX_SESSION_SECONDS = 86400  # One-day bounded session with route lease.
 START_TIMEOUT_SECONDS = 35
 ENGINES = (Path("/usr/local/opt/openvpn/sbin/openvpn"),
            Path("/opt/homebrew/opt/openvpn/sbin/openvpn"))
@@ -39,7 +39,7 @@ FAILURES = (("AUTH_FAILED", "OPENVPN_AUTH_FAILED"),
 
 
 def output(state: str) -> None:
-    print(json.dumps({"state": state, "system_vpn_verified": False}),
+    print(json.dumps({"state": state, "system_vpn_verified": state == "connected"}),
           flush=True)
 
 
@@ -112,6 +112,16 @@ def status() -> str:
             return "OPENVPN_WORKER_EXITED"
         if time.time() >= data.get("deadline", 0):
             return "OPENVPN_SESSION_EXPIRED"
+    if state in ("tunnel_established_unrouted", "tunnel_egress_verified_unrouted"):
+        guard = Path("/private/var/run/twinconnect-full-route-guard/state.json")
+        try:
+            routed = json.loads(guard.read_text())
+            if (routed.get("mode") == "leased" and
+                    routed.get("worker_pid") == data.get("worker_pid") and
+                    time.time() < routed.get("deadline", 0)):
+                return "connected"
+        except (OSError, ValueError, TypeError):
+            pass
     return state
 
 
@@ -284,7 +294,7 @@ def start() -> int:
     lock = locked()
     try:
         if status() in ("starting", "tunnel_established_unrouted",
-                        "tunnel_egress_verified_unrouted"):
+                        "tunnel_egress_verified_unrouted", "connected"):
             output("OPENVPN_ALREADY_RUNNING")
             return 2
         # A dead worker may leave files; never wipe an active process's data.
@@ -317,6 +327,46 @@ def start() -> int:
         time.sleep(0.5)
     STOP.touch(mode=0o600)
     output("OPENVPN_HANDSHAKE_TIMEOUT")
+    return 1
+
+
+def run_route_guard(action: str) -> tuple[int, str]:
+    """Use the root-owned guard's fixed actions, never a shell command."""
+    if action not in ("connect", "heartbeat"):
+        return (2, "OPENVPN_INVALID_ROUTE_ACTION")
+    script = Path(
+        "/Library/PrivilegedHelperTools/TwinConnectFullRouteGuard/"
+        "macos_openvpn_full_route_guard.py")
+    try:
+        stat = script.lstat()
+        if script.is_symlink() or stat.st_uid != 0 or not script.is_file():
+            return (2, "OPENVPN_ROUTE_GUARD_UNTRUSTED")
+        response = subprocess.run(
+            ["/usr/bin/python3", str(script), action],
+            capture_output=True, text=True, timeout=30, check=False)
+        response_text = response.stdout.strip()
+        if not response_text or len(response_text) > 180:
+            return (2, "OPENVPN_ROUTE_GUARD_ERROR")
+        return (response.returncode, response_text)
+    except (OSError, subprocess.TimeoutExpired):
+        return (2, "OPENVPN_ROUTE_GUARD_UNAVAILABLE")
+
+
+def connect_full_route() -> int:
+    if status() not in ("tunnel_established_unrouted",
+                        "tunnel_egress_verified_unrouted"):
+        output("OPENVPN_TUNNEL_NOT_READY")
+        return 1
+    code, result = run_route_guard("connect")
+    if code == 0 and result == "IPV4_FULL_ROUTE_CONNECTED":
+        output("connected")
+        return 0
+    # Do not echo arbitrary subprocess output or sensitive endpoints.
+    output(result if result.startswith(("DNS_", "OPENVPN_", "VPN_", "IPV4_",
+                                       "FULL_", "ROUTE_", "MANAGEMENT_",
+                                       "BASELINE_", "REMOTE_", "EXISTING_",
+                                       "INDEPENDENT_")) else
+           "OPENVPN_ROUTE_SETUP_FAILED")
     return 1
 
 
@@ -373,7 +423,7 @@ def main() -> int:
         output("MACOS_ROOT_REQUIRED")
         return 2
     if len(sys.argv) != 2 or sys.argv[1] not in (
-            "start", "stop", "status", "worker"):
+            "start", "stop", "status", "connect", "worker"):
         output("OPENVPN_INVALID_ACTION")
         return 2
     action = sys.argv[1]
@@ -383,7 +433,15 @@ def main() -> int:
         return start()
     if action == "stop":
         return stop()
-    output(status())
+    if action == "connect":
+        return connect_full_route()
+    current = status()
+    if current == "connected":
+        code, response = run_route_guard("heartbeat")
+        if code or response != "IPV4_FULL_ROUTE_CONNECTED":
+            output("OPENVPN_ROUTE_LEASE_LOST")
+            return 1
+    output(current)
     return 0
 
 
