@@ -259,6 +259,85 @@ def run(profile: dict, management_ip: str) -> int:
                 restore_network()
 
 
+CISCO_HOST_GUARD = ("/Library/PrivilegedHelperTools/TwinConnectCisco/"
+                    "cisco_management_route_guard.py")
+
+
+def cisco_tun_interfaces() -> dict[str, str]:
+    """Observe only the configured private IPv4 on genuine utun devices."""
+    listed = subprocess.run(["/sbin/ifconfig", "-l"], capture_output=True,
+                            text=True, timeout=5, check=False)
+    if listed.returncode:
+        return {}
+    found = {}
+    for name in listed.stdout.split():
+        if not re.fullmatch(r"utun[0-9]{1,4}", name):
+            continue
+        info = subprocess.run(["/sbin/ifconfig", name], capture_output=True,
+                              text=True, timeout=5, check=False)
+        if info.returncode:
+            continue
+        value = re.search(r"(?m)^\s*inet\s+([0-9.]+)\s+", info.stdout)
+        if value:
+            try:
+                address = ipaddress.IPv4Address(value.group(1))
+                if address.is_private and not address.is_loopback:
+                    found[name] = str(address)
+            except ipaddress.AddressValueError:
+                continue
+    return found
+
+
+def cisco_verified_probe(baseline_interfaces: dict[str, str]) -> str:
+    """One-destination HTTPS egress test; independent guard owns restoration."""
+    if not trusted_root_owned_path(CISCO_HOST_GUARD):
+        return "CISCO_EGRESS_GUARD_UNTRUSTED"
+    available = cisco_tun_interfaces()
+    created = [name for name in available
+               if baseline_interfaces.get(name) != available[name]]
+    if len(created) != 1:
+        return "CISCO_EGRESS_TUN_NOT_IDENTIFIED"
+    interface = created[0]
+    guard = ["/usr/bin/python3", CISCO_HOST_GUARD]
+    try:
+        baseline = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--connect-timeout", "3", "--max-time", "7",
+             "https://1.1.1.1/cdn-cgi/trace"],
+            capture_output=True, text=True, timeout=9, check=False)
+        if baseline.returncode:
+            return "CISCO_BASELINE_EGRESS_FAILED"
+        original = re.search(r"(?m)^ip=([0-9.]+)$", baseline.stdout)
+        if not original:
+            return "CISCO_BASELINE_EGRESS_FAILED"
+        trial = subprocess.run([*guard, "probe-host", interface],
+                               capture_output=True, text=True, timeout=12,
+                               check=False)
+        if trial.returncode or trial.stdout.strip() != "CISCO_HOST_EGRESS_TRIAL_ACTIVE":
+            return "CISCO_EGRESS_ROUTE_GUARD_REFUSED"
+        try:
+            tunnel = subprocess.run(
+                ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+                 "--connect-timeout", "3", "--max-time", "8",
+                 "https://1.1.1.1/cdn-cgi/trace"],
+                capture_output=True, text=True, timeout=10, check=False)
+            if tunnel.returncode:
+                return "CISCO_EGRESS_HTTPS_FAILED"
+            result = re.search(r"(?m)^ip=([0-9.]+)$", tunnel.stdout)
+            if not result or result.group(1) == original.group(1):
+                return "CISCO_EGRESS_NOT_VERIFIED"
+            return "CISCO_EGRESS_VERIFIED"
+        finally:
+            restored = subprocess.run([*guard, "rollback"],
+                                      capture_output=True, text=True,
+                                      timeout=12, check=False)
+            # A failed restore is unsafe even if the egress request succeeded.
+            if restored.returncode or "ROLLBACK_VERIFIED" not in restored.stdout:
+                raise ValueError("CISCO_EGRESS_ROLLBACK_INCOMPLETE")
+    except (OSError, subprocess.TimeoutExpired):
+        return "CISCO_EGRESS_TEST_UNAVAILABLE"
+
+
 def probe_unrouted(profile: dict) -> int:
     """One-minute Cisco tunnel experiment WITHOUT changing system routes.
 
@@ -295,6 +374,7 @@ def probe_unrouted(profile: dict) -> int:
         "--servercert=" + profile["servercert"], "--script=" + script,
         "https://" + profile["host"] + ":" + str(profile["port"])
     ]
+    initial_interfaces = cisco_tun_interfaces()
     child = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, start_new_session=True)
@@ -312,6 +392,7 @@ def probe_unrouted(profile: dict) -> int:
                           "vpn_connected": False}), flush=True)
         import time
         deadline = time.monotonic() + 60
+        egress_reason = None
         while time.monotonic() < deadline:
             if child.poll() is not None:
                 raise ValueError("CISCO_UNROUTED_ENGINE_EXITED")
@@ -320,10 +401,20 @@ def probe_unrouted(profile: dict) -> int:
                 text=True, timeout=5, check=False)
             if current.returncode or dict(ROUTE_GET.findall(current.stdout)) != original:
                 raise ValueError("CISCO_UNROUTED_ROUTE_CHANGED")
+            # Wait for a new, actually configured Cisco utun before probing.
+            if egress_reason is None and any(
+                    initial_interfaces.get(k) != v
+                    for k, v in cisco_tun_interfaces().items()):
+                egress_reason = cisco_verified_probe(initial_interfaces)
+                print(json.dumps({"state": "cisco_egress_probe",
+                                  "reason": egress_reason,
+                                  "vpn_connected": False}), flush=True)
+            if egress_reason is not None:
+                break
             time.sleep(1)
-        print(json.dumps({"state": "cisco_unrouted_probe_completed",
-                          "vpn_connected": False}), flush=True)
-        return 0
+        if egress_reason is None:
+            raise ValueError("CISCO_UNROUTED_TUNNEL_TIMEOUT")
+        return 0 if egress_reason == "CISCO_EGRESS_VERIFIED" else 1
     except KeyboardInterrupt:
         print(json.dumps({"state": "cisco_unrouted_probe_stopped",
                           "vpn_connected": False}), flush=True)
