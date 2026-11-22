@@ -31,6 +31,12 @@ class OpenVPNReviewTests(unittest.TestCase):
         self.assertFalse(result["route_changed"])
         self.assertEqual(result["remotes"], 1)
 
+    def test_remote_cert_tls_requires_server(self):
+        with self.assertRaises(ValueError):
+            reviewer.review(SAFE.replace("remote-cert-tls server", "remote-cert-tls"))
+        with self.assertRaises(ValueError):
+            reviewer.review(SAFE.replace("remote-cert-tls server", "remote-cert-tls client"))
+
     def test_rejects_script_execution(self):
         for directive in (
                 "script-security 2", "up /bin/sh", "plugin /tmp/evil.dylib",
