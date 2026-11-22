@@ -31,6 +31,19 @@ class CiscoRecoveryTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_readiness_rejects_console_management_without_network_changes(self):
+        with mock.patch.object(recovery, "capture", return_value=STATIC), \
+             mock.patch.object(recovery, "command") as cmd, \
+             mock.patch.object(recovery, "BASE", Path(self.tmp.name)):
+            (Path(self.tmp.name) / "management_ipv4").write_text(
+                "console-test\n")
+            result = recovery.readiness()
+            self.assertEqual(result["state"], "CISCO_PRECHECK_BLOCKED")
+            self.assertIn("CISCO_REMOTE_MANAGEMENT_NOT_PINNED",
+                          result["reasons"])
+            self.assertFalse(result["vpn_connected"])
+            cmd.assert_not_called()
+
     def test_capture_original_manual_ip_and_dns(self):
         def fake_command(*args):
             if "-listnetworkserviceorder" in args:
