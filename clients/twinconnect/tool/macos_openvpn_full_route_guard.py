@@ -149,6 +149,32 @@ def rollback() -> str:
     return "ROLLBACK_VERIFIED"
 
 
+def observed_openvpn_endpoint() -> str | None:
+    """Get actual authenticated session's remote IPv4 from root-owned log.
+
+    Never infer the server endpoint from its egress IP or from UI labels.
+    """
+    log = Path("/private/var/run/twinconnect-openvpn-app/openvpn.log")
+    try:
+        with open(log, "rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - 131072))
+            data = stream.read()
+    except OSError:
+        return None
+    # OpenVPN prints the actual transport peer after DNS resolution.
+    matches = re.findall(
+        rb"(?:UDPv4 link remote|TCP connection established with|TCPv4_CLIENT link remote):\s*\[AF_INET\]([0-9.]+):[0-9]+",
+        data)
+    if not matches:
+        return None
+    try:
+        ip = ipaddress.IPv4Address(matches[-1].decode("ascii"))
+    except (UnicodeError, ipaddress.AddressValueError):
+        return None
+    return str(ip) if ip.is_global else None
+
+
 def trial(endpoint: str) -> str:
     try:
         ip = ipaddress.ip_address(endpoint)
@@ -287,6 +313,9 @@ def main() -> int:
             return 0
         if args == ["rollback"]:
             result = rollback()
+        elif args == ["trial", "auto"]:
+            endpoint = observed_openvpn_endpoint()
+            result = trial(endpoint) if endpoint else "OPENVPN_ENDPOINT_NOT_OBSERVED"
         elif len(args) == 2 and args[0] == "trial":
             result = trial(args[1])
         else:
