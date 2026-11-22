@@ -2852,6 +2852,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             guard let self = self else { return }
             _ = self.runLocalManager(
                 ["stop"], root: self.localRuntimeRoot())
+            if self.openVPNAppSessionInstalled() {
+                _ = self.runOpenVPNAppSession("stop")
+            }
             if self.fullTunServicePresent() {
                 _ = self.runFullTunClient("stop")
             }
