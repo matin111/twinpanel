@@ -88,6 +88,17 @@ if [[ -n "$openvpn_candidate" ]]; then
   grep -q '^OpenVPN ' "$stage/macos_native/build/openvpn/$arch/version.txt" ||
     { echo "OPENVPN_BUNDLED_VERSION_INVALID" >&2; exit 3; }
   echo "OPENVPN_BUNDLED_EXECUTION_VERIFIED"
+  # Keep an identical unprivileged build artifact available for subsequent
+  # administrator-controlled local-console installation. No sudo here.
+  helper_build="macos_native/build/openvpn/$arch"
+  if [[ -e "$helper_build" || -L "$helper_build" ]]; then
+    echo "OPENVPN_HELPER_BUILD_ALREADY_EXISTS; REBUILD_REFUSED" >&2
+    # Packaging the app itself remains possible on repeated builds.
+  else
+    mkdir -p "$(dirname "$helper_build")"
+    cp -R "$stage/macos_native/build/openvpn/$arch" "$helper_build"
+    echo "OPENVPN_PRIVILEGED_INSTALL_CANDIDATE_PREPARED"
+  fi
   installed=$((installed + 1))
 else
   echo "OPENVPN_CLI_NOT_INSTALLED; NOT_PACKAGED"
