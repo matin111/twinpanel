@@ -239,7 +239,11 @@ class Session:
                     output.write(encoded)
                 if use_openvpn:
                     command = [str(engine), "--config", str(path),
-                               "--script-security", "1", "--auth-nocache"]
+                               "--script-security", "1", "--auth-nocache",
+                               # Server-pushed routes and DNS are prohibited
+                               # until physical-console recovery and an
+                               # independently reviewed route policy exist.
+                               "--route-nopull"]
                 else:
                     validate_full_tun_config(path)
                     subprocess.run([str(engine), "check", "-c", str(path)],
