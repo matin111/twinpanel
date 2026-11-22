@@ -33,7 +33,7 @@ ALLOWED_STRING = {"remote", "verify-x509-name", "data-ciphers", "tls-cipher",
 FORBIDDEN = {"up", "down", "route-up", "route-pre-down", "learn-address",
              "ipchange", "client-connect", "client-disconnect", "plugin",
              "script-security", "user", "group", "management", "management-client",
-             "management-query-passwords", "redirect-gateway", "route",
+             "management-query-passwords", "route",
              "route-ipv6", "dhcp-option", "setenv", "setenv-safe",
              "askpass", "auth-user-pass", "auth-token", "secret",
              "tls-verify", "config", "include", "cd", "chroot",
@@ -44,6 +44,16 @@ FORBIDDEN = {"up", "down", "route-up", "route-pre-down", "learn-address",
              "http-proxy-user-pass", "pkcs11-providers", "pkcs11-id",
              "tls-crypt-v2", "tls-auth", "key-direction"}
 INLINE_TAGS = {"ca", "cert", "key", "tls-crypt"}
+# Standard TwinPanel export contains redirect-gateway def1. It MUST be
+# removed for an unrouted candidate, never forwarded to the engine.
+STRIP_LOCAL_DEFAULT_ROUTE = {"redirect-gateway": {("def1",), ("def1", "bypass-dhcp")}}
+# Conservative transport controls for existing generated OpenVPN profiles.
+BOUNDED_NUMBERS = {
+    "tun-mtu": (576, 9000),
+    "mssfix": (0, 9000),
+    "verb": (0, 4),
+}
+
 
 
 def review(text: str) -> dict:
@@ -60,6 +70,7 @@ def review(text: str) -> dict:
     buffer = []
     seen = set()
     remotes = 0
+    stripped = []
     for line in lines:
         item = line.strip()
         if active is not None:
@@ -95,6 +106,14 @@ def review(text: str) -> dict:
         directive, values = tokens[0].lower(), tokens[1:]
         if not re.fullmatch(r"[a-z][a-z0-9-]*", directive):
             raise ValueError("OVPN_INVALID_DIRECTIVE")
+        if directive in STRIP_LOCAL_DEFAULT_ROUTE:
+            if tuple(values) not in STRIP_LOCAL_DEFAULT_ROUTE[directive]:
+                raise ValueError("OVPN_UNSAFE_DIRECTIVE")
+            if directive in seen:
+                raise ValueError("OVPN_INVALID_VALUE")
+            seen.add(directive)
+            stripped.append(directive)
+            continue
         if directive in FORBIDDEN or directive.startswith("route-"):
             raise ValueError("OVPN_UNSAFE_DIRECTIVE")
         if directive in ALLOWED_SINGLE:
@@ -102,6 +121,15 @@ def review(text: str) -> dict:
                 raise ValueError("OVPN_INVALID_FLAG")
         elif directive in ALLOWED_VALUE:
             if len(values) != 1 or values[0] not in ALLOWED_VALUE[directive] or directive in seen:
+                raise ValueError("OVPN_INVALID_VALUE")
+        elif directive in BOUNDED_NUMBERS:
+            low, high = BOUNDED_NUMBERS[directive]
+            if len(values) != 1 or directive in seen or not values[0].isdigit() or not (low <= int(values[0]) <= high):
+                raise ValueError("OVPN_INVALID_VALUE")
+        elif directive == "resolv-retry":
+            if len(values) != 1 or directive in seen or not (
+                    values[0] == "infinite" or
+                    (values[0].isdigit() and 1 <= int(values[0]) <= 600)):
                 raise ValueError("OVPN_INVALID_VALUE")
         elif directive == "remote":
             if len(values) not in (1, 2, 3) or remotes >= 8:
@@ -134,7 +162,8 @@ def review(text: str) -> dict:
         raise ValueError("OVPN_INCOMPLETE_PROFILE")
     return {"state": "reviewed_unrouted_candidate",
             "directives": cleaned, "inline": inline, "remotes": remotes,
-            "connected": False, "route_changed": False}
+            "connected": False, "route_changed": False,
+            "stripped": stripped}
 
 def main() -> int:
     """Review a private stdin profile. Print no credentials or destinations."""
