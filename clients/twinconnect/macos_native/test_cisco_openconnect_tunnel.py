@@ -34,6 +34,17 @@ class CiscoTunnelTests(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
+    def test_utun_counter_parsing_for_packet_flow_diagnostics(self):
+        output = ("Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll\n"
+                  "utun4 1300 <Link#23> 0 50 0 12345 44 0 6789 0\n")
+        response = subprocess.CompletedProcess([], 0, output, "")
+        with mock.patch.object(tun.subprocess, "run", return_value=response) as run:
+            self.assertEqual(tun.cisco_tun_counters("utun4"), (12345, 6789))
+            run.assert_called_once()
+        with mock.patch.object(tun.subprocess, "run") as run:
+            self.assertIsNone(tun.cisco_tun_counters("en0"))
+            run.assert_not_called()
+
     def test_checkpoint_and_restore_wrap_successful_console_trial(self):
         with mock.patch.object(tun.os, "geteuid", return_value=0), \
              mock.patch.object(tun.os.path, "isfile", return_value=True), \
