@@ -27,6 +27,8 @@ ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconn
 NETWORK_GUARD = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_network_recovery.py"
 CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
 CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED = False  # Strict production safety interlock.
+CISCO_SYSTEM_ROUTE_ENABLED = False  # Disabled after real macOS internet loss.
+
 
 CISCO_RESULT_FILE = ("/private/var/run/twinconnect-cisco-route-guard/"
                      "last-result.json")
@@ -515,6 +517,8 @@ def main() -> int:
         if sys.argv[1:] == ["probe"]:
             return probe_unrouted(profile)
         if sys.argv[1:] == ["system"]:
+            if not CISCO_SYSTEM_ROUTE_ENABLED:
+                raise ValueError("CISCO_SYSTEM_ROUTE_DISABLED")
             return probe_unrouted(profile, system_vpn=True)
         return run(profile, sys.argv[2])
     except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
