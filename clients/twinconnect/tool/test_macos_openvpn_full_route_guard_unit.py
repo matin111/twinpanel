@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SOURCE = Path(__file__).with_name("macos_openvpn_full_route_guard.py")
 spec = importlib.util.spec_from_file_location("macos_openvpn_full_route_guard", SOURCE)
@@ -43,10 +43,10 @@ class GuardTests(unittest.TestCase):
               patch.object(guard, "management_peers", return_value=[]),
               patch.object(guard, "get_route",
                            return_value={"interface": "en0", "gateway": "192.0.2.1"}),
-              patch.object(guard.SESSION, "read_text", return_value=
+              patch.object(guard, "SESSION", Mock(read_text=Mock(return_value=
                            '{"worker_pid":222,"interface":"utun4",'
                            '"state":"tunnel_established_unrouted",'
-                           '"deadline":99999999999}'),
+                           '"deadline":99999999999}'))),
               patch.object(guard.os, "kill", return_value=None),
               patch.object(guard, "store") as store):
             self.assertEqual(guard.trial("8.8.8.8"),
