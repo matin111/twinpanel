@@ -2829,6 +2829,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func signOut(_ sender: NSButton) {
         // Never keep a privileged Cisco session after account logout.
         ciscoTunnelGeneration += 1
+        if ciscoTunnelTask != nil {
+            DispatchQueue.global(qos: .utility).async {
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                if (try? stop.run()) != nil { stop.waitUntilExit() }
+            }
+        }
         ciscoTunnelTask?.terminate()
         ciscoTunnelTask = nil
         ciscoTunnelBusy = false
