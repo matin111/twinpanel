@@ -163,4 +163,4 @@ test -r "$destination/macos_native/standalone_connection_manager.py" ||
 echo "MACOS_LOCAL_PROXY_RUNTIME_PACKAGED"
 echo "Runtime: $destination"
 echo "Engines: $installed"
-echo "LOCAL_PROXY_ONLY; NO_SYSTEM_WIDE_VPN; UNSIGNED_BUILD"
+echo "PROXY_ENGINES_PACKAGED; OPENVPN_SYSTEM_IPV4_REQUIRES_PRIVILEGED_GUARD; UNSIGNED_NETWORK_EXTENSION"
