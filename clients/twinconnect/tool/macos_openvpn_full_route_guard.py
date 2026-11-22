@@ -121,7 +121,7 @@ def termalin_control_peers() -> list[str]:
         if sockets.returncode:
             continue
         for row in sockets.stdout.splitlines():
-            match = re.search(r"TCP\\s+[0-9.]+:[0-9]+->([0-9.]+):[0-9]+\\s+\\(ESTABLISHED\\)", row)
+            match = re.search(r"TCP\s+[0-9.]+:[0-9]+->([0-9.]+):[0-9]+\s+\(ESTABLISHED\)", row)
             if not match:
                 continue
             try:
