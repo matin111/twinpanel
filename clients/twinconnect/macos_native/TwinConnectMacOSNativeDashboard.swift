@@ -3620,6 +3620,91 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                response["system_vpn_verified"] as? Bool == false
     }
 
+    private func reviewOpenVPNProfile(_ profile: Data) -> Bool {
+        guard profile.count > 0, profile.count <= 65536 else { return false }
+        let script = localRuntimeRoot() + "/macos_native/openvpn_profile_review.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return false
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return false }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard let result = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+            return result["state"] as? String == "reviewed_unrouted_candidate" &&
+                   result["connected"] as? Bool == false
+        } catch { return false }
+    }
+
+    private func startOpenVPN(_ session: TwinMacNativeSession,
+                              serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Retrieving authenticated OpenVPN profile…"
+        view = build()
+        directory.prepareOpenVPNProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure:
+                self.fullTunBusy = false
+                self.status = "OpenVPN profile unavailable for selected account."
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let valid = self.reviewOpenVPNProfile(profile)
+                    let service = self.fullTunServicePresent()
+                    var response: (Int32, String) = (1, "")
+                    if valid && service,
+                       let text = String(data: profile, encoding: .utf8),
+                       let envelope = try? JSONSerialization.data(
+                        withJSONObject: ["mode": "openvpn", "profile": text]) {
+                        response = self.runFullTunClient("start", profile: envelope)
+                    }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard generation == self.localProxyGeneration,
+                              self.accountSession?.accessToken == session.accessToken else {
+                            if response.0 == 0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runFullTunClient("stop")
+                                }
+                            }
+                            return
+                        }
+                        self.fullTunActive = response.0 == 0 &&
+                            self.tunResponseIs(response.1,
+                                               state: "engine_running_unverified")
+                        if self.fullTunActive {
+                            self.status = "OpenVPN engine running; VPN egress not verified."
+                        } else if !valid {
+                            self.status = "OpenVPN profile rejected; no connection started."
+                        } else if !service {
+                            self.status = "OpenVPN reviewed; privileged local helper not installed."
+                        } else {
+                            self.status = "OpenVPN start rejected; no connection confirmed."
+                        }
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
     private func startFullTun(_ session: TwinMacNativeSession,
                               serverID: String, protocolCode: String) {
         fullTunBusy = true
@@ -3774,6 +3859,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if activeProtocol == "cisco" {
             requestCiscoTunnel(sender)
+            return
+        }
+        if activeProtocol == "openvpn" {
+            guard let session = accountSession,
+                  let serverID = activeServer,
+                  snapshot?.protocols.contains(where: {
+                      $0.code == "openvpn" && $0.configured
+                  }) == true else {
+                status = "Choose an entitled OpenVPN server."
+                view = build()
+                return
+            }
+            startOpenVPN(session, serverID: serverID)
             return
         }
         if ciscoTunnelTask != nil || ciscoTunnelBusy {
