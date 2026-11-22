@@ -469,6 +469,8 @@ def heartbeat(pid: int) -> str:
         os.kill(pid, 0)
     except OSError:
         return "CISCO_WORKER_NOT_RUNNING"
+    if openconnect_endpoint(pid) != current.get("endpoint"):
+        return "CISCO_TRANSPORT_ENDPOINT_CHANGED"
     if any(route(ip).get("interface") != current.get("full_interface")
            for ip in ("1.0.0.1", "129.0.0.1")):
         return "CISCO_FULL_ROUTE_LOST"
