@@ -26,6 +26,9 @@ SESSION = Path("/private/var/run/twinconnect-openvpn-app/state.json")
 ROUTE = "/sbin/route"
 SERVICE = "system/com.twinconnect.full-route-guard"
 TTL = 45
+LEASE_SECONDS = 45
+DNS_SERVERS = ("1.1.1.1", "1.0.0.1")
+NETWORKSETUP = "/usr/sbin/networksetup"
 SPLITS = ("0.0.0.0/1", "128.0.0.0/1")
 
 
@@ -61,6 +64,63 @@ def load() -> dict:
         return d if isinstance(d, dict) else {}
     except (ValueError, OSError):
         return {}
+
+
+def network_service_for_interface(interface: str) -> str | None:
+    """Select the actual macOS network service bound to the baseline NIC."""
+    r = run(NETWORKSETUP, "-listnetworkserviceorder")
+    if r.returncode:
+        return None
+    service = None
+    for line in r.stdout.splitlines():
+        found = re.match(r"^\\(\\d+\\) (.+)$", line)
+        if found:
+            service = found.group(1)
+            continue
+        device = re.search(r"Device: ([A-Za-z0-9]+)\\)", line)
+        if device and device.group(1) == interface:
+            return service if service and not service.startswith("*") else None
+    return None
+
+
+def read_dns(service: str) -> list[str] | None:
+    r = run(NETWORKSETUP, "-getdnsservers", service)
+    if r.returncode:
+        return None
+    lines = [line.strip() for line in r.stdout.splitlines() if line.strip()]
+    if len(lines) == 1 and "aren't any DNS Servers set" in lines[0]:
+        return []
+    try:
+        if not lines or len(lines) > 8:
+            return None
+        for address in lines:
+            ipaddress.ip_address(address)
+    except ValueError:
+        return None
+    return lines
+
+
+def set_dns(service: str, addresses: list[str]) -> bool:
+    args = list(addresses) if addresses else ["Empty"]
+    return run(NETWORKSETUP, "-setdnsservers", service, *args).returncode == 0
+
+
+def external_ipv4() -> str | None:
+    try:
+        r = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--connect-timeout", "4", "--max-time", "9",
+             "https://1.1.1.1/cdn-cgi/trace"],
+            capture_output=True, text=True, timeout=11, check=False)
+        if r.returncode:
+            return None
+        for line in r.stdout.splitlines():
+            if line.startswith("ip="):
+                address = ipaddress.ip_address(line[3:])
+                return str(address) if address.version == 4 and address.is_global else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    return None
 
 
 def delete_if_owned(network: str, interface: str) -> bool:
@@ -197,6 +257,13 @@ def rollback() -> str:
             successful = False
     if not successful:
         return "ROLLBACK_INCOMPLETE_MANUAL_RECOVERY_REQUIRED"
+    if d.get("dns_started"):
+        service = d.get("dns_service")
+        original = d.get("dns_prior")
+        if not isinstance(service, str) or not isinstance(original, list):
+            return "DNS_STATE_INVALID_MANUAL_RECOVERY_REQUIRED"
+        if not set_dns(service, original):
+            return "DNS_ROLLBACK_INCOMPLETE_MANUAL_RECOVERY_REQUIRED"
     STATE.unlink(missing_ok=True)
     return "ROLLBACK_VERIFIED"
 
@@ -295,6 +362,7 @@ def trial(endpoint: str) -> str:
         return "IPV6_DEFAULT_PRESENT_REFUSED"
     # State first, then changes. launchd daemon expires these even if CLI dies.
     state = {"interface": interface, "endpoint": endpoint, "gateway": gateway,
+             "mode": "trial",
              "original_interface": default["interface"], "pin_committed": False,
              "management_pin_committed": [],
              "worker_pid": worker_pid, "deadline": time.time() + TTL}
@@ -325,6 +393,73 @@ def trial(endpoint: str) -> str:
     if get_route(endpoint).get("interface") != default["interface"]:
         return "SERVER_BYPASS_FAILED_" + rollback()
     return "IPV4_FULL_ROUTE_TRIAL_ACTIVE_45_SECONDS"
+
+
+def connect() -> str:
+    """Lease full IPv4 routing only when HTTPS egress and DNS can be restored."""
+    if load():
+        return "ROUTE_ALREADY_OWNED"
+    baseline = external_ipv4()
+    if baseline is None:
+        return "BASELINE_IP_UNVERIFIED"
+    endpoint = observed_openvpn_endpoint()
+    if endpoint is None:
+        return "OPENVPN_ENDPOINT_NOT_OBSERVED"
+    result = trial(endpoint)
+    if result != "IPV4_FULL_ROUTE_TRIAL_ACTIVE_45_SECONDS":
+        return result
+    # The watchdog will recover the routes even if this command crashes.
+    tunneled = external_ipv4()
+    if tunneled is None or tunneled == baseline:
+        return "VPN_EGRESS_NOT_VERIFIED_" + rollback()
+    state = load()
+    service = network_service_for_interface(state["original_interface"])
+    if service is None:
+        return "DNS_NETWORK_SERVICE_UNKNOWN_" + rollback()
+    previous = read_dns(service)
+    if previous is None:
+        return "DNS_BACKUP_FAILED_" + rollback()
+    state["dns_service"] = service
+    state["dns_prior"] = previous
+    state["dns_started"] = True
+    # Intent must precede the network change, so a daemon crash recovers DNS.
+    store(state)
+    if not set_dns(service, list(DNS_SERVERS)):
+        return "DNS_APPLY_FAILED_" + rollback()
+    state["mode"] = "leased"
+    state["deadline"] = time.time() + LEASE_SECONDS
+    store(state)
+    return "IPV4_FULL_ROUTE_CONNECTED"
+
+
+def heartbeat() -> str:
+    """Renew only an already verified lease while both control links are safe."""
+    d = load()
+    if d.get("mode") != "leased":
+        return "FULL_ROUTE_NOT_ACTIVE"
+    if time.time() >= d.get("deadline", 0):
+        return "FULL_ROUTE_EXPIRED"
+    try:
+        os.kill(d["worker_pid"], 0)
+    except (OSError, KeyError, TypeError):
+        return "OPENVPN_WORKER_EXITED"
+    interface = d.get("interface")
+    if any(get_route(ip).get("interface") != interface
+           for ip in ("1.0.0.1", "129.0.0.1")):
+        return "VPN_ROUTE_LOST"
+    if get_route(d["endpoint"]).get("interface") != d["original_interface"]:
+        return "OPENVPN_SERVER_BYPASS_LOST"
+    for peer in d.get("management_pin_committed", []):
+        if get_route(peer).get("interface") != d["original_interface"]:
+            return "MANAGEMENT_BYPASS_LOST"
+    # Connector may reconnect to a different edge. Such a transition is not
+    # silently routed through the VPN: expire and recover instead.
+    observed = termalin_control_peers()
+    if observed and not set(observed).issubset(set(d.get("management_pin_committed", []))):
+        return "MANAGEMENT_PEER_CHANGED"
+    d["deadline"] = time.time() + LEASE_SECONDS
+    store(d)
+    return "IPV4_FULL_ROUTE_CONNECTED"
 
 
 def service() -> int:
@@ -365,11 +500,18 @@ def main() -> int:
     with open(LOCK, "a+") as fd:
         fcntl.flock(fd, fcntl.LOCK_EX)
         if args == ["status"]:
-            print(json.dumps({"state": "TRIAL_ACTIVE" if load() else "IDLE",
-                              "remaining_seconds": max(0, int(load().get("deadline", 0) - time.time()))}))
+            current = load()
+            state = ("CONNECTED" if current.get("mode") == "leased" else
+                     ("TRIAL_ACTIVE" if current else "IDLE"))
+            print(json.dumps({"state": state,
+                              "remaining_seconds": max(0, int(current.get("deadline", 0) - time.time()))}))
             return 0
         if args == ["rollback"]:
             result = rollback()
+        elif args == ["connect"]:
+            result = connect()
+        elif args == ["heartbeat"]:
+            result = heartbeat()
         elif args == ["trial", "auto"]:
             endpoint = observed_openvpn_endpoint()
             result = trial(endpoint) if endpoint else "OPENVPN_ENDPOINT_NOT_OBSERVED"
@@ -378,7 +520,7 @@ def main() -> int:
         else:
             result = "USAGE: service|status|rollback|trial PUBLIC_IPV4_ENDPOINT"
     print(result, flush=True)
-    return 0 if result in ("ROLLBACK_VERIFIED", "NO_OWNED_ROUTES", "IPV4_FULL_ROUTE_TRIAL_ACTIVE_45_SECONDS") else 1
+    return 0 if result in ("ROLLBACK_VERIFIED", "NO_OWNED_ROUTES", "IPV4_FULL_ROUTE_TRIAL_ACTIVE_45_SECONDS", "IPV4_FULL_ROUTE_CONNECTED") else 1
 
 
 if __name__ == "__main__":
