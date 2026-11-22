@@ -51,6 +51,12 @@ class NativeOpenVPNIntegrationTests(unittest.TestCase):
                 daemon.Session().start(501, {"mode": "openvpn", "profile": malicious})
             file_write.assert_not_called()
 
+    def test_openvpn_never_imports_server_pushed_routes(self):
+        source = (DIR / "unsigned_tun_daemon.py").read_text()
+        self.assertIn('"--route-nopull"', source)
+        self.assertIn('"--script-security", "1"', source)
+        self.assertNotIn('"--redirect-gateway"', source)
+
     def test_reviewed_profile_still_never_claims_verified_vpn(self):
         self.assertIn('"system_vpn_verified": False',
                       (DIR / "unsigned_tun_daemon.py").read_text())
