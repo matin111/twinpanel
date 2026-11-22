@@ -290,9 +290,10 @@ async def admin_edit_subscription_fast_v1(
                 elif new_duration_days > 0:
                     from ..subscription_override_models import unlimited_without_expiry
                     was_indefinite = unlimited_without_expiry(sub, plan, override)
-                    if not expiry_sent and sub.starts_at is None and sub.expires_at is None:
-                        # A never-connected account must retain its first-use
-                        # activation clock. Do not invent today's start/expiry.
+                    if not expiry_sent and sub.starts_at is None:
+                        # No recorded first-use start: a duration change must
+                        # never manufacture a start date, even if stale data
+                        # already contains an expiry without a start.
                         sub.expires_at = None
                     elif was_indefinite and not expiry_sent:
                         now = datetime.utcnow()
