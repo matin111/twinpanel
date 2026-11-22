@@ -293,7 +293,38 @@ def start() -> int:
     return 1
 
 
+def rollback_routes_before_stop() -> bool:
+    """Never tear down OpenVPN while a managed full-route trial is active.
+
+    The root route watchdog owns the route state. Its lock serializes route
+    rollback with its daemon; this worker may only ask it to roll back.
+    If rollback cannot be verified, preserve the tunnel and report failure.
+    """
+    guard_state = Path("/private/var/run/twinconnect-full-route-guard/state.json")
+    if not guard_state.exists():
+        return True
+    guard_script = Path(
+        "/Library/PrivilegedHelperTools/TwinConnectFullRouteGuard/"
+        "macos_openvpn_full_route_guard.py")
+    if not guard_script.is_file():
+        return False
+    try:
+        result = subprocess.run(
+            ["/usr/bin/python3", str(guard_script), "rollback"],
+            capture_output=True, text=True, timeout=12, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return (result.returncode == 0 and
+            result.stdout.strip() == "ROLLBACK_VERIFIED" and
+            not guard_state.exists())
+
+
 def stop() -> int:
+    # All stop paths must restore owned routes before removing the tunnel.
+    # A failure leaves the tunnel alive so management access is not stranded.
+    if not rollback_routes_before_stop():
+        output("OPENVPN_ROUTE_ROLLBACK_REQUIRED")
+        return 1
     current = status()
     if current not in ("starting", "tunnel_established_unrouted",
                         "tunnel_egress_verified_unrouted"):
