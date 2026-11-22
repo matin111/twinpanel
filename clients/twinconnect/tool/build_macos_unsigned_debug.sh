@@ -58,7 +58,7 @@ PY
   echo "UNSIGNED BUILD + LOCAL PROXY ENGINE PACKAGING SUCCEEDED"
   echo "Runner.app: $built_app"
   echo "Build log: $log"
-  echo "NOTE: local SOCKS/HTTP proxy only. System VPN extension not provisioned."
+  echo "NOTE: macOS Network Extension is unsigned; OpenVPN system IPv4 requires the separately installed privileged route guard."
 else
   code=$?
   echo "UNSIGNED BUILD FAILED (exit $code)" >&2
