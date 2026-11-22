@@ -64,12 +64,24 @@ def load() -> dict:
 
 
 def delete_if_owned(network: str, interface: str) -> bool:
-    """Delete only our specific route, not arbitrary system VPN routes."""
-    actual = get_route(network.split("/")[0])
-    if actual.get("interface") != interface:
+    """Rollback an owned /1, verifying an address INSIDE that subnet.
+
+    route get 0.0.0.0 or 128.0.0.0 may resolve through the baseline
+    default even while 1.0.0.1 / 129.0.0.1 are VPN-routed. The original
+    base-address check therefore missed the route and reported success.
+    """
+    probes = {"0.0.0.0/1": "1.0.0.1",
+              "128.0.0.0/1": "129.0.0.1"}
+    probe = probes[network]
+    current = get_route(probe)
+    if current.get("interface") != interface:
         return True
-    r = run(ROUTE, "-n", "delete", "-net", network, "-interface", interface)
-    return r.returncode == 0 and get_route(network.split("/")[0]).get("interface") != interface
+    deleted = run(ROUTE, "-n", "delete", "-net", network,
+                  "-interface", interface)
+    # A concurrent watchdog may already have deleted our route.
+    # The only trustworthy success criterion is the resulting route.
+    verified = get_route(probe).get("interface") != interface
+    return verified
 
 
 def management_peers() -> list[str]:
@@ -178,6 +190,11 @@ def rollback() -> str:
                 current.get("interface") == d.get("original_interface")):
             removed = run(ROUTE, "-n", "delete", "-host", peer, d["gateway"])
             successful = removed.returncode == 0 and successful
+    # Do not report success while either split still directs ordinary
+    # destinations through the VPN, regardless of route command exit codes.
+    for probe in ("1.0.0.1", "129.0.0.1"):
+        if get_route(probe).get("interface") == interface:
+            successful = False
     if not successful:
         return "ROLLBACK_INCOMPLETE_MANUAL_RECOVERY_REQUIRED"
     STATE.unlink(missing_ok=True)
