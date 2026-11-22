@@ -72,6 +72,46 @@ def delete_if_owned(network: str, interface: str) -> bool:
     return r.returncode == 0 and get_route(network.split("/")[0]).get("interface") != interface
 
 
+def management_peers() -> list[str]:
+    """Find established inbound SSH clients; fail closed if ambiguous.
+
+    The app must never infer a management peer from the public gateway.
+    Only the active, locally terminated SSH transport is trusted here.
+    """
+    r = run("/usr/sbin/netstat", "-an", "-f", "inet", "-p", "tcp")
+    if r.returncode:
+        return []
+    peers: set[str] = set()
+    for row in r.stdout.splitlines():
+        parts = row.split()
+        if len(parts) < 6 or parts[-1] != "ESTABLISHED":
+            continue
+        local, remote = parts[3], parts[4]
+        # netstat displays IPv4 TCP ports as dotted suffixes on macOS.
+        if not local.endswith(".22"):
+            continue
+        addr, dot, port = remote.rpartition(".")
+        try:
+            remote_ip = ipaddress.IPv4Address(addr)
+            if dot and port.isdigit() and remote_ip.is_global:
+                peers.add(str(remote_ip))
+        except ipaddress.AddressValueError:
+            continue
+    return sorted(peers)
+
+
+def exact_host_routes() -> set[str] | None:
+    r = run("/usr/sbin/netstat", "-rn", "-f", "inet")
+    if r.returncode:
+        return None
+    result: set[str] = set()
+    for line in r.stdout.splitlines():
+        fields = line.split()
+        if fields:
+            result.add(fields[0])
+    return result
+
+
 def rollback() -> str:
     d = load()
     if not d:
@@ -94,6 +134,14 @@ def rollback() -> str:
         if (current.get("gateway") == gateway and
                 current.get("interface") == d.get("original_interface")):
             removed = run(ROUTE, "-n", "delete", "-host", endpoint, gateway)
+            successful = removed.returncode == 0 and successful
+    for peer in d.get("management_pin_committed", []):
+        if not isinstance(peer, str):
+            return "INVALID_STATE_MANUAL_RECOVERY_REQUIRED"
+        current = get_route(peer)
+        if (current.get("gateway") == d.get("gateway") and
+                current.get("interface") == d.get("original_interface")):
+            removed = run(ROUTE, "-n", "delete", "-host", peer, d["gateway"])
             successful = removed.returncode == 0 and successful
     if not successful:
         return "ROLLBACK_INCOMPLETE_MANUAL_RECOVERY_REQUIRED"
@@ -137,20 +185,22 @@ def trial(endpoint: str) -> str:
     original = get_route(endpoint)
     if original.get("interface") != default.get("interface"):
         return "ENDPOINT_ROUTE_NOT_ON_BASELINE"
-    # The rollback logic can remove only a route created by this trial.
-    # Refuse an existing exact host route instead of overwriting it.
-    routing_table = run("/usr/sbin/netstat", "-rn", "-f", "inet")
-    if routing_table.returncode:
+    # Require at least one *observed* inbound SSH session and pin all
+    # active clients through the baseline interface before installing /1s.
+    # No SSH session means no safe remote-management proof: fail closed.
+    peers = management_peers()
+    if not peers:
+        return "ESTABLISHED_SSH_MANAGEMENT_REQUIRED"
+    if endpoint in peers:
+        return "SERVER_AND_MANAGEMENT_PEER_CONFLICT"
+    existing = exact_host_routes()
+    if existing is None:
         return "ROUTING_TABLE_UNAVAILABLE"
-    for line in routing_table.stdout.splitlines():
-        fields = line.split()
-        if fields and fields[0] in (endpoint, endpoint + "/32"):
-            return "EXISTING_ENDPOINT_HOST_ROUTE_REFUSED"
-    # This remote Mac must retain its management connectivity. Until the
-    # initiating management peer can be pinned and recovered independently,
-    # deny full-route trials rather than risk sending SSH return traffic
-    # through the VPN.
-    return "REMOTE_MANAGEMENT_ROUTE_PROTECTION_NOT_IMPLEMENTED"
+    if any(ip in existing or ip + "/32" in existing for ip in [endpoint, *peers]):
+        return "EXISTING_HOST_ROUTE_REFUSED"
+    if any(get_route(ip).get("interface") != default["interface"]
+           for ip in peers):
+        return "MANAGEMENT_NOT_ON_BASELINE"
     gateway = default["gateway"]
     # Avoid masking an existing VPN or special-purpose split route.
     for dest in ("1.0.0.1", "129.0.0.1"):
@@ -163,6 +213,7 @@ def trial(endpoint: str) -> str:
     # State first, then changes. launchd daemon expires these even if CLI dies.
     state = {"interface": interface, "endpoint": endpoint, "gateway": gateway,
              "original_interface": default["interface"], "pin_committed": False,
+             "management_pin_committed": [],
              "worker_pid": worker_pid, "deadline": time.time() + TTL}
     store(state)
     pin = run(ROUTE, "-n", "add", "-host", endpoint, gateway)
@@ -172,6 +223,15 @@ def trial(endpoint: str) -> str:
         return "ENDPOINT_PIN_FAILED"
     state["pin_committed"] = True
     store(state)
+    for peer in peers:
+        pinned = run(ROUTE, "-n", "add", "-host", peer, gateway)
+        if pinned.returncode:
+            return "MANAGEMENT_PIN_FAILED_" + rollback()
+        state["management_pin_committed"].append(peer)
+        store(state)
+    if any(get_route(peer).get("interface") != default["interface"]
+           for peer in peers):
+        return "MANAGEMENT_BYPASS_VERIFY_FAILED_" + rollback()
     for net in SPLITS:
         added = run(ROUTE, "-n", "add", "-net", net, "-interface", interface)
         if added.returncode:
