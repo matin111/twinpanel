@@ -45,8 +45,32 @@ class OpenVPNReviewTests(unittest.TestCase):
                 reviewer.review(SAFE + directive + "\n")
 
     def test_rejects_server_route_injection(self):
-        for directive in ("redirect-gateway def1", "route 0.0.0.0 0.0.0.0",
+        for directive in ("redirect-gateway local", "route 0.0.0.0 0.0.0.0",
                           "dhcp-option DNS 8.8.8.8", "pull-filter ignore route"):
+            with self.subTest(directive=directive), self.assertRaises(ValueError):
+                reviewer.review(SAFE + directive + "\n")
+
+    def test_twinpanel_export_is_reviewed_with_default_route_removed(self):
+        export = SAFE + (
+            "nobind\n"
+            "persist-key\n"
+            "persist-tun\n"
+            "data-ciphers AES-256-GCM:AES-128-GCM\n"
+            "mssfix 1300\n"
+            "tun-mtu 1500\n"
+            "resolv-retry infinite\n"
+            "verb 3\n"
+            "redirect-gateway def1\n"
+        )
+        result = reviewer.review(export)
+        self.assertEqual(result["state"], "reviewed_unrouted_candidate")
+        self.assertIn("redirect-gateway", result["stripped"])
+        self.assertFalse(any(x.startswith("redirect-gateway")
+                             for x in result["directives"]))
+
+    def test_rejects_out_of_range_transport_values(self):
+        for directive in ("mssfix 99999", "tun-mtu -1", "verb 9",
+                          "resolv-retry 999999", "redirect-gateway def1 local"):
             with self.subTest(directive=directive), self.assertRaises(ValueError):
                 reviewer.review(SAFE + directive + "\n")
 
