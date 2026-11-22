@@ -3722,10 +3722,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                     .filter { $0.range(
                                         of: "^[A-Z0-9_]{4,80}$",
                                         options: .regularExpression) != nil }
-                                summary = resultCodes.first(where: {
-                                    $0 == "OPENVPN_HANDSHAKE_VERIFIED" ||
-                                    $0.hasPrefix("OPENVPN_")
-                                }) ?? "OPENVPN_TEST_FAILED"
+                                // OPENVPN_TEST_STOPPED is lifecycle information,
+                                // not an outcome. Prefer the actual handshake
+                                // verdict, then an explicit failure reason.
+                                // The runner emits STOPPED before its verdict.
+                                let outcomes = resultCodes.filter {
+                                    $0.hasPrefix("OPENVPN_") &&
+                                    $0 != "OPENVPN_TEST_STOPPED" &&
+                                    $0 != "OPENVPN_START_FAILED"
+                                }
+                                summary = outcomes.first(where: {
+                                    $0 == "OPENVPN_HANDSHAKE_VERIFIED"
+                                }) ?? outcomes.first ??
+                                    (resultCodes.contains("OPENVPN_START_FAILED") ?
+                                     "OPENVPN_START_FAILED" : "OPENVPN_TEST_FAILED")
                             } catch {
                                 summary = "OPENVPN_APP_PROBE_LAUNCH_FAILED"
                             }
