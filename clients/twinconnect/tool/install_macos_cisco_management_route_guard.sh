@@ -2,7 +2,7 @@
 # Install independent Cisco management pin watchdog; no VPN or routes altered.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ "$(uname -s)" == Darwin && "\${EUID}" == 0 ]] ||
+[[ "$(uname -s)" == Darwin && "${EUID}" == 0 ]] ||
   { echo "CISCO_MACOS_ROOT_REQUIRED" >&2; exit 2; }
 helper="/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py"
 plist="/Library/LaunchDaemons/com.twinconnect.cisco-management-route-guard.plist"
