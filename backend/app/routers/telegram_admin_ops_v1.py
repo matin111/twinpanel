@@ -617,11 +617,13 @@ async def _deliver_broadcast(
                 f"https://api.telegram.org/bot{token}/sendMessage", json={
                 "chat_id": int(admin_chat_id),
                 "text": (
-                    "📢 گزارش ارسال همگانی\\n"
-                    f"✅ ارسال‌شده: {sent}\\n"
-                    f"❌ ناموفق: {failed}\\n"
-                    f"🚫 مسدودشده: {blocked}"
+                    "📢 <b>گزارش ارسال همگانی</b>\n\n"
+                    f"👥 کل مخاطبان: <b>{len(targets)}</b>\n"
+                    f"✅ ارسال موفق: <b>{sent}</b>\n"
+                    f"❌ ارسال ناموفق: <b>{failed - blocked}</b>\n"
+                    f"🚫 مسدودشده: <b>{blocked}</b>"
                 ),
+                "parse_mode": "HTML",
             })
         except httpx.HTTPError:
             pass
