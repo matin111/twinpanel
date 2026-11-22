@@ -61,7 +61,7 @@ def proof_success(status=None, renewal=False, receipt=False):
     if status:
         text += f"\nوضعیت: <b>{escape(str(status))}</b>\n"
     text += (f"\nپس از تأیید، {operation(renewal)} "
-             + ("برای دوره بعد رزرو می‌شود." if renewal else "به‌صورت خودکار تکمیل می‌شود."))
+             + ("برای دوره بعد رزرو می‌شود و پس از پایان زمان یا حجم دوره فعلی، خودکار فعال می‌شود." if renewal else "به‌صورت خودکار تکمیل می‌شود."))
     return text
 
 
@@ -89,7 +89,7 @@ def wallet_success_text(order_id, renewal=False, fulfilled=False):
         "💰 مبلغ از کیف پول پرداخت شد.\n"
     )
     if renewal:
-        text += "🕒 تمدید برای دوره بعد رزرو شد."
+        text += "🕒 تمدید برای دوره بعد رزرو شد و پس از پایان زمان یا حجم دوره فعلی، خودکار فعال می‌شود."
     elif fulfilled:
         text += "📦 اشتراک شما آماده است."
     else:
