@@ -28,6 +28,32 @@ NETWORK_GUARD = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_network_r
 CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
 CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED = False  # Strict production safety interlock.
 
+CISCO_RESULT_FILE = ("/private/var/run/twinconnect-cisco-route-guard/"
+                     "last-result.json")
+
+
+def record_cisco_result(reason: str) -> None:
+    """Record a sanitized result for remote troubleshooting; no credentials."""
+    if os.geteuid() != 0 or not re.fullmatch(r"CISCO_[A-Z0-9_]{3,60}", reason):
+        return
+    import stat
+    import time
+    root = os.path.dirname(CISCO_RESULT_FILE)
+    try:
+        info = os.stat(root)
+        if info.st_uid != 0 or not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o077:
+            return
+        fd = os.open(CISCO_RESULT_FILE, os.O_CREAT | os.O_TRUNC |
+                     os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"reason": reason, "timestamp": int(time.time())},
+                      stream)
+            stream.flush()
+    except OSError:
+        pass
+
+
+
 
 def trusted_script(path: str) -> bool:
     # Never let root launch the Homebrew copy owned by a normal user.
@@ -406,6 +432,7 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
                     initial_interfaces.get(k) != v
                     for k, v in cisco_tun_interfaces().items()):
                 egress_reason = cisco_verified_probe(initial_interfaces)
+                record_cisco_result(egress_reason)
                 print(json.dumps({"state": "cisco_egress_probe",
                                   "reason": egress_reason,
                                   "vpn_connected": False}), flush=True)
@@ -430,6 +457,7 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
                                    text=True, timeout=29, check=False)
         if activated.returncode or activated.stdout.strip() != "CISCO_SYSTEM_IPV4_CONNECTED":
             raise ValueError("CISCO_SYSTEM_ROUTE_ACTIVATION_FAILED")
+        record_cisco_result("CISCO_SYSTEM_IPV4_CONNECTED")
         print(json.dumps({"state": "connected",
                           "reason": "CISCO_SYSTEM_IPV4_CONNECTED",
                           "vpn_connected": True}), flush=True)
@@ -444,6 +472,7 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
                 raise ValueError("CISCO_SYSTEM_ROUTE_LEASE_LOST")
         raise ValueError("CISCO_ENGINE_EXITED")
     except KeyboardInterrupt:
+        record_cisco_result("CISCO_SYSTEM_DISCONNECTED")
         print(json.dumps({"state": "cisco_unrouted_probe_stopped",
                           "vpn_connected": False}), flush=True)
         return 0
@@ -492,6 +521,7 @@ def main() -> int:
         code = str(exc)
         if not re.fullmatch(r"CISCO_[A-Z0-9_]{3,60}", code):
             code = "CISCO_TUNNEL_FAILED"
+        record_cisco_result(code)
         print(json.dumps({"state": "error", "reason": code,
                           "vpn_connected": False}), flush=True)
         return 1
