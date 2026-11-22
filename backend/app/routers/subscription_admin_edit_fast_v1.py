@@ -269,17 +269,18 @@ async def admin_edit_subscription_fast_v1(
             # Same transaction as the edit. Do not delete cumulative
             # cursor baselines or historical accounting events.
             reset_subscription_period_usage(db, sub, origin="admin_edit")
-        if new_device_limit is not None:
+        # Reuse the same pending ORM row when both device and duration
+        # settings are updated in one request. Session.get() does not return
+        # an unflushed pending instance from its identity map.
+        override = None
+        if new_device_limit is not None or new_duration_days is not None or expiry_sent:
             override = db.get(SubscriptionRuntimeOverride, int(sub.id))
             if override is None:
                 override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
                 db.add(override)
+        if new_device_limit is not None:
             override.device_limit = new_device_limit
         if new_duration_days is not None or expiry_sent:
-            override = db.get(SubscriptionRuntimeOverride, int(sub.id))
-            if override is None:
-                override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
-                db.add(override)
             if new_duration_days is not None:
                 if new_duration_days == 0 and not (expiry_sent and new_expires_at):
                     # Zero or a cleared duration means unlimited: no expiry.
