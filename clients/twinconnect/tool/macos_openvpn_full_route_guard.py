@@ -73,11 +73,11 @@ def network_service_for_interface(interface: str) -> str | None:
         return None
     service = None
     for line in r.stdout.splitlines():
-        found = re.match(r"^\\(\\d+\\) (.+)$", line)
+        found = re.match(r"^\(\d+\) (.+)$", line)
         if found:
             service = found.group(1)
             continue
-        device = re.search(r"Device: ([A-Za-z0-9]+)\\)", line)
+        device = re.search(r"Device: ([A-Za-z0-9]+)\)", line)
         if device and device.group(1) == interface:
             return service if service and not service.startswith("*") else None
     return None
