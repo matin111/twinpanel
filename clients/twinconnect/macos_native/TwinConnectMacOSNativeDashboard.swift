@@ -1386,8 +1386,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
                "◉  OpenVPN · Tunnel only") :
-             (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")),
-            color: (localProxyActive || openVPNAppSessionActive) ? sea : muted))
+             (ciscoTunnelTask != nil ?
+              "◉  Cisco · Tunnel test" :
+              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))),
+            color: (localProxyActive || openVPNAppSessionActive ||
+                    ciscoTunnelTask != nil) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1592,7 +1595,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
-             (fullTunActive ? "TUN running · unverified" : "Disconnected")),
+             (ciscoTunnelTask != nil ? "Cisco · Tunnel test" :
+              (fullTunActive ? "TUN running · unverified" : "Disconnected"))),
             color: (localProxyActive || openVPNSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
