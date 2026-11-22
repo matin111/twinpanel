@@ -3762,9 +3762,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         }
                         self.openVPNAppSessionActive =
                             result.0 == 0 &&
-                            result.1 == "tunnel_established_unrouted"
+                            (result.1 == "tunnel_established_unrouted" ||
+                             result.1 == "tunnel_egress_verified_unrouted")
                         self.status = self.openVPNAppSessionActive ?
-                            "OpenVPN: tunnel active; system internet is NOT routed." :
+                            (result.1 == "tunnel_egress_verified_unrouted" ?
+                             "OpenVPN: tunnel HTTPS verified; system internet is NOT routed." :
+                             "OpenVPN: tunnel active; egress not verified.") :
                             "OpenVPN: " + result.1
                         self.view = self.build()
                     }
@@ -3809,12 +3812,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       self.activeProtocol == "openvpn",
                       !self.fullTunBusy else { return }
                 let active = result.0 == 0 &&
-                    result.1 == "tunnel_established_unrouted"
-                if active != self.openVPNAppSessionActive {
+                    (result.1 == "tunnel_established_unrouted" ||
+                     result.1 == "tunnel_egress_verified_unrouted")
+                let nextStatus = active ?
+                    (result.1 == "tunnel_egress_verified_unrouted" ?
+                     "OpenVPN: tunnel HTTPS verified; system internet is NOT routed." :
+                     "OpenVPN: tunnel active; egress not verified.") :
+                    "OpenVPN: " + result.1
+                if active != self.openVPNAppSessionActive ||
+                   self.status != nextStatus {
                     self.openVPNAppSessionActive = active
-                    self.status = active ?
-                        "OpenVPN: tunnel active; system internet is NOT routed." :
-                        "OpenVPN: " + result.1
+                    self.status = nextStatus
                     self.view = self.build()
                 }
             }
