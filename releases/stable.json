@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-22T03:45:28Z",
+  "released_at": "2026-11-22T04:03:35Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cc8c85d4fd46b853a96318ef2d5aa0ae23c182eb",
+  "source_sha": "17711d0d6c60c240e3e4755b532b9f745dc7d341",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.9/twinpanel-1.1.9-linux-x86_64.tar.gz",
-    "sha256": "a4e7ec7e1dadb9a8f8bf2972d86a71e8f24fbeace88e48641bce3735ee6052a1",
-    "size_bytes": 31415953
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.10/twinpanel-1.1.10-linux-x86_64.tar.gz",
+    "sha256": "2324bbd1e3a64f8ff857c39f5d093810a2d8ac692bb644af78162b6e50d2a962",
+    "size_bytes": 31416539
   },
   "notes": {
-    "fa": "اصلاح کامل متن مراحل تمدید در ربات: تمدید اکانت‌های معمولی و انتقالی پس از تأیید پرداخت رزرو می‌شود و پس از اتمام زمان یا حجم دوره فعلی فعال خواهد شد؛ متن خرید جدید جدا و فعال‌سازی خرید جدید بدون رزرو حفظ شده است. شامل اصلاحات کد تخفیف تمدید و حسابداری سریع Xray.",
-    "en": "Corrected normal and imported renewal checkout messaging: renewals reserve the next period until current quota or validity ends; new purchases retain distinct immediate provisioning messages. Includes renewal coupon and fast Xray accounting improvements."
+    "fa": "اصلاح خطای ذخیره ویرایش اشتراک، مرتب‌سازی گزارش ارسال همگانی ربات با آمار جداگانه، و حذف کامل اکانت نماینده با استفاده از مسیر حذف مرکزی و ثبت فرمان لغو دسترسی سرورها.",
+    "en": "Fix subscription admin edit runtime override, readable Telegram broadcast reports, and reseller subscription hard-deletion through the canonical server revocation path."
   }
 }
