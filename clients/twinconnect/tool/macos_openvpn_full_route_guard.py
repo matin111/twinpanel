@@ -512,6 +512,12 @@ def main() -> int:
             result = connect()
         elif args == ["heartbeat"]:
             result = heartbeat()
+            if result != "IPV4_FULL_ROUTE_CONNECTED":
+                # Never leave a known-broken leased route in place until the
+                # watchdog's TTL. Recover immediately on a lost management
+                # bypass, dead worker, route loss or changed Connector edge.
+                recovered = rollback()
+                result = result + "_" + recovered
         elif args == ["trial", "auto"]:
             endpoint = observed_openvpn_endpoint()
             result = trial(endpoint) if endpoint else "OPENVPN_ENDPOINT_NOT_OBSERVED"
