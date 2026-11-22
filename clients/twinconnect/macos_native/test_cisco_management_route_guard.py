@@ -62,6 +62,60 @@ class CiscoManagementGuardTests(unittest.TestCase):
             self.assertEqual(guard.trial(), "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS")
             self.assertEqual(guard.load()["peers"], ["8.8.8.8"])
 
+    def test_probe_host_pins_only_one_fixed_destination(self):
+        from subprocess import CompletedProcess
+        seen = set()
+        commands = []
+        def fake_run(*args):
+            commands.append(args)
+            if args[:2] == ("/sbin/ifconfig", "-l"):
+                return ok("lo0 en0 utun4")
+            if args[:2] == ("/sbin/ifconfig", "utun4"):
+                return ok("utun4: flags=8051\n    inet 10.91.0.63 --> 10.91.0.63\n")
+            if "-host" in args and "add" in args:
+                seen.add("1.1.1.1")
+            return ok()
+        def fake_route(ip):
+            if ip == "1.1.1.1" and ip in seen:
+                return {"interface": "utun4"}
+            return {"interface": "en0", "gateway": "185.236.39.33"}
+        with patch.object(guard, "preflight", return_value=(
+                "CISCO_MANAGEMENT_PRECHECK_READY", ["188.114.97.3"],
+                "185.236.39.33", "en0")), \
+             patch.object(guard, "run", side_effect=fake_run), \
+             patch.object(guard, "route", side_effect=fake_route), \
+             patch.object(guard, "exact_routes", side_effect=lambda: set(seen)):
+            self.assertEqual(guard.probe_host("utun4"),
+                             "CISCO_HOST_EGRESS_TRIAL_ACTIVE")
+        self.assertEqual(guard.load()["probe_dest"], "1.1.1.1")
+        self.assertEqual(guard.load()["probe_interface"], "utun4")
+        self.assertEqual(
+            [c for c in commands if "-host" in c and "add" in c],
+            [("/sbin/route", "-n", "add", "-host", "1.1.1.1",
+              "-interface", "utun4")])
+
+    def test_probe_rejects_physical_interface_without_routing(self):
+        with patch.object(guard, "run") as commands:
+            self.assertEqual(guard.probe_host("en0"),
+                             "CISCO_PROBE_INTERFACE_INVALID")
+            commands.assert_not_called()
+
+    def test_probe_host_watchdog_rolls_back_only_own_route(self):
+        guard.store({"peers": [], "gateway": "185.236.39.33",
+                     "interface": "en0", "deadline": 0,
+                     "probe_dest": "1.1.1.1", "probe_interface": "utun4"})
+        observed = {"1.1.1.1"}
+        def fake_run(*args):
+            if "delete" in args:
+                observed.clear()
+            return ok()
+        with patch.object(guard, "run", side_effect=fake_run), \
+             patch.object(guard, "exact_routes", side_effect=lambda: observed), \
+             patch.object(guard, "route", return_value={"interface": "utun4"}):
+            self.assertEqual(guard.rollback(),
+                             "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED")
+        self.assertFalse(guard.STATE.exists())
+
     def test_rollback_only_own_matching_host_route(self):
         guard.store({"peers": ["8.8.8.8"], "gateway": "185.236.39.33",
                      "interface": "en0", "deadline": 0})
