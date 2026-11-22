@@ -293,13 +293,55 @@ def watch(parent_pid: int, deadline_seconds: int) -> None:
             restore()
 
 
+def readiness() -> dict:
+    """Read-only Cisco admission report; never enables the tunnel.
+
+    A console-test management marker is not a safe route on a remote VPS.
+    Keep real Cisco disabled until its connection worker can pin BOTH the
+    server endpoint and the public Connector egress and restore static IPv4.
+    """
+    data = capture()
+    issues = []
+    if CHECKPOINT.exists():
+        issues.append("CISCO_NETWORK_CHECKPOINT_EXISTS")
+    config = BASE / "management_ipv4"
+    try:
+        marker = config.read_text().strip()
+    except OSError:
+        marker = ""
+    if marker in ("", "console-test", "desktop"):
+        issues.append("CISCO_REMOTE_MANAGEMENT_NOT_PINNED")
+    else:
+        try:
+            candidate = ipaddress.IPv4Address(marker)
+            if not candidate.is_global:
+                issues.append("CISCO_MANAGEMENT_IP_INVALID")
+        except ValueError:
+            issues.append("CISCO_MANAGEMENT_IP_INVALID")
+    # OpenVPN and Cisco must not own the same system routing concurrently.
+    vpn_guard = Path(
+        "/private/var/run/twinconnect-full-route-guard/state.json")
+    if vpn_guard.exists():
+        issues.append("CISCO_CONCURRENT_VPN_ROUTE_REFUSED")
+    # Inform the caller that network recovery works, not that production
+    # Cisco is authorized to modify the VPS network.
+    return {"state": "CISCO_PRECHECK_BLOCKED" if issues else
+            "CISCO_NETWORK_BASELINE_READY",
+            "network_mode": data["mode"],
+            "recovery_checkpoint_clear": not CHECKPOINT.exists(),
+            "reasons": issues,
+            "vpn_connected": False}
+
+
 def main():
     try:
         if ((len(sys.argv) != 2 and len(sys.argv) != 4) or
-            sys.argv[1] not in {"inspect", "snapshot", "restore", "watch"} or
+            sys.argv[1] not in {"inspect", "readiness", "snapshot", "restore", "watch"} or
             (sys.argv[1] == "watch") != (len(sys.argv) == 4)):
             raise ValueError("CISCO_NETWORK_ACTION_INVALID")
-        if sys.argv[1] == "inspect":
+        if sys.argv[1] == "readiness":
+            print(json.dumps(readiness(), sort_keys=True))
+        elif sys.argv[1] == "inspect":
             value = capture()
             print(json.dumps({"state": "CISCO_NETWORK_READY",
                               "interface": value["interface"],
