@@ -259,16 +259,93 @@ def run(profile: dict, management_ip: str) -> int:
                 restore_network()
 
 
+def probe_unrouted(profile: dict) -> int:
+    """One-minute Cisco tunnel experiment WITHOUT changing system routes.
+
+    The only privileged child network edit is the root-owned utun-only
+    vpnc script. This does not certify full-device VPN, and the production
+    Cisco gate remains closed. Keep the original uplink under observation
+    to stop the candidate if any unexpected route change occurs.
+    """
+    if os.geteuid() != 0:
+        raise ValueError("CISCO_ROOT_REQUIRED")
+    script = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_unrouted_vpnc.py"
+    if not trusted_script(script):
+        raise ValueError("CISCO_UNROUTED_SCRIPT_UNTRUSTED")
+    if not os.path.isfile(ISOLATED_OPENCONNECT) or not os.access(
+            ISOLATED_OPENCONNECT, os.X_OK):
+        raise ValueError("CISCO_ISOLATED_OPENCONNECT_MISSING")
+    if not trusted_openconnect_dependencies(ISOLATED_OPENCONNECT):
+        raise ValueError("CISCO_UNTRUSTED_OPENCONNECT_DEPENDENCIES")
+    if not profile.get("servercert"):
+        raise ValueError("CISCO_PIN_REQUIRED_FOR_TUNNEL")
+    baseline = subprocess.run(
+        [ROUTE, "-n", "get", "default"], capture_output=True, text=True,
+        timeout=5, check=False)
+    if baseline.returncode:
+        raise ValueError("CISCO_BASELINE_ROUTE_UNAVAILABLE")
+    original = dict(ROUTE_GET.findall(baseline.stdout))
+    if not original.get("gateway") or not re.fullmatch(
+            r"en[0-9]{1,3}", original.get("interface", "")):
+        raise ValueError("CISCO_BASELINE_ROUTE_UNSAFE")
+    cmd = [
+        ISOLATED_OPENCONNECT, "--protocol=anyconnect", "--no-proxy",
+        "--non-inter", "--passwd-on-stdin", "--no-system-trust",
+        "--user=" + profile["username"],
+        "--servercert=" + profile["servercert"], "--script=" + script,
+        "https://" + profile["host"] + ":" + str(profile["port"])
+    ]
+    child = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        assert child.stdin is not None
+        child.stdin.write((profile["password"] + "\n").encode())
+        child.stdin.close()
+        print(json.dumps({"state": "cisco_unrouted_probe_started",
+                          "vpn_connected": False}), flush=True)
+        import time
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            if child.poll() is not None:
+                raise ValueError("CISCO_UNROUTED_ENGINE_EXITED")
+            current = subprocess.run(
+                [ROUTE, "-n", "get", "default"], capture_output=True,
+                text=True, timeout=5, check=False)
+            if current.returncode or dict(ROUTE_GET.findall(current.stdout)) != original:
+                raise ValueError("CISCO_UNROUTED_ROUTE_CHANGED")
+            time.sleep(1)
+        print(json.dumps({"state": "cisco_unrouted_probe_completed",
+                          "vpn_connected": False}), flush=True)
+        return 0
+    finally:
+        if child.poll() is None:
+            try:
+                os.killpg(child.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                child.wait(timeout=6)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                child.wait(timeout=5)
+
+
 def main() -> int:
     try:
-        if len(sys.argv) != 3 or sys.argv[1] != "connect":
+        if sys.argv[1:] != ["probe"] and (
+                len(sys.argv) != 3 or sys.argv[1] != "connect"):
             raise ValueError("CISCO_INVALID_ACTION")
-        management_ip = sys.argv[2]
-        # Validation before any privileged route or tunnel change.
+        # Validation before any privileged network operation.
         profile = validate(sys.stdin.buffer.read(16385))
         if not profile.get("servercert"):
             raise ValueError("CISCO_PIN_REQUIRED_FOR_TUNNEL")
-        return run(profile, management_ip)
+        if sys.argv[1:] == ["probe"]:
+            return probe_unrouted(profile)
+        return run(profile, sys.argv[2])
     except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
         code = str(exc)
         if not re.fullmatch(r"CISCO_[A-Z0-9_]{3,60}", code):
