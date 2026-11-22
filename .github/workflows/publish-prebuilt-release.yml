@@ -107,6 +107,7 @@ jobs:
             "backend/app/telegram_runtime_bot.py" \
             "backend/app/telegram_subscription_import_bot_v1.py" \
             "backend/app/telegram_renewal_catalog_main_v1.py" \
+            "backend/app/telegram_checkout_copy_v1.py" \
             "backend/app/routers/discounts.py" \
             "backend/tests/test_telegram_renewal_discount_wiring_v1.py" \
             "backend/tests/test_imported_renewal_coupon_checkout_v1.py"; do
