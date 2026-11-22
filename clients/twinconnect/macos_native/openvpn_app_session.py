@@ -106,7 +106,8 @@ def pid_running(pid: object) -> bool:
 def status() -> str:
     data = read_state()
     state = data.get("state", "stopped")
-    if state in ("starting", "tunnel_established_unrouted"):
+    if state in ("starting", "tunnel_established_unrouted",
+                 "tunnel_egress_verified_unrouted"):
         if not pid_running(data.get("worker_pid")):
             return "OPENVPN_WORKER_EXITED"
         if time.time() >= data.get("deadline", 0):
@@ -148,10 +149,43 @@ def state_write(state: str, worker_pid: int, deadline: float) -> None:
     }).encode())
 
 
+def utun_interfaces() -> set[str]:
+    """Observe utun interfaces without touching default routing."""
+    try:
+        result = subprocess.run(["/sbin/ifconfig", "-l"],
+                                capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    if result.returncode:
+        return set()
+    return {name for name in result.stdout.split()
+            if name.startswith("utun") and name[4:].isdigit()}
+
+
+def tunnel_https_probe(interface: str) -> bool:
+    """Bind one HTTPS request to the new utun; do not add routes or DNS."""
+    if interface not in utun_interfaces():
+        return False
+    try:
+        result = subprocess.run([
+            "/usr/bin/curl", "--interface", "if!" + interface,
+            "--noproxy", "*", "--connect-timeout", "5",
+            "--max-time", "10", "--fail", "--silent",
+            "https://1.1.1.1/cdn-cgi/trace",
+        ], capture_output=True, timeout=12)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if result.returncode != 0 or len(result.stdout) > 4096:
+        return False
+    return any(line.startswith(b"ip=") and 6 <= len(line) <= 68
+               for line in result.stdout.splitlines())
+
+
 def worker() -> int:
     source = CONFIG
     engine = next((p for p in ENGINES if p.is_file() and os.access(p, os.X_OK)), None)
     before = default_route()
+    before_utun = utun_interfaces()
     deadline = time.time() + MAX_SESSION_SECONDS
     if engine is None or before is None or not source.is_file():
         state_write("OPENVPN_ENGINE_OR_ROUTE_MISSING", os.getpid(), deadline)
@@ -165,6 +199,7 @@ def worker() -> int:
             ], stdin=subprocess.DEVNULL, stdout=log,
                 stderr=subprocess.STDOUT, start_new_session=True)
             handshake = False
+            egress_checked = False
             while time.time() < deadline and not STOP.exists():
                 if default_route() != before:
                     state_write("OPENVPN_ROUTE_CHANGED_STOPPED",
@@ -191,6 +226,12 @@ def worker() -> int:
                             if pattern.encode() in log_bytes:
                                 state_write(reason, os.getpid(), deadline)
                                 return 2
+                if handshake and not egress_checked:
+                    egress_checked = True
+                    added = sorted(utun_interfaces() - before_utun)
+                    if len(added) == 1 and tunnel_https_probe(added[0]):
+                        state_write("tunnel_egress_verified_unrouted",
+                                    os.getpid(), deadline)
                 time.sleep(0.5)
             if not handshake and not STOP.exists():
                 state_write("OPENVPN_HANDSHAKE_TIMEOUT",
@@ -211,7 +252,8 @@ def start() -> int:
         return 2
     lock = locked()
     try:
-        if status() in ("starting", "tunnel_established_unrouted"):
+        if status() in ("starting", "tunnel_established_unrouted",
+                        "tunnel_egress_verified_unrouted"):
             output("OPENVPN_ALREADY_RUNNING")
             return 2
         # A dead worker may leave files; never wipe an active process's data.
@@ -239,7 +281,8 @@ def start() -> int:
         current = status()
         if current != "starting":
             output(current)
-            return 0 if current == "tunnel_established_unrouted" else 1
+            return 0 if current in ("tunnel_established_unrouted",
+                                    "tunnel_egress_verified_unrouted") else 1
         time.sleep(0.5)
     STOP.touch(mode=0o600)
     output("OPENVPN_HANDSHAKE_TIMEOUT")
@@ -248,7 +291,8 @@ def start() -> int:
 
 def stop() -> int:
     current = status()
-    if current not in ("starting", "tunnel_established_unrouted"):
+    if current not in ("starting", "tunnel_established_unrouted",
+                        "tunnel_egress_verified_unrouted"):
         output("stopped")
         return 0
     STOP.touch(mode=0o600)
