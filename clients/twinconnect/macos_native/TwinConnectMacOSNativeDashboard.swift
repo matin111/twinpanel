@@ -593,6 +593,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
     private var openVPNAppSessionActive = false
+    private var openVPNSystemRouteVerified = false
     private var openVPNAppStatusPollAt = Date.distantPast
     private var fullTunBusy = false
     private var fullTunStatusPollBusy = false
@@ -1375,7 +1376,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
             localProxyActive ? "◉  " + connectedProtocolTitle + " proxy active" :
-            (openVPNAppSessionActive ? "◉  OpenVPN · Tunnel only" :
+            (openVPNAppSessionActive ?
+              (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
+               "◉  OpenVPN · Tunnel only") :
              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")),
             color: (localProxyActive || openVPNAppSessionActive) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
@@ -1567,7 +1570,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
-            (openVPNAppSessionActive ? "Tunnel only" :
+            (openVPNAppSessionActive ?
+              (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
              (fullTunActive ? "TUN running · unverified" : "Disconnected")),
             color: localProxyActive ? sea : muted))
         content.addArrangedSubview(header)
@@ -2816,6 +2820,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // The root daemon independently enforces TUN ownership.
         fullTunActive = false
         openVPNAppSessionActive = false
+        openVPNSystemRouteVerified = false
         fullTunBusy = false
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
@@ -3657,7 +3662,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func runOpenVPNAppSession(_ action: String, profile: Data? = nil)
         -> (Int32, String) {
-        guard ["start", "stop", "status"].contains(action) else {
+        guard ["start", "connect", "stop", "status"].contains(action) else {
             return (1, "OPENVPN_INVALID_ACTION")
         }
         let script = "/Library/PrivilegedHelperTools/TwinConnectOpenVPN/" +
@@ -3713,9 +3718,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             case .success(let profile):
                 DispatchQueue.global(qos: .userInitiated).async {
                     let valid = self.reviewOpenVPNProfile(profile)
-                    let result = valid ?
+                    let started = valid ?
                         self.runOpenVPNAppSession("start", profile: profile) :
                         (1, "OPENVPN_PROFILE_REJECTED")
+                    let result: (Int32, String)
+                    if started.0 == 0 {
+                        result = self.runOpenVPNAppSession("connect")
+                        if result.0 != 0 {
+                            // Never leave an orphaned unrouted tunnel after a
+                            // failed attempt to activate verified system VPN.
+                            _ = self.runOpenVPNAppSession("stop")
+                        }
+                    } else {
+                        result = started
+                    }
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.fullTunBusy = false
@@ -3729,15 +3745,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             }
                             return
                         }
-                        self.openVPNAppSessionActive =
-                            result.0 == 0 &&
-                            (result.1 == "tunnel_established_unrouted" ||
-                             result.1 == "tunnel_egress_verified_unrouted")
-                        self.status = self.openVPNAppSessionActive ?
-                            (result.1 == "tunnel_egress_verified_unrouted" ?
-                             "OpenVPN: tunnel HTTPS verified; system internet is NOT routed." :
-                             "OpenVPN: tunnel active; egress not verified.") :
-                            "OpenVPN: " + result.1
+                        self.openVPNSystemRouteVerified =
+                            result.0 == 0 && result.1 == "connected"
+                        self.openVPNAppSessionActive = self.openVPNSystemRouteVerified
+                        self.status = self.openVPNSystemRouteVerified ?
+                            "Connected · OpenVPN" : "OpenVPN: " + result.1
                         self.view = self.build()
                     }
                 }
@@ -3758,7 +3770,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.fullTunBusy = false
                 if result.0 == 0 && result.1 == "stopped" {
                     self.openVPNAppSessionActive = false
-                    self.status = "OpenVPN: tunnel stopped."
+                    self.openVPNSystemRouteVerified = false
+                    self.status = "OpenVPN: disconnected."
                 } else {
                     self.status = "OpenVPN: " + result.1
                 }
@@ -3768,7 +3781,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func refreshOpenVPNAppSession() {
-        guard accountSession != nil, activeProtocol == "openvpn",
+        guard accountSession != nil,
               openVPNAppSessionInstalled(), !fullTunBusy,
               Date().timeIntervalSince(openVPNAppStatusPollAt) >= 5
         else { return }
@@ -3777,20 +3790,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             guard let self = self else { return }
             let result = self.runOpenVPNAppSession("status")
             DispatchQueue.main.async { [weak self] in
-                guard let self = self,
-                      self.activeProtocol == "openvpn",
-                      !self.fullTunBusy else { return }
+                guard let self = self, !self.fullTunBusy else { return }
                 let active = result.0 == 0 &&
-                    (result.1 == "tunnel_established_unrouted" ||
+                    (result.1 == "connected" ||
+                     result.1 == "tunnel_established_unrouted" ||
                      result.1 == "tunnel_egress_verified_unrouted")
-                let nextStatus = active ?
-                    (result.1 == "tunnel_egress_verified_unrouted" ?
-                     "OpenVPN: tunnel HTTPS verified; system internet is NOT routed." :
-                     "OpenVPN: tunnel active; egress not verified.") :
-                    "OpenVPN: " + result.1
+                let routed = result.0 == 0 && result.1 == "connected"
+                let nextStatus = routed ? "Connected · OpenVPN" :
+                    (active ? "OpenVPN tunnel only · not system VPN" :
+                     "OpenVPN: " + result.1)
                 if active != self.openVPNAppSessionActive ||
+                   routed != self.openVPNSystemRouteVerified ||
                    self.status != nextStatus {
                     self.openVPNAppSessionActive = active
+                    self.openVPNSystemRouteVerified = routed
                     self.status = nextStatus
                     self.view = self.build()
                 }
