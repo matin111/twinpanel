@@ -75,11 +75,24 @@ def check() -> dict:
     current_test = route(IPV4_TRACE)
     checks["test_route"] = current_test or "UNAVAILABLE"
     checks["ipv6_default"] = route("default", ipv6=True) or "UNAVAILABLE"
-    # Full tunnel must account for IPv6 and DNS; these remain gated.
-    checks["server_endpoint_bypass"] = "NOT_CONFIGURED"
+    # Report the live state of the independently installed rollback guard
+    # instead of an obsolete constant. This does not enable routing.
+    guard = Path("/Library/PrivilegedHelperTools/TwinConnectFullRouteGuard/macos_openvpn_full_route_guard.py")
+    if guard.is_file():
+        try:
+            guard_status = run(["/usr/bin/python3", str(guard), "status"])
+            if guard_status.returncode == 0:
+                parsed = json.loads(guard_status.stdout)
+                checks["independent_full_route_rollback"] = parsed.get("state", "UNKNOWN")
+            else:
+                checks["independent_full_route_rollback"] = "NOT_READY"
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            checks["independent_full_route_rollback"] = "NOT_READY"
+    else:
+        checks["independent_full_route_rollback"] = "NOT_INSTALLED"
+    checks["server_endpoint_bypass"] = "NOT_ACTIVE"
     checks["dns_restore"] = "NOT_IMPLEMENTED"
-    checks["ipv6_policy"] = "NOT_IMPLEMENTED"
-    checks["independent_full_route_rollback"] = "NOT_IMPLEMENTED"
+    checks["ipv6_policy"] = "NO_DEFAULT" if checks["ipv6_default"] == "UNAVAILABLE" else "REQUIRES_POLICY"
     checks["app_full_tunnel_integration"] = "NOT_IMPLEMENTED"
     return {"ready": False, "checks": checks,
             "message": "FULL_TUNNEL_BLOCKED_UNTIL_SAFE_ROUTING_IMPLEMENTED"}
