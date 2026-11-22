@@ -27,6 +27,13 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn("self.fullTunActive = false", section)
         self.assertIn("System VPN not connected.", section)
 
+    def test_openvpn_progress_and_errors_are_visible_beside_button(self):
+        section = DASHBOARD.split("private func connectPage()", 1)[1]
+        section = section.split("private func ", 1)[0]
+        self.assertIn('if activeProtocol == "openvpn" {', section)
+        self.assertIn('status.hasPrefix("OpenVPN")', section)
+        self.assertIn('main.addArrangedSubview(connectionFeedback)', section)
+
     def test_root_probe_uses_fixed_path_and_bounded_runtime(self):
         self.assertIn("/Library/PrivilegedHelperTools/TwinConnectOpenVPN", INSTALLER)
         self.assertIn("NOPASSWD: /usr/bin/python3 %s --stdin", INSTALLER)
