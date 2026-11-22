@@ -1847,7 +1847,7 @@ async def subscription_renew_plan(callback: CallbackQuery):
         f"🔄 <b>تمدید اشتراک #{sub_id}</b>\n\n"
         f"📦 پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
         f"💳 مبلغ: <b>{_fmt_money(plan.get('price_toman'))} تومان</b>\n\n"
-        "پس از پرداخت، تمدید برای دوره بعد رزرو می‌شود. "
+        "پس از تأیید پرداخت، تمدید برای دوره بعد رزرو می‌شود و پس از پایان زمان یا حجم اشتراک فعلی، خودکار فعال می‌شود. "
         "نام کاربری، رمز، دستگاه‌های مجاز و پروتکل‌های موجود تغییر نمی‌کنند.",
         reply_markup=renewal_confirm_keyboard(sub_id, plan_id, nonce),
     )
@@ -2889,7 +2889,7 @@ async def _telegram_notification_worker(bot):
                     days = int(payload.get("duration_days") or 0)
                     lines = [
                         "✅ <b>تمدید اشتراک فعال شد</b>" if is_active
-                        else "✅ <b>تمدید اشتراک با موفقیت ثبت شد</b>",
+                        else "✅ <b>تمدید دوره بعد رزرو شد</b>",
                         "",
                         f"👤 اکانت: <code>{username}</code>",
                         f"📦 پلن: <b>{plan}</b>",
