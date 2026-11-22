@@ -173,8 +173,13 @@ def main() -> int:
         return 1
     try:
         reviewed = review(raw.decode("utf-8", errors="strict"))
-    except (ValueError, UnicodeError):
-        print(json.dumps({"state": "rejected"}))
+    except (ValueError, UnicodeError) as error:
+        # Only our own fixed symbolic codes are exposed, never certificate,
+        # passwords, file paths or raw input from the user profile.
+        reason = str(error)
+        if not re.fullmatch(r"OVPN_[A-Z_]{3,64}", reason):
+            reason = "OVPN_PROFILE_REJECTED"
+        print(json.dumps({"state": "rejected", "reason": reason}))
         return 1
     print(json.dumps({
         "state": reviewed["state"], "connected": False,
