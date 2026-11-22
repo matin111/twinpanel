@@ -97,6 +97,43 @@ jobs:
           grep -q 'wallet_credit_status' source/backend/app/routers/wallet_payment_v2.py
           grep -q 'subscriptionId:number|null' source/components/payments-review-runtime.tsx
 
+      - name: Preserve customer and imported renewal coupon checkout in release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # A pinned candidate from before the coupon hotfix must not
+          # overwrite the verified live Telegram renewal checkout.
+          for path in \
+            "backend/app/telegram_runtime_bot.py" \
+            "backend/app/telegram_subscription_import_bot_v1.py" \
+            "backend/app/routers/discounts.py" \
+            "backend/tests/test_telegram_renewal_discount_wiring_v1.py" \
+            "backend/tests/test_imported_renewal_coupon_checkout_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path" || {
+              echo "::error file=$path::Renewal coupon protection is missing from release source"
+              exit 1
+            }
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would revert renewal coupons for regular or imported accounts. Pin a newer candidate containing the fix."
+              exit 1
+            }
+          done
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          for filename in (
+              "test_telegram_renewal_discount_wiring_v1.py",
+              "test_imported_renewal_coupon_checkout_v1.py",
+          ):
+              path = Path("source/backend/tests") / filename
+              spec = importlib.util.spec_from_file_location(path.stem, path)
+              module = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(module)
+              for name in sorted(key for key in vars(module) if key.startswith("test_")):
+                  getattr(module, name)()
+          print("Renewal coupon release protection passed")
+          PY
+
       - name: Protect nonblocking subscription creation in pinned release
         shell: bash
         run: |
