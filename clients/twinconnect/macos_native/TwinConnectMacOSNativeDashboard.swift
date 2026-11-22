@@ -1390,7 +1390,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let fabric = TwinNativeNetworkFabric(frame:
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
-        fabric.proxyActive = localProxyActive
+        fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified
         fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
@@ -1414,8 +1414,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             (activeProtocol != "cisco" || ciscoTunnelTask != nil)
-        connect.toolTip = activeProtocol == "openvpn" && openVPNAppSessionActive ?
-            "OpenVPN tunnel running without default-route import; Disconnect stops it." :
+        connect.toolTip = activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
+            "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
+            activeProtocol == "openvpn" && openVPNAppSessionActive ?
+            "OpenVPN tunnel only; system routing not active." :
             activeProtocol == "openvpn" && !fullTunServicePresent() ?
             "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
@@ -1573,7 +1575,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
              (fullTunActive ? "TUN running · unverified" : "Disconnected")),
-            color: localProxyActive ? sea : muted))
+            color: (localProxyActive || openVPNSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
