@@ -1415,12 +1415,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
+                             (ciscoTunnelTask != nil ? "Stop Test" :
+                              (ciscoSafetyHold ? "Test Cisco" : "Connect")) :
                              (localProxyActive || fullTunActive || openVPNAppSessionActive ?
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
-            (activeProtocol != "cisco" || ciscoTunnelTask != nil)
+            !ciscoTunnelBusy
         connect.toolTip = activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
             "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
             activeProtocol == "openvpn" && openVPNAppSessionActive ?
@@ -1428,7 +1429,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             activeProtocol == "openvpn" && !fullTunServicePresent() ?
             "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
-            "Disabled after macOS network configuration loss; network recovery must be verified first." :
+            "Safe, time-limited Cisco utun-only test. No system routing or DNS changes." :
             (fullTunActive ? "TUN engine started; network egress NOT verified." :
                 (fullTunServicePresent() ? "Experimental local-console TUN service." :
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
@@ -1475,6 +1476,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 connectionFeedback.widthAnchor.constraint(
                     lessThanOrEqualTo: main.widthAnchor).isActive = true
             }
+        }
+        if activeProtocol == "cisco" {
+            let message = ciscoTunnelStatus.isEmpty ?
+                "Cisco test mode only · system VPN not enabled" :
+                ciscoTunnelStatus
+            let feedback = text(message, size: 12, color: muted)
+            main.addArrangedSubview(feedback)
+            feedback.widthAnchor.constraint(
+                lessThanOrEqualTo: main.widthAnchor).isActive = true
         }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
@@ -3046,11 +3056,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             view = build()
             return
         }
-        if ciscoSafetyHold {
-            ciscoTunnelStatus = "CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY"
-            view = build()
-            return
-        }
+        // Keep production Cisco gated. The test instead uses a separate
+        // no-route/no-DNS OpenConnect script and never labels it as VPN.
         guard !ciscoTunnelBusy, let session = accountSession,
               let serverID = activeServer,
               snapshot?.protocols.contains(where: {
@@ -3070,9 +3077,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let configured = try? String(contentsOfFile:
             "/Library/PrivilegedHelperTools/TwinConnectCisco/management_ipv4",
             encoding: .utf8)
-        let mgmt = configured?.trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? ""
-        guard mgmt == "desktop" || mgmt == "console-test" || mgmt.range(of:
+        let mgmt = ciscoSafetyHold ? "unrouted-probe" :
+            (configured?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        guard mgmt == "unrouted-probe" || mgmt == "desktop" ||
+              mgmt == "console-test" || mgmt.range(of:
             "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
             options: .regularExpression) != nil else {
             ciscoTunnelStatus = "CISCO_MANAGEMENT_ROUTE_NOT_CONFIGURED"
@@ -3116,8 +3124,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // An administrator must explicitly authorize this fixed root-owned command.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-        task.arguments = ["-n", "/usr/bin/python3", helper, "connect",
-                          managementIP]
+        task.arguments = managementIP == "unrouted-probe" ?
+            ["-n", "/usr/bin/python3", helper, "probe"] :
+            ["-n", "/usr/bin/python3", helper, "connect", managementIP]
         let input = Pipe()
         let output = Pipe()
         task.standardInput = input
@@ -3132,9 +3141,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if self.ciscoTunnelGeneration == generation {
                     self.ciscoTunnelTask = task
                     self.ciscoTunnelBusy = false
-                    self.ciscoTunnelStatus = managementIP == "console-test" ?
-                        "Cisco console trial: automatic stop after 120s; VPN unverified." :
-                        "Cisco starting; VPN not verified."
+                    self.ciscoTunnelStatus = managementIP == "unrouted-probe" ?
+                        "Cisco TUN test (60s) · system VPN not enabled" :
+                        (managementIP == "console-test" ?
+                         "Cisco console trial: automatic stop after 120s; VPN unverified." :
+                         "Cisco starting; VPN not verified.")
                     self.view = self.build()
                 } else { task.terminate() }
             }
@@ -3148,7 +3159,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     with: Data(line.utf8)) as? [String: Any] else { return nil }
                 return obj["reason"] as? String
             }
-            let reason = states.last ?? "CISCO_TUNNEL_STOPPED"
+            let reason = states.last ?? (
+                managementIP == "unrouted-probe" ?
+                (task.terminationStatus == 0 ?
+                 "CISCO_UNROUTED_TEST_FINISHED" :
+                 "CISCO_UNROUTED_TEST_FAILED") :
+                "CISCO_TUNNEL_STOPPED")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self,
                       self.ciscoTunnelGeneration == generation else { return }
