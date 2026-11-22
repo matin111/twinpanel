@@ -135,6 +135,20 @@ def trial(endpoint: str) -> str:
     original = get_route(endpoint)
     if original.get("interface") != default.get("interface"):
         return "ENDPOINT_ROUTE_NOT_ON_BASELINE"
+    # The rollback logic can remove only a route created by this trial.
+    # Refuse an existing exact host route instead of overwriting it.
+    routing_table = run("/usr/sbin/netstat", "-rn", "-f", "inet")
+    if routing_table.returncode:
+        return "ROUTING_TABLE_UNAVAILABLE"
+    for line in routing_table.stdout.splitlines():
+        fields = line.split()
+        if fields and fields[0] in (endpoint, endpoint + "/32"):
+            return "EXISTING_ENDPOINT_HOST_ROUTE_REFUSED"
+    # This remote Mac must retain its management connectivity. Until the
+    # initiating management peer can be pinned and recovered independently,
+    # deny full-route trials rather than risk sending SSH return traffic
+    # through the VPN.
+    return "REMOTE_MANAGEMENT_ROUTE_PROTECTION_NOT_IMPLEMENTED"
     gateway = default["gateway"]
     # Avoid masking an existing VPN or special-purpose split route.
     for dest in ("1.0.0.1", "129.0.0.1"):
