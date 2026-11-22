@@ -81,7 +81,25 @@ def rollback() -> str:
 
 
 def trial(interface: str) -> str:
-    if not re.fullmatch(r"utun[0-9]{1,4}", interface) or interface not in active_interfaces():
+    if interface == "auto":
+        # Resolve the tunnel only from TwinConnect's root-only authenticated
+        # OpenVPN worker state; never guess among macOS-owned utun devices.
+        source = Path("/private/var/run/twinconnect-openvpn-app/state.json")
+        try:
+            session = json.loads(source.read_text())
+            worker_pid = session["worker_pid"]
+            if (session["state"] not in (
+                    "tunnel_established_unrouted",
+                    "tunnel_egress_verified_unrouted") or
+                    time.time() >= session["deadline"] or
+                    not isinstance(worker_pid, int) or worker_pid <= 1):
+                return "OPENVPN_SESSION_NOT_ACTIVE"
+            os.kill(worker_pid, 0)
+            interface = session["interface"]
+        except (OSError, KeyError, ValueError, TypeError):
+            return "OPENVPN_SESSION_NOT_READY"
+    if not isinstance(interface, str) or not re.fullmatch(
+            r"utun[0-9]{1,4}", interface) or interface not in active_interfaces():
         return "INVALID_UTUN"
     # The rollback service must already be loaded and running BEFORE trial.
     try:
