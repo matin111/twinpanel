@@ -311,6 +311,26 @@ def probe_host(interface: str) -> str:
     return "CISCO_HOST_EGRESS_TRIAL_ACTIVE"
 
 
+def stop_system() -> str:
+    """Disconnect a verified Cisco worker, not arbitrary OpenConnect PIDs."""
+    current = load()
+    pid = current.get("worker_pid")
+    # Restore network first while the TUN can still carry traffic.
+    recovered = rollback()
+    if recovered not in ("CISCO_MANAGEMENT_PIN_IDLE",
+                         "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED"):
+        return recovered
+    if isinstance(pid, int) and pid > 1:
+        command = run("/bin/ps", "-p", str(pid), "-o", "command=")
+        if command.returncode == 0 and command.stdout.strip().startswith(
+                OPENCONNECT_BIN + " "):
+            try:
+                os.kill(pid, 15)
+            except ProcessLookupError:
+                pass
+    return "CISCO_SYSTEM_DISCONNECTED"
+
+
 def network_service(interface: str) -> str | None:
     response = run(NETWORKSETUP, "-listnetworkserviceorder")
     if response.returncode:
@@ -535,6 +555,8 @@ def main() -> int:
             result = probe_host(sys.argv[2])
         elif sys.argv[1:] == ["rollback"]:
             result = rollback()
+        elif sys.argv[1:] == ["stop"]:
+            result = stop_system()
         else:
             result = "CISCO_MANAGEMENT_ACTION_INVALID"
     print(result, flush=True)
@@ -544,6 +566,7 @@ def main() -> int:
         "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS",
         "CISCO_HOST_EGRESS_TRIAL_ACTIVE",
         "CISCO_SYSTEM_IPV4_CONNECTED",
+        "CISCO_SYSTEM_DISCONNECTED",
         "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED") else 1
 
 
