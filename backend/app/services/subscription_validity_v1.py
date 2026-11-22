@@ -27,15 +27,18 @@ def add_validity_days(
     effective_days = stored_days or max(0, int(plan_days or 0))
     flagged_unlimited = bool(override is not None and override.duration_unlimited)
 
-    if reset_date or (old_expiry is None and (flagged_unlimited or effective_days == 0 or old_start is not None)):
-        # Adding days to an indefinite/undated account starts a real
-        # finite period now. It must not retain a stale unlimited override.
+    if not reset_date and old_start is None and old_expiry is None:
+        # Never-connected subscriptions store days, not calendar dates.
+        # This applies even when the former plan/override was unlimited.
+        subscription.activation_duration_days = effective_days + days
+        subscription.expires_at = None
+    elif reset_date or (old_expiry is None and (flagged_unlimited or effective_days == 0 or old_start is not None)):
+        # Explicit reset or an already-started unlimited subscription:
+        # start a new finite period now.
         subscription.starts_at = now
         subscription.expires_at = now + timedelta(days=days)
         subscription.activation_duration_days = days
     elif old_expiry is None:
-        # A previously configured finite subscription still awaits its
-        # first connection. The expiry is assigned by the first-use engine.
         subscription.activation_duration_days = effective_days + days
     else:
         # An already started finite subscription keeps remaining time.
