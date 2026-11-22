@@ -19,9 +19,9 @@ case "${1:-}" in
     /bin/launchctl print "system/$label" 2>/dev/null | /usr/bin/grep -E 'state =|pid =' || true
     exit 0
     ;;
-  install) ;;
+  install|upgrade) action="$1" ;;
   *)
-    echo "Usage: sudo bash tool/install_macos_full_route_guard.sh {install|check}" >&2
+    echo "Usage: sudo bash tool/install_macos_full_route_guard.sh {install|upgrade|check}" >&2
     exit 2
     ;;
 esac
@@ -31,11 +31,31 @@ esac
 }
 [[ -t 0 && -t 1 ]] || { echo "INTERACTIVE_CONSOLE_REQUIRED"; exit 2; }
 [[ -f "$source_file" && ! -L "$source_file" ]] || { echo "SOURCE_MISSING"; exit 2; }
+/usr/bin/python3 -m py_compile "$source_file"
+if [[ "$action" == upgrade ]]; then
+  # Safe replacement only when the independent rollback guard is idle.
+  # Never overwrite its executable while an owned route may still exist.
+  for item in "$root" "$script" "$plist"; do
+    [[ -e "$item" && ! -L "$item" &&
+       "$(/usr/bin/stat -f '%u' "$item")" == "0" ]] ||
+      { echo "UNTRUSTED_OR_MISSING_GUARD_INSTALL"; exit 3; }
+  done
+  state="$(/usr/bin/python3 "$script" status)" || exit 3
+  echo "$state"
+  [[ "$state" == *'"state": "IDLE"'* ]] ||
+    { echo "GUARD_NOT_IDLE_UPGRADE_REFUSED"; exit 3; }
+  /usr/bin/install -o root -g wheel -m 0644 "$source_file" "$script"
+  /bin/launchctl kickstart -k "system/$label"
+  /bin/sleep 1
+  /usr/bin/python3 "$script" status
+  /usr/bin/shasum -a 256 "$source_file" "$script"
+  echo "FULL_ROUTE_GUARD_UPGRADED; NO_ROUTE_TRIAL_STARTED"
+  exit 0
+fi
 if [[ -e "$plist" || -L "$plist" || -e "$root" || -L "$root" ]]; then
   echo "ALREADY_INSTALLED_OR_PATH_EXISTS; refusing overwrite"
   exit 3
 fi
-/usr/bin/python3 -m py_compile "$source_file"
 /usr/bin/printf '%s\n' \
   "Installs a root-owned rollback watchdog; DOES NOT touch routing." \
   "This does NOT authorize a full-tunnel test on a remotely managed Mac."
