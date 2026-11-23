@@ -169,16 +169,123 @@ static int prepareService(NSDictionary *profile) {
     return code;
 }
 
+static SCNetworkConnectionRef l2tpConnection(void) {
+    SCPreferencesRef prefs=SCPreferencesCreate(NULL, CFSTR("TwinConnectL2TP"), NULL);
+    if (!prefs) return NULL;
+    SCNetworkServiceRef svc=findService(prefs);
+    SCNetworkConnectionRef conn=NULL;
+    if (svc) {
+        CFStringRef identifier=SCNetworkServiceGetServiceID(svc);
+        if (identifier) conn=SCNetworkConnectionCreateWithServiceID(
+            NULL,identifier,NULL,NULL);
+        CFRelease(svc);
+    }
+    CFRelease(prefs);
+    return conn;
+}
+
+static int currentStatus(void) {
+    SCNetworkConnectionRef conn=l2tpConnection();
+    if (!conn) { result(@"offline",@"L2TP_NATIVE_SERVICE_NOT_CONFIGURED"); return 0; }
+    SCNetworkConnectionStatus state=SCNetworkConnectionGetStatus(conn);
+    NSString *name=@"L2TP_NATIVE_STATUS_UNKNOWN";
+    if (state==kSCNetworkConnectionConnected) name=@"L2TP_NATIVE_LINK_CONNECTED_UNROUTED";
+    else if (state==kSCNetworkConnectionConnecting) name=@"L2TP_NATIVE_LINK_CONNECTING";
+    else if (state==kSCNetworkConnectionDisconnected) name=@"L2TP_NATIVE_LINK_DISCONNECTED";
+    else if (state==kSCNetworkConnectionDisconnecting) name=@"L2TP_NATIVE_LINK_DISCONNECTING";
+    result(state==kSCNetworkConnectionConnected ? @"link" : @"offline",name);
+    CFRelease(conn);
+    return 0;
+}
+
+static int stopService(void) {
+    if (geteuid()!=0) { result(@"error",@"L2TP_ROOT_REQUIRED"); return 2; }
+    SCNetworkConnectionRef conn=l2tpConnection();
+    if (!conn) { result(@"offline",@"L2TP_NATIVE_SERVICE_NOT_CONFIGURED"); return 0; }
+    SCNetworkConnectionStatus old=SCNetworkConnectionGetStatus(conn);
+    if (old==kSCNetworkConnectionDisconnected) {
+        result(@"offline",@"L2TP_NATIVE_LINK_DISCONNECTED");
+        CFRelease(conn);
+        return 0;
+    }
+    BOOL ok=SCNetworkConnectionStop(conn,TRUE);
+    CFRelease(conn);
+    result(ok?@"stopping":@"error",
+           ok?@"L2TP_NATIVE_DISCONNECT_REQUESTED":@"L2TP_NATIVE_DISCONNECT_FAILED");
+    return ok?0:2;
+}
+
+static BOOL routeWatchdogArmed(void) {
+    NSString *path=@"/private/var/run/twinconnect-l2tp-route-guard/state.json";
+    struct stat info;
+    if (lstat(path.UTF8String,&info)!=0 || !S_ISREG(info.st_mode) ||
+        info.st_uid!=0 || (info.st_mode & 0077)!=0 || info.st_nlink!=1 ||
+        info.st_size>8192) return NO;
+    NSData *data=[NSData dataWithContentsOfFile:path];
+    NSDictionary *obj=[NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if (![obj isKindOfClass:NSDictionary.class]) return NO;
+    if (![obj[@"mode"] isEqual:@"armed"]) return NO;
+    NSNumber *deadline=obj[@"deadline"];
+    return [deadline isKindOfClass:NSNumber.class] &&
+        deadline.doubleValue > [[NSDate date] timeIntervalSince1970];
+}
+
+static int connectService(NSDictionary *profile) {
+    if (geteuid()!=0 || !noParallelVPN() || !routeWatchdogArmed()) {
+        result(@"error",@"L2TP_INDEPENDENT_ROUTE_GUARD_REQUIRED");
+        return 2;
+    }
+    SCNetworkConnectionRef conn=l2tpConnection();
+    if (!conn) { result(@"error",@"L2TP_NATIVE_SERVICE_NOT_CONFIGURED"); return 2; }
+    if (SCNetworkConnectionGetStatus(conn)!=kSCNetworkConnectionDisconnected) {
+        result(@"error",@"L2TP_NATIVE_SERVICE_BUSY");
+        CFRelease(conn);
+        return 2;
+    }
+    // Credentials are in-memory only. The host/IP and username were
+    // stored by prepare; no password or PSK is saved in preferences.
+    NSDictionary *options=@{
+        (__bridge NSString*)kSCEntNetPPP:@{
+            (__bridge NSString*)kSCPropNetPPPAuthName:profile[@"username"],
+            (__bridge NSString*)kSCPropNetPPPAuthPassword:profile[@"password"]
+        },
+        (__bridge NSString*)kSCEntNetL2TP:@{
+            (__bridge NSString*)kSCPropNetL2TPIPSecSharedSecret:profile[@"psk"],
+            (__bridge NSString*)kSCPropNetL2TPTransport:
+                (__bridge NSString*)kSCValNetL2TPTransportIPSec
+        },
+        (__bridge NSString*)kSCEntNetIPSec:@{
+            (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
+                (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret,
+            (__bridge NSString*)kSCPropNetIPSecSharedSecret:profile[@"psk"]
+        }
+    };
+    BOOL ok=SCNetworkConnectionStart(conn,(__bridge CFDictionaryRef)options,TRUE);
+    if (!ok) {
+        result(@"error",@"L2TP_NATIVE_START_REJECTED");
+        CFRelease(conn);
+        return 2;
+    }
+    // Establishing PPP is not proof of tunneled Internet. A separate guard
+    // must test traffic and apply verified routing before UI shows Connected.
+    result(@"starting",@"L2TP_NATIVE_HANDSHAKE_STARTED_NOT_CONNECTED");
+    CFRelease(conn);
+    return 0;
+}
+
 int main(int argc,const char *argv[]) {
     @autoreleasepool {
         if (argc!=2) {result(@"error",@"L2TP_OPERATION_NOT_ALLOWED");return 2;}
         NSString *arg=[NSString stringWithUTF8String:argv[1]];
         if ([arg isEqualToString:@"capabilities"]) return capabilities();
-        if (![arg isEqualToString:@"prepare"]) {
+        if ([arg isEqualToString:@"status"]) return currentStatus();
+        if ([arg isEqualToString:@"stop"]) return stopService();
+        if (![arg isEqualToString:@"prepare"] && ![arg isEqualToString:@"start"]) {
             result(@"error",@"L2TP_OPERATION_NOT_ALLOWED"); return 2;
         }
         NSDictionary *profile=readProfile();
         if (!profile) {result(@"error",@"L2TP_PROFILE_INVALID");return 2;}
-        return prepareService(profile);
+        return [arg isEqualToString:@"prepare"] ?
+            prepareService(profile) : connectService(profile);
     }
 }
