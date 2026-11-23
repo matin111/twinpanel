@@ -27,6 +27,7 @@ LEASE_SECONDS = 45
 SPLIT_NETWORKS = ("0.0.0.0/1", "128.0.0.0/1")
 DNS_SERVERS = ("1.1.1.1", "1.0.0.1")
 NETWORKSETUP = "/usr/sbin/networksetup"
+TUN_DNS_STATE = ROOT / "tunnel-dns.json"
 OPENCONNECT_BIN = ("/Library/PrivilegedHelperTools/TwinConnectCisco/"
                    "openconnect-runtime/bin/openconnect")
 ROUTE = "/sbin/route"
@@ -401,7 +402,39 @@ def openconnect_endpoint(pid: int) -> str | None:
     return next(iter(peers)) if len(peers) == 1 else None
 
 
-def verify_named_https_and_dns() -> str:
+def dns_for_tunnel(interface: str) -> list[str]:
+    """Trust only fresh, root-owned DNS metadata for this exact configured utun."""
+    import stat
+    try:
+        info = os.lstat(TUN_DNS_STATE)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
+                info.st_mode & 0o077 or info.st_nlink != 1):
+            return []
+        data = json.loads(TUN_DNS_STATE.read_text())
+        if (data.get("interface") != interface or
+                abs(time.time() - data.get("timestamp", 0)) > 150):
+            return []
+        address = ipaddress.IPv4Address(data["address"])
+        tun = run("/sbin/ifconfig", interface)
+        if tun.returncode or not re.search(
+                r"(?m)^\s*inet\s+" + re.escape(str(address)) + r"\s",
+                tun.stdout):
+            return []
+        candidates = data["servers"]
+        if not isinstance(candidates, list) or len(candidates) > 4:
+            return []
+        servers: list[str] = []
+        for candidate in candidates:
+            server = ipaddress.IPv4Address(candidate)
+            if server.is_unspecified or server.is_loopback or server.is_multicast:
+                return []
+            servers.append(str(server))
+        return servers
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return []
+
+
+def verify_named_https_and_dns(resolver: str = "1.1.1.1") -> str:
     """Confirm ordinary applications can resolve names and fetch HTTPS.
 
     Single-IP curl probes only prove tunnel forwarding, not macOS DNS.
@@ -409,7 +442,7 @@ def verify_named_https_and_dns() -> str:
     rollback immediately on any failure.
     """
     dns = run("/usr/bin/dig", "+time=2", "+tries=1",
-              "@1.1.1.1", "example.com", "A", "+short")
+              "@" + resolver, "example.com", "A", "+short")
     if dns.returncode:
         return "CISCO_TUNNEL_DNS_UNREACHABLE"
     addresses = []
@@ -511,9 +544,20 @@ def activate_full(interface: str, pid: int) -> str:
         return "CISCO_FULL_EGRESS_NOT_VERIFIED_" + rollback()
     state["dns_started"] = True
     store(state)
-    if run(NETWORKSETUP, "-setdnsservers", service, *DNS_SERVERS).returncode:
-        return "CISCO_DNS_ACTIVATION_FAILED_" + rollback()
-    health = verify_named_https_and_dns()
+    # Prefer the resolver supplied by the authenticated AnyConnect tunnel.
+    # Public resolvers can be reachable over HTTPS but blocked over UDP/53.
+    candidates = []
+    assigned = dns_for_tunnel(interface)
+    if assigned:
+        candidates.append(assigned)
+    candidates.append(list(DNS_SERVERS))
+    health = "CISCO_DNS_ACTIVATION_FAILED"
+    for dns_servers in candidates:
+        if run(NETWORKSETUP, "-setdnsservers", service, *dns_servers).returncode:
+            continue
+        health = verify_named_https_and_dns(dns_servers[0])
+        if health == "CISCO_NAMED_HTTPS_VERIFIED":
+            break
     if health != "CISCO_NAMED_HTTPS_VERIFIED":
         return health + "_" + rollback()
     state["mode"] = "leased"
