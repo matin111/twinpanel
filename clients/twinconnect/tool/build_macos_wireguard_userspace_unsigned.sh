@@ -24,6 +24,10 @@ trap 'rm -rf "$temp"' EXIT
 cp "$source_dir/go.mod" "$temp/pinned.mod"
 cp "$source_dir/go.sum" "$temp/pinned.sum"
 chmod u+w "$temp/pinned.mod" "$temp/pinned.sum"
+# Go's -modfile requires the current working directory to be inside a
+# module. Switch to pinned upstream only for the build and then restore.
+repo_root="$PWD"
+cd "$source_dir"
 # The bundled WireGuardKitGo has these dependencies cached. The upstream
 # standalone CLI module otherwise requests older, unavailable versions.
 "$go_binary" mod edit -modfile="$temp/pinned.mod" \
@@ -45,6 +49,7 @@ chmod u+w "$temp/pinned.mod" "$temp/pinned.sum"
 "$temp/wireguard-go" --version | grep -Fq "Userspace WireGuard daemon for darwin-$arch" || {
   echo "WIREGUARD_UNSIGNED_VERSION_INVALID" >&2; exit 3;
 }
+cd "$repo_root"
 out="macos_native/build/wireguard-userspace/$arch"
 [[ ! -L "$out" && ! -L "$out/wireguard-go" ]] || {
   echo "WIREGUARD_UNSAFE_OUTPUT_PATH" >&2; exit 3;
