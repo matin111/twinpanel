@@ -183,6 +183,10 @@ class TUNDaemonControlTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     server.decode_request(request)
 
+    def test_start_has_longer_timeout_than_status(self):
+        source = (DIR / "unsigned_tun_client.py").read_text()
+        self.assertIn('client.settimeout(30 if action == "start" else 6)', source)
+
     def test_client_fail_closed_without_service(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "TUN_SERVICE_UNAVAILABLE"):
