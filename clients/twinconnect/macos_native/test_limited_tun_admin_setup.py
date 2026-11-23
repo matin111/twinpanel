@@ -17,6 +17,15 @@ class LimitedTunAdminSetupTests(unittest.TestCase):
         self.assertNotIn('NOPASSWD: ALL', SCRIPT)
         self.assertNotIn('NOPASSWD: /bin/bash', SCRIPT)
 
+    def test_vps_controller_requires_oob_and_bounded_expiry(self):
+        installer = (SOURCE.parent / "activate_macos_tun_vps.sh").read_text()
+        self.assertIn("PROVIDER_VNC_CONSOLE_REQUIRED", installer)
+        self.assertIn("ENABLE-VPS-TUN-CONTROLLER", installer)
+        self.assertIn("VPS_SESSION = 45", installer)
+        self.assertIn("NO_VPN_STARTED; MAX_TRIAL_45_SECONDS", installer)
+        self.assertNotIn("sing-box run", installer)
+        self.assertNotIn("route add", installer)
+
     def test_setup_is_staging_only(self):
         self.assertIn('DAEMON_NOT_STARTED; ROUTES_UNCHANGED', SCRIPT)
         self.assertNotIn('launchctl bootstrap', SCRIPT)
