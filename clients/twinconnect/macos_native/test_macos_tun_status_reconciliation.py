@@ -28,7 +28,8 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.tunRouteIsRunning(result.1)', poll)
         self.assertIn('self.runFullTunClient("status")', poll)
         self.assertNotIn('self.runFullTunClient("start"', poll)
-        self.assertIn('(fullTunActive || activeProtocol == "v2ray")', poll)
+        self.assertIn('activeProtocol == "v2ray" ||', poll)
+        self.assertIn('activeProtocol == "hysteria2"', poll)
 
     def test_transient_status_error_does_not_fake_offline_or_connected(self):
         start = UI.index('private func refreshFullTunStatus()')
