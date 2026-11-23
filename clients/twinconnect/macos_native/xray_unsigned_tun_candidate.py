@@ -102,30 +102,47 @@ def convert(data: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("source", type=Path, nargs="?")
+    parser.add_argument("--stdin", action="store_true", help="Read profile from stdin; emit TUN JSON on stdout")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--engine", type=Path, help="Optional sing-box binary for offline 'check'")
     args = parser.parse_args()
     try:
-        source = args.source
-        if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_CONFIG:
-            raise ValueError("XRAY_SOURCE_UNTRUSTED")
-        if args.output.exists() or args.output.is_symlink() or not args.output.parent.is_dir():
-            raise ValueError("OUTPUT_UNSAFE")
-        candidate = convert(json.loads(source.read_text(encoding="utf-8")))
-        encoded = json.dumps(candidate, indent=2).encode()
-        fd = os.open(args.output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        with os.fdopen(fd, "wb") as out:
-            out.write(encoded)
-        validate_full_tun_config(args.output)
-        if args.engine:
-            import subprocess
-            result = subprocess.run([str(args.engine), "check", "-c", str(args.output)],
-                                    capture_output=True, timeout=20)
-            if result.returncode:
-                args.output.unlink(missing_ok=True)
-                raise ValueError("SINGBOX_CONFIGURATION_REJECTED")
-        print("VLESS_TUN_CANDIDATE_VALIDATED_OFFLINE; NOT_CONNECTED; NO_ROUTES_CHANGED")
+        if args.stdin == (args.source is not None) or (args.stdin == (args.output is not None)):
+            raise ValueError("INPUT_OUTPUT_MODE_INVALID")
+        if args.stdin:
+            raw = sys.stdin.buffer.read(MAX_CONFIG + 1)
+            if not raw or len(raw) > MAX_CONFIG:
+                raise ValueError("XRAY_SOURCE_UNTRUSTED")
+            candidate = convert(json.loads(raw))
+        else:
+            source = args.source
+            if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_CONFIG:
+                raise ValueError("XRAY_SOURCE_UNTRUSTED")
+            if args.output.exists() or args.output.is_symlink() or not args.output.parent.is_dir():
+                raise ValueError("OUTPUT_UNSAFE")
+            candidate = convert(json.loads(source.read_text(encoding="utf-8")))
+        encoded = json.dumps(candidate, separators=(",", ":")).encode()
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="twinconnect-tun-review-") as folder:
+            candidate_file = Path(folder) / "candidate.json"
+            fd = os.open(candidate_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "wb") as out:
+                out.write(encoded)
+            validate_full_tun_config(candidate_file)
+            if args.engine:
+                import subprocess
+                result = subprocess.run([str(args.engine), "check", "-c", str(candidate_file)],
+                                        capture_output=True, timeout=20)
+                if result.returncode:
+                    raise ValueError("SINGBOX_CONFIGURATION_REJECTED")
+        if args.stdin:
+            sys.stdout.buffer.write(encoded + b"\n")
+        else:
+            fd = os.open(args.output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "wb") as out:
+                out.write(encoded)
+            print("VLESS_TUN_CANDIDATE_VALIDATED_OFFLINE; NOT_CONNECTED; NO_ROUTES_CHANGED")
         return 0
     except (ValueError, OSError, TypeError, json.JSONDecodeError) as exc:
         print(str(exc) if str(exc).isupper() and len(str(exc)) < 90 else
