@@ -1443,6 +1443,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "snell": return "Snell"
         case "naive": return "NaiveProxy"
         case "shadowtls": return "ShadowTLS"
+        case "mieru": return "Mieru"
         case "v2ray": return "V2Ray"
         default: return "Proxy"
         }
@@ -1458,6 +1459,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "snell": return "Snell"
         case "naive": return "NaiveProxy"
         case "shadowtls": return "ShadowTLS"
+        case "mieru": return "Mieru"
         default: return nil
         }
     }
@@ -4613,6 +4615,55 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         } catch { return (nil, "VLESS_CONVERTER_EXEC_FAILED") }
     }
 
+    private func reviewedMieruTunCandidate(_ raw: Data) -> (Data?, String) {
+        guard raw.count > 0 && raw.count <= 131072 else {
+            return (nil, "MIERU_PROFILE_INVALID")
+        }
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_mieru_profile.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (nil, "MIERU_CONVERTER_NOT_PACKAGED")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "--candidate"]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(raw)
+            input.fileHandleForWriting.closeFile()
+            let converted = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            guard converted.count <= 262144,
+                  let obj = try? JSONSerialization.jsonObject(with: converted)
+                    as? [String: Any] else {
+                return (nil, "MIERU_CANDIDATE_INVALID")
+            }
+            if task.terminationStatus != 0 {
+                let reason = obj["reason"] as? String ?? "MIERU_PROFILE_INVALID"
+                let valid = reason.range(of: "^MIERU_[A-Z0-9_]{2,63}$",
+                                         options: .regularExpression) != nil
+                return (nil, valid ? reason : "MIERU_PROFILE_INVALID")
+            }
+            guard let inbound = obj["inbounds"] as? [[String: Any]],
+                  inbound.count == 1,
+                  inbound[0]["type"] as? String == "tun",
+                  let outbounds = obj["outbounds"] as? [[String: Any]],
+                  outbounds.count == 1,
+                  outbounds[0]["type"] as? String == "mieru",
+                  outbounds[0]["tag"] as? String == "proxy" else {
+                return (nil, "MIERU_CANDIDATE_INVALID")
+            }
+            return (converted, "")
+        } catch {
+            return (nil, "MIERU_CONVERTER_EXEC_FAILED")
+        }
+    }
+
     private func readActiveFullTunProtocol() -> String? {
         // The limited-sudo status operation is read-only; the root-owned
         // helper looks at the actual running sing-box process and its active
@@ -4644,7 +4695,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 }
             let allowed: Set<String> = [
                 "v2ray", "hysteria2", "tuic", "anytls",
-                "socks5", "snell", "naive", "shadowtls"
+                "socks5", "snell", "naive", "shadowtls", "mieru"
             ]
             guard codes.count == 1, allowed.contains(codes[0]) else {
                 return nil
@@ -5065,8 +5116,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "Starting local-console TUN engine…"
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let conversion = protocolCode == "v2ray" ?
-                        self.reviewedV2RayTunCandidate(profile) : (profile, "")
+                    let conversion: (Data?, String)
+                    if protocolCode == "v2ray" {
+                        conversion = self.reviewedV2RayTunCandidate(profile)
+                    } else if protocolCode == "mieru" {
+                        conversion = self.reviewedMieruTunCandidate(profile)
+                    } else {
+                        conversion = (profile, "")
+                    }
                     let reviewed = conversion.0
                     let conversionReason = conversion.1
                     let response: (Int32, String) = reviewed.map {
@@ -5100,7 +5157,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             self.fullTunProbeLastAt = .distantPast
                             self.status = "TUN route running; checking HTTPS."
                         } else if reviewed == nil {
-                            self.status = "V2Ray TUN: " + conversionReason
+                            self.status = protocolCode.uppercased() +
+                                " TUN: " + conversionReason
                             self.recordProxyAttempt(protocolCode, conversionReason)
                         } else {
                             let reason: String
@@ -5125,7 +5183,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 }
             }
         }
-        if protocolCode == "v2ray" {
+        if protocolCode == "mieru" {
+            directory.prepareLocalSingBox(session, serverID: serverID,
+                                          protocolCode: "mieru",
+                                          completion: completion)
+        } else if protocolCode == "v2ray" {
             directory.prepareLocalSingBox(session, serverID: serverID,
                                           protocolCode: "v2ray",
                                           v2rayInboundID: activeV2RayInbound,
@@ -5743,7 +5805,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         let enabled: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
-            "snell", "naive", "shadowtls", "v2ray"
+            "snell", "naive", "shadowtls", "v2ray", "mieru"
         ]
         guard let selectedProtocol = activeProtocol,
               enabled.contains(selectedProtocol),
