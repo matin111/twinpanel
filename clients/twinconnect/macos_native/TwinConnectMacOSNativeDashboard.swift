@@ -573,6 +573,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private let v2rayInboundIDs = ["tcp_tls", "websocket_tls", "xhttp_reality"]
     private let v2rayInboundLabels = ["TCP TLS", "WebSocket TLS", "XHTTP Reality"]
     private var activeV2RayInbound = "tcp_tls"
+    private var xrayInboundIndex = [String: [TwinMacNativeXrayInbound]]()
+    private var xrayIndexLoaded = false
+    private var xrayIndexLoading = false
+    private var xrayIndexError: String?
+    private var xrayInboundChoices = [(String, String)]()
+    private var xrayInboundRtts = [String: Int]()
+    private var xrayInboundProbing = Set<String>()
+    private var xrayIndexGeneration = 0
     private var activeServer: String?
     private var nodePingResults = [String: TwinMacNativePingResult]()
     private var nodePingBusy = Set<String>()
@@ -1888,8 +1896,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let all = snapshot?.servers ?? []
         let needle = locationSearch.trimmingCharacters(
             in: .whitespacesAndNewlines).localizedLowercase
-        guard !needle.isEmpty else { return all }
-        return all.filter { server in
+        let scoped = activeProtocol == "v2ray" && xrayIndexLoaded ?
+            all.filter { !(xrayInboundIndex[$0.id] ?? []).isEmpty } : all
+        guard !needle.isEmpty else { return scoped }
+        return scoped.filter { server in
             server.name.localizedLowercase.contains(needle) ||
                 countryName(server.country).localizedLowercase.contains(needle) ||
                 server.country.localizedLowercase.contains(needle)
@@ -2055,28 +2065,108 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     // A server's V2Ray routes are separate rows within that server card.
     // No globally selectable inlet or Quick Connect transport selector.
+    // Match Windows' per-inbound cards; each action is keyed by its real
+    // node ID + inbound ID, not by a fabricated 3-per-node index.
     @objc private func selectServerV2RayInbound(_ sender: NSButton) {
-        let serverIndex = sender.tag / v2rayInboundIDs.count
-        let inboundIndex = sender.tag % v2rayInboundIDs.count
-        guard locationRowIDs.indices.contains(serverIndex),
-              v2rayInboundIDs.indices.contains(inboundIndex),
+        guard xrayInboundChoices.indices.contains(sender.tag),
               !localProxyBusy, !fullTunBusy, !fullTunActive,
               !ciscoTunnelBusy else { return }
-        let selectedServerID = locationRowIDs[serverIndex]
-        if activeServer != selectedServerID && localProxyActive {
-            activeServer = selectedServerID
-            activeV2RayInbound = v2rayInboundIDs[inboundIndex]
-            activeProtocol = "v2ray"
-            persistCurrentSelection()
-            stopVerifiedLocalProxy()
-            return
-        }
-        activeServer = selectedServerID
-        activeV2RayInbound = v2rayInboundIDs[inboundIndex]
+        let (nodeID, inboundID) = xrayInboundChoices[sender.tag]
+        guard xrayInboundIndex[nodeID]?.contains(where: { $0.id == inboundID })
+                == true else { return }
+        if localProxyActive { stopVerifiedLocalProxy() }
+        activeServer = nodeID
+        activeV2RayInbound = inboundID
         activeProtocol = "v2ray"
         persistCurrentSelection()
-        status = "Server and V2Ray " + v2rayInboundLabels[inboundIndex] + " selected."
+        tab = 0
+        status = "V2Ray " + (v2rayInboundLabel(inboundID)) + " selected."
         view = build()
+    }
+
+    private func v2rayInboundLabel(_ id: String) -> String {
+        switch id {
+        case "websocket_tls": return "WS TLS"
+        case "xhttp_reality": return "XHTTP Reality"
+        case "tcp_tls": return "TCP TLS"
+        default: return id
+        }
+    }
+
+    private func xrayPingKey(_ node: String, _ inbound: String) -> String {
+        node + ":" + inbound
+    }
+
+    @objc private func probeXrayInbound(_ sender: NSButton) {
+        guard xrayInboundChoices.indices.contains(sender.tag) else { return }
+        let (node, id) = xrayInboundChoices[sender.tag]
+        guard let inbound = xrayInboundIndex[node]?.first(where: { $0.id == id })
+        else { return }
+        let key = xrayPingKey(node, id)
+        guard !xrayInboundProbing.contains(key) else { return }
+        xrayInboundProbing.insert(key)
+        view = build()
+        let generation = xrayIndexGeneration
+        let token = accountSession?.accessToken
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let start = ProcessInfo.processInfo.systemUptime
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+            task.arguments = ["-G", "2", "-z", inbound.host, String(inbound.port)]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            var elapsed: Int?
+            do {
+                try task.run()
+                DispatchQueue.global(qos: .utility).asyncAfter(
+                    deadline: .now() + 4) {
+                    if task.isRunning { task.terminate() }
+                }
+                task.waitUntilExit()
+                if task.terminationStatus == 0 {
+                    elapsed = max(1, Int((ProcessInfo.processInfo.systemUptime
+                                         - start) * 1000))
+                }
+            } catch { }
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.xrayIndexGeneration == generation,
+                      self.accountSession?.accessToken == token else { return }
+                self.xrayInboundProbing.remove(key)
+                if let elapsed = elapsed {
+                    self.xrayInboundRtts[key] = elapsed
+                } else {
+                    self.xrayInboundRtts.removeValue(forKey: key)
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func loadXrayInbounds() {
+        guard let session = accountSession, activeProtocol == "v2ray",
+              let servers = snapshot?.servers, !xrayIndexLoading else { return }
+        xrayIndexLoading = true
+        xrayIndexGeneration += 1
+        let generation = xrayIndexGeneration
+        let allowed = Set(servers.map { $0.id })
+        directory.loadXrayInboundIndex(session, allowedServerIDs: allowed) {
+            [weak self] result in
+            guard let self = self, self.xrayIndexGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            self.xrayIndexLoading = false
+            switch result {
+            case .success(let found):
+                self.xrayInboundIndex = found
+                self.xrayIndexLoaded = true
+                self.xrayIndexError = nil
+            case .failure:
+                self.xrayInboundIndex = [:]
+                self.xrayIndexLoaded = false
+                self.xrayIndexError = "XRAY_SERVER_PROFILES_UNAVAILABLE"
+            }
+            self.view = self.build()
+        }
     }
 
     // Locations follow Flutter's Search -> protocol chips -> country accordion.
@@ -2159,11 +2249,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         locationCountryIDs = codes
         locationRowIDs = visible.map { $0.id }
+        xrayInboundChoices = activeProtocol == "v2ray" ? visible.flatMap { server in
+            (xrayInboundIndex[server.id] ?? []).map { (server.id, $0.id) }
+        } : []
 
-        let count = visible.count
+        let count = activeProtocol == "v2ray" && xrayIndexLoaded ?
+            xrayInboundChoices.count : visible.count
         wrapper.addArrangedSubview(text(
-            String(codes.count) + " COUNTRIES  ·  " + String(count) + " SERVERS",
+            String(codes.count) + " COUNTRIES  ·  " + String(count) +
+                (activeProtocol == "v2ray" ? " INBOUNDS" : " SERVERS"),
             size: 11, weight: .semibold, color: sea))
+        if activeProtocol == "v2ray" && !xrayIndexLoaded {
+            wrapper.addArrangedSubview(text(
+                xrayIndexLoading ? "Loading V2Ray profiles from the panel…" :
+                    (xrayIndexError ?? "No verified V2Ray profiles loaded."),
+                size: 11, color: muted))
+        }
         if codes.isEmpty {
             let message: String
             if let issue = snapshot?.errors["servers"] {
@@ -2186,6 +2287,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             }
             let expanded = expandedCountries.contains(code)
             let selectedHere = items.contains { $0.id == activeServer }
+            let inboundCount = activeProtocol == "v2ray" && xrayIndexLoaded ?
+                items.reduce(0) { $0 + (xrayInboundIndex[$1.id]?.count ?? 0) } :
+                items.count
             let group = stack(spacing: 12)
             group.alignment = .leading
 
@@ -2198,7 +2302,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             countryInfo.addArrangedSubview(text(countryName(code), size: 14,
                                                 weight: .semibold))
             countryInfo.addArrangedSubview(text(
-                String(items.count) + (items.count == 1 ? " server" : " servers") +
+                String(inboundCount) + (activeProtocol == "v2ray" ?
+                    (inboundCount == 1 ? " inbound" : " inbounds") :
+                    (inboundCount == 1 ? " server" : " servers")) +
                 (selectedHere ? "    ·    Selected" : ""),
                 size: 10, color: selectedHere ? sea : muted))
             countryHeader.addArrangedSubview(countryInfo)
@@ -2219,7 +2325,75 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             group.addArrangedSubview(headerCard)
             headerCard.widthAnchor.constraint(equalTo: group.widthAnchor)
                 .isActive = true
-            if expanded {
+            if expanded && activeProtocol == "v2ray" {
+                // Windows Locations: direct sibling glass cards, one for each
+                // validated inbound delivered by the panel for this node.
+                for server in items {
+                    for inbound in xrayInboundIndex[server.id] ?? [] {
+                        let key = xrayPingKey(server.id, inbound.id)
+                        let selected = activeServer == server.id &&
+                            activeV2RayInbound == inbound.id
+                        let row = stack(.horizontal, spacing: 10)
+                        row.alignment = .centerY
+                        row.addArrangedSubview(text(flag(code), size: 24,
+                                                      weight: .medium))
+                        let detail = stack(spacing: 3)
+                        detail.alignment = .leading
+                        detail.addArrangedSubview(text(
+                            countryName(code) + " · " + v2rayInboundLabel(inbound.id),
+                            size: 13, weight: .semibold))
+                        detail.addArrangedSubview(text("V2Ray / Xray",
+                                                       size: 10, color: muted))
+                        row.addArrangedSubview(detail)
+                        let spacer = NSView()
+                        spacer.setContentHuggingPriority(.defaultLow,
+                                                         for: .horizontal)
+                        row.addArrangedSubview(spacer)
+                        let pingValue = xrayInboundRtts[key].map {
+                            String($0) + " ms"
+                        } ?? (xrayInboundProbing.contains(key) ? "…" : "— ms")
+                        let ping = text(pingValue, size: 11, weight: .semibold,
+                                        color: xrayInboundRtts[key].map { milliseconds in
+                                            milliseconds <= 300 ? NSColor.systemGreen :
+                                                (milliseconds <= 700 ? NSColor.systemYellow :
+                                                    NSColor.systemRed)
+                                        } ?? muted)
+                        row.addArrangedSubview(ping)
+                        let index = xrayInboundChoices.firstIndex {
+                            $0.0 == server.id && $0.1 == inbound.id
+                        } ?? -1
+                        let probe = button("ϟ", action: #selector(probeXrayInbound(_:)),
+                                           tag: index, mutedButton: true)
+                        probe.widthAnchor.constraint(equalToConstant: 32).isActive = true
+                        probe.heightAnchor.constraint(equalToConstant: 32).isActive = true
+                        probe.toolTip = "Test inbound TCP handshake latency"
+                        probe.isEnabled = index >= 0 &&
+                            !xrayInboundProbing.contains(key)
+                        row.addArrangedSubview(probe)
+                        let choose = button(selected ? "✓" : "⏻",
+                            action: #selector(selectServerV2RayInbound(_:)),
+                            tag: index, primary: selected, mutedButton: !selected)
+                        choose.widthAnchor.constraint(equalToConstant: 39).isActive = true
+                        choose.heightAnchor.constraint(equalToConstant: 34).isActive = true
+                        choose.toolTip = "Select " + countryName(code) + " " +
+                            v2rayInboundLabel(inbound.id) + " for Quick Connect"
+                        choose.isEnabled = index >= 0
+                        row.addArrangedSubview(choose)
+                        let tile = card([row], radius: 16, padding: 13)
+                        tile.layer?.borderColor = (selected ? sea : tint())
+                            .withAlphaComponent(selected ? 0.70 : 0.20).cgColor
+                        group.addArrangedSubview(tile)
+                        tile.widthAnchor.constraint(equalTo: group.widthAnchor)
+                            .isActive = true
+                    }
+                }
+                if !xrayIndexLoaded {
+                    group.addArrangedSubview(text(
+                        xrayIndexLoading ? "Loading actual V2Ray inbounds…" :
+                            (xrayIndexError ?? "No verified inbounds loaded."),
+                        size: 11, color: muted))
+                }
+            } else if expanded {
                 for (position, server) in items.enumerated() {
                     let serverIndex = locationRowIDs.firstIndex(of: server.id) ?? -1
                     let selected = activeServer == server.id
@@ -2286,31 +2460,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     tileContent.addArrangedSubview(row)
                     row.widthAnchor.constraint(equalTo: tileContent.widthAnchor)
                         .isActive = true
-                    if activeProtocol == "v2ray" {
-                        // Every node owns its three independently selectable routes.
-                        // A route is never silently replaced by another inbound.
-                        let inboundRows = stack(spacing: 6)
-                        inboundRows.alignment = .leading
-                        for (inboundIndex, inboundLabel) in v2rayInboundLabels.enumerated() {
-                            let isSelected = selected &&
-                                activeV2RayInbound == v2rayInboundIDs[inboundIndex]
-                            let inboundButton = button(
-                                (isSelected ? "✓  " : "›  ") + inboundLabel,
-                                action: #selector(selectServerV2RayInbound(_:)),
-                                tag: serverIndex * v2rayInboundIDs.count + inboundIndex,
-                                primary: isSelected, mutedButton: !isSelected)
-                            inboundButton.heightAnchor.constraint(equalToConstant: 33)
-                                .isActive = true
-                            inboundButton.toolTip = "Select this server's " + inboundLabel +
-                                " inbound. Connection requires a valid panel profile."
-                            inboundRows.addArrangedSubview(inboundButton)
-                            inboundButton.widthAnchor.constraint(
-                                equalTo: inboundRows.widthAnchor).isActive = true
-                        }
-                        tileContent.addArrangedSubview(inboundRows)
-                        inboundRows.widthAnchor.constraint(
-                            equalTo: tileContent.widthAnchor).isActive = true
-                    }
                     let tile = card([tileContent], radius: 15, padding: 13)
                     tile.wantsLayer = true
                     tile.layer?.backgroundColor = (selected ?
@@ -2881,6 +3030,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             self.accountSession = session
             self.restoreCurrentSelection(session)
             self.snapshot = nil
+            self.xrayIndexGeneration += 1
+            self.xrayInboundIndex.removeAll()
+            self.xrayIndexLoaded = false
+            self.xrayIndexLoading = false
+            self.xrayIndexError = nil
+            self.xrayInboundChoices.removeAll()
+            self.xrayInboundRtts.removeAll()
+            self.xrayInboundProbing.removeAll()
             self.pingGeneration += 1
             self.nodePingResults.removeAll()
             self.nodePingBusy.removeAll()
@@ -2937,6 +3094,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 return
             }
             self.snapshot = data
+            if data.sectionsLoaded.contains("servers") &&
+               data.sectionsLoaded.contains("protocols") &&
+               self.activeProtocol == "v2ray" &&
+               !self.xrayIndexLoaded && !self.xrayIndexLoading {
+                self.loadXrayInbounds()
+            }
             if data.sectionsLoaded.contains("servers") {
                 let validIDs = Set(data.servers.map { $0.id })
                 self.nodePingResults = self.nodePingResults.filter {
@@ -2979,6 +3142,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func refresh(_ sender: NSButton) {
         status = "Refreshing subscription data…"
+        if activeProtocol == "v2ray" {
+            xrayIndexGeneration += 1
+            xrayInboundIndex.removeAll()
+            xrayIndexLoaded = false
+            xrayIndexLoading = false
+            xrayInboundRtts.removeAll()
+            loadXrayInbounds()
+        }
         refreshData()
         view = build()
     }
@@ -3069,6 +3240,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         snapshot = nil
         activeProtocol = nil
         activeServer = nil
+        xrayIndexGeneration += 1
+        xrayInboundIndex.removeAll()
+        xrayIndexLoaded = false
+        xrayIndexLoading = false
+        xrayIndexError = nil
+        xrayInboundChoices.removeAll()
+        xrayInboundRtts.removeAll()
+        xrayInboundProbing.removeAll()
         country = "All countries"
         expandedCountries.removeAll()
         locationCountryIDs.removeAll()
@@ -3119,6 +3298,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         activeProtocol = chosen
         persistCurrentSelection()
+        if chosen == "v2ray" && !xrayIndexLoaded { loadXrayInbounds() }
         view = build()
     }
 
