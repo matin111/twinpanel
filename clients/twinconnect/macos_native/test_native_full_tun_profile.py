@@ -35,6 +35,12 @@ class NativeFullTUNProfileTests(unittest.TestCase):
             "private func localHysteria2Config(", 1)[0]
         self.assertIn('"outbounds": outbounds', section)
 
+    def test_v2ray_uses_unsigned_tun_only_when_helper_present(self):
+        self.assertIn('self.reviewedV2RayTunCandidate(profile)', DASHBOARD)
+        self.assertIn('if protocolCode == "v2ray" {', DASHBOARD)
+        self.assertIn('if fullTunServicePresent() {', DASHBOARD)
+        self.assertIn('self.runFullTunClient("start", profile: $0)', DASHBOARD)
+
     def test_main_connect_still_uses_verified_proxy(self):
         section = DASHBOARD.split(
             "@objc private func requestVPNConnection(", 1)[1].split(
