@@ -3159,7 +3159,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         task.arguments = managementIP == "unrouted-probe" ?
-            ["-n", "/usr/bin/python3", helper, "probe"] :
+            ["-n", "/usr/bin/python3", helper, "system"] :
             ["-n", "/usr/bin/python3", helper, "connect", managementIP]
         let input = Pipe()
         let output = Pipe()
