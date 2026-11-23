@@ -1544,7 +1544,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return "◉  Connected" + fullTunConnectedSuffix
         }
         if fullTunActive {
-            return "◉  TUN running · unverified" + fullTunConnectedSuffix
+            return "◌  Verifying internet" + fullTunConnectedSuffix
         }
         return "◌  Offline"
     }
@@ -1576,7 +1576,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return "Connected" + fullTunConnectedSuffix
         }
         if fullTunActive {
-            return "TUN running · unverified" + fullTunConnectedSuffix
+            return "Checking HTTPS" + fullTunConnectedSuffix
         }
         return "Disconnected"
     }
@@ -5206,8 +5206,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func refreshFullTunEgress() {
         // Only a live system HTTPS request through the currently observed
         // utun route can promote the UI from TUN running to Connected.
+        let recentStart = fullTunStartedAt.map {
+            Date().timeIntervalSince($0) < 45
+        } == true
+        // Newly started unsigned TUNs often need several seconds to settle
+        // DNS and HTTPS. Retry quickly during initial verification instead
+        // of waiting 15 seconds with no IP or actionable progress.
+        let probeInterval: TimeInterval =
+            (!fullTunHTTPSConnected && recentStart) ? 4 : 15
         guard fullTunActive, !fullTunBusy, !fullTunProbeBusy,
-              Date().timeIntervalSince(fullTunProbeLastAt) >= 15 else { return }
+              Date().timeIntervalSince(fullTunProbeLastAt) >= probeInterval
+        else { return }
         fullTunProbeBusy = true
         fullTunProbeLastAt = Date()
         let generation = localProxyGeneration
@@ -5340,7 +5349,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.lastTraffic = (down.int64Value, up.int64Value, now)
                 self.downloadedTotal = self.transferTotal(down.int64Value)
                 self.uploadedTotal = self.transferTotal(up.int64Value)
-                if let ping = result?["ping_ms"] as? NSNumber,
+                if self.fullTunHTTPSConnected,
+                   let ping = result?["ping_ms"] as? NSNumber,
                    ping.doubleValue > 0 && ping.doubleValue < 10000 {
                     self.openVPNPing = ping.doubleValue
                     self.openVPNPingText?.stringValue =
