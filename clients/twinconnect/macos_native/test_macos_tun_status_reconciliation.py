@@ -55,7 +55,9 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.fullTunEgressConfirmedAt = Date()', UI)
         self.assertIn('self.tunRouteIsRunning(response.1)', UI)
         self.assertIn('self.refreshFullTunEgress()', UI)
-        self.assertIn('Date().timeIntervalSince(fullTunProbeLastAt) >= 15', UI)
+        self.assertIn('let probeInterval: TimeInterval =', UI)
+        self.assertIn('(!fullTunHTTPSConnected && recentStart) ? 4 : 15', UI)
+        self.assertIn('Date().timeIntervalSince(fullTunProbeLastAt) >= probeInterval', UI)
 
     def test_attested_protocol_not_selected_picker(self):
         self.assertIn('private var fullTunConnectedProtocol: String?', UI)
