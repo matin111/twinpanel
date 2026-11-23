@@ -140,8 +140,7 @@ static int selftest(void) {
     if (good) {
         NSDictionary *ppp=@{
             (__bridge NSString*)kSCPropNetPPPAuthName:@"TWINCONNECT_PROBE_ONLY",
-            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:@"198.51.100.11",
-            (__bridge NSString*)kSCPropNetPPPOverridePrimary:@NO
+            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:@"198.51.100.11"
         };
         NSDictionary *ipsec=@{
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
@@ -149,7 +148,7 @@ static int selftest(void) {
         };
         BOOL pppAccepted=SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp);
         BOOL ipsecAccepted=SCNetworkInterfaceSetExtendedConfiguration(
-            iface,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
+            pppInterface,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
         if (!pppAccepted) {
             result(@"error",@"L2TP_NATIVE_PPP_SETTINGS_REJECTED");
             good=NO;
@@ -215,15 +214,14 @@ static int prepareService(NSDictionary *profile) {
         // Disable automatic full-tunnel route; external watchdog owns routing.
         NSDictionary *ppp=@{
             (__bridge NSString*)kSCPropNetPPPAuthName:profile[@"username"],
-            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:profile[@"server"],
-            (__bridge NSString*)kSCPropNetPPPOverridePrimary:@0
+            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:profile[@"server"]
         };
         NSDictionary *ipsec=@{
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
         if (!SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp) ||
-            !SCNetworkInterfaceSetExtendedConfiguration(iface,kSCEntNetIPSec,
+            !SCNetworkInterfaceSetExtendedConfiguration(pppInterface,kSCEntNetIPSec,
                                                          (__bridge CFDictionaryRef)ipsec) ||
             !SCNetworkSetAddService(set,svc)) {
             result(@"error",@"L2TP_SERVICE_SETTINGS_REJECTED"); break;
