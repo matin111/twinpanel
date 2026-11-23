@@ -1063,18 +1063,47 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         return
                     }
                     if protocolCode == "mieru" {
-                        // Relay the exact panel-supplied, entitled node
-                        // profile only; the unsigned Mieru converter
-                        // validates its public endpoint and returns mbox
-                        // TUN JSON in memory. No secrets in logs/argv.
+                        // The session's selected-node inventory and private
+                        // Mieru profile are independently scoped to the same
+                        // authenticated subscription. Some app projections
+                        // omit ipAddress but supply domainName instead.
+                        // Pin a missing/unusable Mieru endpoint to the
+                        // *same selected node's* public probe_ip, never an
+                        // arbitrary hostname or an unreviewed DNS fallback.
                         var original: Any? = matches[0]["config"]
                         if let text = original as? String,
                            text.utf8.count <= 131072 {
                             original = try? JSONSerialization.jsonObject(
                                 with: Data(text.utf8))
                         }
-                        guard let object = original as? [String: Any],
-                              JSONSerialization.isValidJSONObject(object),
+                        guard var object = original as? [String: Any],
+                              var profileRows = object["profiles"] as? [[String: Any]],
+                              profileRows.count == 1,
+                              var serverRows = profileRows[0]["servers"]
+                                as? [[String: Any]],
+                              serverRows.count == 1 else {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "MIERU_PROFILE_INVALID")))
+                            return
+                        }
+                        let rawAddress = serverRows[0]["ipAddress"] as? String ?? ""
+                        if rawAddress.contains(":") ||
+                           TwinMacNativePing.validatedPublicIP(rawAddress) == nil {
+                            guard let selectedNode = servers.first(where: {
+                                    ($0["id"] as? String) == serverID
+                                }),
+                                  let probeAddress = selectedNode["probe_ip"] as? String,
+                                  TwinMacNativePing.validatedPublicIP(probeAddress) != nil,
+                                  !probeAddress.contains(":") else {
+                                completion(.failure(TwinMacNativeError.failure(
+                                    "MIERU_SELECTED_NODE_IP_MISSING")))
+                                return
+                            }
+                            serverRows[0]["ipAddress"] = probeAddress
+                            profileRows[0]["servers"] = serverRows
+                            object["profiles"] = profileRows
+                        }
+                        guard JSONSerialization.isValidJSONObject(object),
                               let core = try? JSONSerialization.data(
                                 withJSONObject: object),
                               !core.isEmpty, core.count <= 131072 else {
