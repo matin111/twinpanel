@@ -11,7 +11,7 @@ dest=/private/etc/sudoers.d/twinconnect-cisco
 tmp=$(mktemp /private/etc/sudoers.d/.twinconnect-cisco-safe.XXXXXXXX)
 trap 'rm -f "$tmp"' EXIT
 printf '%s\n' \
- 'macvps ALL=(root) NOPASSWD: /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_tunnel.py system, /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py status, /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py stop' > "$tmp"
+ 'macvps ALL=(root) NOPASSWD: /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_tunnel.py system, /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py status, /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py status-uptime, /usr/bin/python3 /Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py stop' > "$tmp"
 chown root:wheel "$tmp"
 chmod 0440 "$tmp"
 /usr/sbin/visudo -cf "$tmp" >/dev/null
