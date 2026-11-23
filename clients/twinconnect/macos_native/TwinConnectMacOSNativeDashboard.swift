@@ -4018,6 +4018,39 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 String(data: output, encoding: .utf8) ?? "")
     }
 
+    // Converts an entitled Xray profile to a reviewed unsigned sing-box TUN
+    // profile. Credentials travel over stdin/stdout, never argv or a log.
+    // Conversion does not start a VPN or change system routes.
+    private func reviewedV2RayTunCandidate(_ profile: Data) -> Data? {
+        guard profile.count > 0 && profile.count <= 262144 else { return nil }
+        let root = localRuntimeRoot()
+        let script = root + "/macos_native/xray_unsigned_tun_candidate.py"
+        guard FileManager.default.isReadableFile(atPath: script) else { return nil }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "--stdin"]
+        task.standardError = FileHandle.nullDevice
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            let converted = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0,
+                  converted.count > 0, converted.count <= 262144,
+                  let obj = try? JSONSerialization.jsonObject(with: converted)
+                    as? [String: Any],
+                  let inbound = obj["inbounds"] as? [[String: Any]],
+                  inbound.count == 1,
+                  inbound[0]["type"] as? String == "tun" else { return nil }
+            return converted
+        } catch { return nil }
+    }
+
     private func tunResponseIs(_ raw: String, state: String) -> Bool {
         guard let data = raw.data(using: .utf8),
               let response = (try? JSONSerialization.jsonObject(with: data))
@@ -4387,9 +4420,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let generation = localProxyGeneration
         status = "Authorizing local TUN profile…"
         view = build()
-        directory.prepareFullTUNCandidate(
-            session, serverID: serverID, protocolCode: protocolCode) {
-            [weak self] result in
+        let completion: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .failure:
@@ -4400,7 +4431,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "Starting local-console TUN engine…"
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let response = self.runFullTunClient("start", profile: profile)
+                    let reviewed: Data? = protocolCode == "v2ray" ?
+                        self.reviewedV2RayTunCandidate(profile) : profile
+                    let response: (Int32, String) = reviewed.map {
+                        self.runFullTunClient("start", profile: $0)
+                    } ?? (1, "")
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.fullTunBusy = false
@@ -4416,7 +4451,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                                state: "engine_running_unverified")
                         self.status = self.fullTunActive ?
                             "TUN engine running; system VPN NOT verified." :
-                            "TUN start rejected; no connection confirmed."
+                            (reviewed == nil ?
+                             "V2Ray TUN profile rejected; proxy mode remains available." :
+                             "TUN start rejected; no connection confirmed.")
                         self.view = self.build()
                         if self.fullTunActive {
                             DispatchQueue.global(qos: .utility).async {
@@ -4444,6 +4481,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     }
                 }
             }
+        }
+        if protocolCode == "v2ray" {
+            directory.prepareLocalSingBox(session, serverID: serverID,
+                                          protocolCode: "v2ray", completion: completion)
+        } else {
+            directory.prepareFullTUNCandidate(session, serverID: serverID,
+                                              protocolCode: protocolCode,
+                                              completion: completion)
         }
     }
 
@@ -4850,7 +4895,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         // An installed root-owned daemon is opt-in on a recoverable local Mac.
         // On remote VPS or without that daemon the existing proxy path remains.
-        if fullTunServicePresent() && selectedProtocol != "v2ray" {
+        if fullTunServicePresent() {
             startFullTun(session, serverID: serverID, protocolCode: selectedProtocol)
             return
         }
