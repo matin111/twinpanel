@@ -83,6 +83,28 @@ class TUNAdminProtocolTests(unittest.TestCase):
                 st.return_value.st_size = config.stat().st_size
                 self.assertIsNone(protocol.current_protocol(root, ps))
 
+    def test_attested_mieru_requires_separate_mbox_process(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "active-mieru.json"
+            config.write_text(json.dumps({
+                "inbounds": [{"type": "tun"}],
+                "outbounds": [{"type": "mieru", "tag": "proxy"}]
+            }))
+            config.chmod(0o600)
+            verified = f"{root}/mbox run -c {config}\n"
+            unsupported = f"{root}/sing-box run -c {config}\n"
+            with patch.object(protocol.os, "geteuid", return_value=0), \
+                 patch.object(protocol.Path, "lstat", autospec=True) as st:
+                info = config.stat()
+                st.return_value.st_uid = 0
+                st.return_value.st_mode = info.st_mode
+                st.return_value.st_size = info.st_size
+                self.assertEqual(
+                    protocol.current_protocol(root, verified), "mieru")
+                self.assertIsNone(
+                    protocol.current_protocol(root, unsupported))
+
     def test_non_root_never_reads_private_profile(self):
         with patch.object(protocol.os, 'geteuid', return_value=501):
             self.assertIsNone(protocol.current_protocol())
