@@ -25,6 +25,8 @@ import time
 
 BINARY = Path("/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard-go")
 CISCO_GUARD = Path("/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py")
+WG_GUARD = Path("/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py")
+WG_DNS_STATE = Path("/private/var/run/twinconnect-wireguard-route-guard/tunnel-dns.json")
 UAPI_DIRECTORY = Path("/var/run/wireguard")
 IFCONFIG = "/sbin/ifconfig"
 ROUTE = "/sbin/route"
@@ -114,8 +116,22 @@ def parse_profile(raw: str) -> dict:
         fail("WG_ENDPOINT_UNRESOLVED")
     if not candidate.is_global:
         fail("WG_ENDPOINT_NOT_PUBLIC")
+    dns = []
+    for raw_dns in interface.get("dns", "").split(","):
+        if not raw_dns.strip():
+            continue
+        try:
+            server = ipaddress.ip_address(raw_dns.strip())
+            if not isinstance(server, ipaddress.IPv4Address) or (
+                    server.is_unspecified or server.is_loopback or server.is_multicast):
+                fail("WG_DNS_INVALID")
+            dns.append(str(server))
+        except ValueError:
+            fail("WG_DNS_INVALID")
+    if len(dns) > 4:
+        fail("WG_DNS_INVALID")
     return {
-        "private": private, "public": public, "psk": psk,
+        "private": private, "public": public, "psk": psk, "dns": dns,
         "address": str(local.ip), "mtu": mtu,
         "endpoint": f"{candidate}:{port}",
         "listenport": int(interface.get("listenport", "0")),
@@ -184,7 +200,84 @@ def uapi_config(profile: dict) -> str:
     return "\n".join(rows)
 
 
-def probe(raw: str) -> str:
+def store_tunnel_dns(name: str, profile: dict) -> None:
+    """Root-owned DNS hints, no credentials or endpoint persisted."""
+    root = WG_DNS_STATE.parent
+    info = root.stat()
+    if root.is_symlink() or info.st_uid != 0 or info.st_mode & 0o077:
+        fail("WG_DNS_STATE_UNTRUSTED")
+    path = root / "tunnel-dns.next"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    with os.fdopen(os.open(path, flags, 0o600), "w") as output:
+        json.dump({"interface": name, "address": profile["address"],
+                   "servers": profile["dns"], "timestamp": int(time.time())}, output)
+        output.flush()
+        os.fsync(output.fileno())
+    os.replace(path, WG_DNS_STATE)
+
+
+def guard_action(*args: str, timeout: float = 13) -> str:
+    if not WG_GUARD.is_file() or WG_GUARD.is_symlink():
+        fail("WG_ROUTE_GUARD_UNAVAILABLE")
+    result = subprocess.run(["/usr/bin/python3", str(WG_GUARD), *args],
+                            capture_output=True, text=True, timeout=timeout,
+                            check=False)
+    if result.returncode:
+        reason = result.stdout.strip()
+        if not re.fullmatch(r"WG_[A-Z0-9_]{4,120}", reason):
+            fail("WG_ROUTE_GUARD_REJECTED")
+        fail(reason)
+    return result.stdout.strip()
+
+
+def safe_probe_egress(interface: str) -> str:
+    """Use only guard's 22-second whitelisted host-route probes."""
+    before = subprocess.run(
+        ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+         "--connect-timeout", "3", "--max-time", "8",
+         "https://1.1.1.1/cdn-cgi/trace"],
+        capture_output=True, text=True, timeout=10)
+    baseline = re.search(r"(?m)^ip=([0-9.]+)$", before.stdout)
+    if before.returncode or not baseline:
+        fail("WG_BASELINE_HTTPS_UNAVAILABLE")
+    guard_action("probe-host", interface, "1.1.1.1")
+    try:
+        result = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--connect-timeout", "4", "--max-time", "10",
+             "https://1.1.1.1/cdn-cgi/trace"],
+            capture_output=True, text=True, timeout=12)
+        after = re.search(r"(?m)^ip=([0-9.]+)$", result.stdout)
+        if result.returncode or not after:
+            fail("WG_TUNNEL_HTTPS_NOT_REACHABLE")
+        if after.group(1) == baseline.group(1):
+            fail("WG_EXIT_IP_NOT_CHANGED")
+    finally:
+        if guard_action("rollback") != "WG_MANAGEMENT_PIN_ROLLBACK_VERIFIED":
+            fail("WG_PROBE_ROUTE_ROLLBACK_FAILED")
+    guard_action("probe-host", interface, "8.8.8.8")
+    try:
+        response = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--resolve", "dns.google:443:8.8.8.8",
+             "--connect-timeout", "4", "--max-time", "10",
+             "https://dns.google/resolve?name=example.com&type=A"],
+            capture_output=True, text=True, timeout=12)
+        if response.returncode:
+            fail("WG_SECOND_EXIT_UNREACHABLE")
+        try:
+            answer = json.loads(response.stdout)
+        except (ValueError, TypeError):
+            fail("WG_SECOND_EXIT_INVALID")
+        if answer.get("Status") != 0 or not answer.get("Answer"):
+            fail("WG_SECOND_EXIT_INVALID")
+    finally:
+        if guard_action("rollback") != "WG_MANAGEMENT_PIN_ROLLBACK_VERIFIED":
+            fail("WG_SECOND_ROUTE_ROLLBACK_FAILED")
+    return "WG_MULTINET_EGRESS_VERIFIED"
+
+
+def probe(raw: str, system_vpn: bool = False) -> str:
     if os.geteuid() != 0 or sys.platform != "darwin":
         fail("WG_MACOS_ROOT_REQUIRED")
     safe_binary()
@@ -196,6 +289,8 @@ def probe(raw: str) -> str:
     if baseline[1] != "en0":
         fail("WG_PHYSICAL_DEFAULT_REQUIRED")
     profile = parse_profile(raw)
+    if system_vpn and guard_action("preflight") != "WG_MANAGEMENT_PRECHECK_READY":
+        fail("WG_GUARD_PREFLIGHT_FAILED")
     interfaces = set(command(IFCONFIG, "-l").split())
     name = next((f"utun{i}" for i in range(15, 40)
                  if f"utun{i}" not in interfaces), None)
@@ -219,6 +314,8 @@ def probe(raw: str) -> str:
             fail("WG_UTUN_NOT_CREATED")
         command(IFCONFIG, name, "inet", profile["address"], profile["address"],
                 "netmask", "255.255.255.255", "mtu", str(profile["mtu"]), "up")
+        if system_vpn:
+            store_tunnel_dns(name, profile)
         uapi_request(name, uapi_config(profile))
         before = int(time.time())
         # Persistent keepalive will trigger a real handshake over the normal
@@ -231,10 +328,39 @@ def probe(raw: str) -> str:
             stats = uapi_request(name, "get=1\n\n")
             handshake = int(stats.get("last_handshake_time_sec", "0"))
             if handshake >= before - 2 and handshake <= time.time() + 1:
-                return "WG_PEER_HANDSHAKE_VERIFIED_UNROUTED"
+                if not system_vpn:
+                    return "WG_PEER_HANDSHAKE_VERIFIED_UNROUTED"
+                safe_probe_egress(name)
+                activation = guard_action("activate-full", name, str(child.pid),
+                                          timeout=34)
+                if activation != "WG_SYSTEM_IPV4_CONNECTED":
+                    fail("WG_SYSTEM_ROUTE_NOT_VERIFIED")
+                print(json.dumps({"state": "connected",
+                                  "reason": "WG_SYSTEM_IPV4_CONNECTED",
+                                  "vpn_connected": True}), flush=True)
+                # Retain the actual userspace tunnel and independent lease
+                # until Disconnect, engine crash, or remote watchdog recovery.
+                def requested_stop(_sig, _frame):
+                    raise KeyboardInterrupt
+                previous = signal.signal(signal.SIGTERM, requested_stop)
+                try:
+                    while child.poll() is None:
+                        time.sleep(10)
+                        if guard_action("heartbeat", str(child.pid), timeout=14) !=                                 "WG_SYSTEM_IPV4_CONNECTED":
+                            fail("WG_ROUTE_LEASE_LOST")
+                    fail("WG_ENGINE_EXITED")
+                except KeyboardInterrupt:
+                    return "WG_SYSTEM_DISCONNECTED"
+                finally:
+                    signal.signal(signal.SIGTERM, previous)
             time.sleep(1)
         return "WG_PEER_HANDSHAKE_NOT_OBSERVED"
     finally:
+        if system_vpn:
+            try:
+                guard_action("rollback", timeout=13)
+            except (ValueError, OSError, subprocess.TimeoutExpired):
+                pass  # independent launchd watchdog still owns the lease
         if child.poll() is None:
             os.killpg(child.pid, signal.SIGTERM)
         try:
@@ -248,7 +374,7 @@ def probe(raw: str) -> str:
 
 def main() -> int:
     try:
-        if sys.argv[1:] != ["probe"]:
+        if sys.argv[1:] not in (["probe"], ["system"]):
             fail("WG_OPERATION_NOT_ALLOWED")
         if os.geteuid() != 0:
             fail("WG_MACOS_ROOT_REQUIRED")
@@ -258,10 +384,11 @@ def main() -> int:
         payload = json.loads(data)
         if not isinstance(payload, dict) or set(payload) != {"config"}:
             fail("WG_INVALID_PAYLOAD")
-        result = probe(payload["config"])
-        print(json.dumps({"state": "probe", "reason": result,
-                          "vpn_connected": False}), flush=True)
-        return 0 if result == "WG_PEER_HANDSHAKE_VERIFIED_UNROUTED" else 1
+        result = probe(payload["config"], system_vpn=sys.argv[1:] == ["system"])
+        print(json.dumps({"state": "stopped" if result == "WG_SYSTEM_DISCONNECTED" else "probe",
+                          "reason": result, "vpn_connected": False}), flush=True)
+        return 0 if result in ("WG_PEER_HANDSHAKE_VERIFIED_UNROUTED",
+                               "WG_SYSTEM_DISCONNECTED") else 1
     except (ValueError, OSError, RuntimeError, json.JSONDecodeError,
             subprocess.TimeoutExpired, configparser.Error) as exc:
         reason = str(exc)
