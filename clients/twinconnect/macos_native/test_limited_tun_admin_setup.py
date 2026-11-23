@@ -10,7 +10,7 @@ class LimitedTunAdminSetupTests(unittest.TestCase):
     def test_root_owned_path_not_writable_usr_local_sbin(self):
         self.assertIn('/Library/PrivilegedHelperTools/TwinConnectOps', SCRIPT)
         self.assertNotIn('/usr/local/sbin/twinconnect', SCRIPT)
-        self.assertIn('/bin/chown root:wheel "$ops/tun-admin"', SCRIPT)
+        self.assertIn('/usr/sbin/chown root:wheel "$ops/tun-admin"', SCRIPT)
 
     def test_grant_is_narrow(self):
         self.assertIn('NOPASSWD: %s status, %s stop', SCRIPT)
