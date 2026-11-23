@@ -29,6 +29,7 @@ import urllib.request
 from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
                                  validate_full_tun_config)
 from openvpn_profile_review import review as review_openvpn
+from tun_vps_management_guard import guard_candidate
 
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
@@ -274,6 +275,13 @@ class Session:
                                "--route-nopull"]
                 else:
                     validate_full_tun_config(path)
+                    if session_limit() == VPS_SESSION:
+                        # Preserve the independent Termalin control transport
+                        # outside sing-box routing; reject if no active peer.
+                        profile = guard_candidate(profile)
+                        path.write_text(json.dumps(profile, separators=(",", ":")),
+                                        encoding="utf-8")
+                        validate_full_tun_config(path)
                     subprocess.run([str(engine), "check", "-c", str(path)],
                                    check=True, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, timeout=20)
