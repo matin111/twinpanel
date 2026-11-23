@@ -590,6 +590,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private weak var heroConnectionTimeText: NSTextField?
     private var ciscoRoutePollBusy = false
     private var ciscoRouteLastPoll = Date.distantPast
+    private var wireGuardProbeTask: Process?
+    private var wireGuardProbeBusy = false
+    private var wireGuardProbeGeneration = 0
+    private var wireGuardProbeStatus = ""
     private var ciscoTunnelTask: Process?
     private var ciscoTunnelGeneration = 0
     private let proxyAttemptQueue = DispatchQueue(
@@ -1449,13 +1453,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button(activeProtocol == "cisco" ?
+        let connect = button(activeProtocol == "wireguard" && wireGuardProbeBusy ?
+                             "Connecting…" : activeProtocol == "cisco" ?
                              (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
                              (localProxyActive || fullTunActive || openVPNAppSessionActive ?
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
-            !ciscoTunnelBusy
+            !ciscoTunnelBusy && !wireGuardProbeBusy
         connect.toolTip = activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
             "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
             activeProtocol == "openvpn" && openVPNAppSessionActive ?
@@ -1515,6 +1520,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         durationRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         // Keep the home page quiet: connection type is already in the pill.
         // Show only ongoing work or actionable errors beside Connect.
+        if activeProtocol == "wireguard" && !wireGuardProbeStatus.isEmpty {
+            let info = text(wireGuardProbeStatus, size: 12, color: muted)
+            main.addArrangedSubview(info)
+            info.widthAnchor.constraint(lessThanOrEqualTo: main.widthAnchor).isActive = true
+        }
         if activeProtocol == "openvpn" {
             let failed = status.contains("FAILED") ||
                          status.contains("REJECTED") ||
@@ -2873,6 +2883,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func signOut(_ sender: NSButton) {
         // Never keep a privileged Cisco session after account logout.
+        wireGuardProbeGeneration += 1
+        wireGuardProbeTask?.terminate()
+        wireGuardProbeTask = nil
+        wireGuardProbeBusy = false
+        wireGuardProbeStatus = ""
         ciscoTunnelGeneration += 1
         if ciscoTunnelTask != nil {
             DispatchQueue.global(qos: .utility).async {
@@ -4356,8 +4371,102 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // may start a real, verified sing-box SOCKS listener on loopback only.
     // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
     // Do not label a SOCKS listener as a connected system VPN.
+    private func requestWireGuardProbe() {
+        guard !wireGuardProbeBusy,
+              ciscoTunnelTask == nil, !ciscoSystemRouteVerified,
+              !openVPNAppSessionActive, !localProxyActive,
+              let session = accountSession,
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "wireguard" && $0.configured
+              }) == true else {
+            wireGuardProbeStatus = "Disconnect the current VPN and select a WireGuard server."
+            view = build()
+            return
+        }
+        let helper = "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_unsigned_tunnel.py"
+        guard FileManager.default.fileExists(atPath: helper) else {
+            wireGuardProbeStatus = "WG_UNSIGNED_HELPER_NOT_INSTALLED"
+            view = build()
+            return
+        }
+        wireGuardProbeBusy = true
+        wireGuardProbeGeneration += 1
+        let generation = wireGuardProbeGeneration
+        wireGuardProbeStatus = "Checking WireGuard peer…"
+        view = build()
+        directory.prepareWireGuardProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self,
+                  self.wireGuardProbeGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            switch result {
+            case .failure(let error):
+                self.wireGuardProbeBusy = false
+                let detail = error.localizedDescription
+                self.wireGuardProbeStatus =
+                    detail.range(of: "^WG_[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    detail : "WG_PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let payload):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                    task.arguments = ["-n", "/usr/bin/python3", helper, "probe"]
+                    let input = Pipe()
+                    let output = Pipe()
+                    task.standardInput = input
+                    task.standardOutput = output
+                    task.standardError = FileHandle.nullDevice
+                    do {
+                        try task.run()
+                        DispatchQueue.main.async {
+                            if self.wireGuardProbeGeneration == generation {
+                                self.wireGuardProbeTask = task
+                            }
+                        }
+                        input.fileHandleForWriting.write(payload)
+                        input.fileHandleForWriting.closeFile()
+                        let data = output.fileHandleForReading.readDataToEndOfFile()
+                        task.waitUntilExit()
+                        let json = (try? JSONSerialization.jsonObject(
+                            with: Data(data.prefix(2048)))) as? [String: Any]
+                        let code = json?["reason"] as? String ?? "WG_PROBE_FAILED"
+                        DispatchQueue.main.async {
+                            guard self.wireGuardProbeGeneration == generation else { return }
+                            self.wireGuardProbeBusy = false
+                            self.wireGuardProbeTask = nil
+                            self.wireGuardProbeStatus =
+                                code == "WG_PEER_HANDSHAKE_VERIFIED_UNROUTED" ?
+                                "WireGuard handshake verified · system routing not enabled" :
+                                (code.range(of: "^WG_[A-Z0-9_]{3,80}$",
+                                            options: .regularExpression) != nil ?
+                                 code : "WG_PROBE_FAILED")
+                            self.view = self.build()
+                        }
+                    } catch {
+                        input.fileHandleForWriting.closeFile()
+                        DispatchQueue.main.async {
+                            guard self.wireGuardProbeGeneration == generation else { return }
+                            self.wireGuardProbeBusy = false
+                            self.wireGuardProbeTask = nil
+                            self.wireGuardProbeStatus = "WG_PROBE_LAUNCH_FAILED"
+                            self.view = self.build()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @objc private func requestVPNConnection(_ sender: NSButton) {
-        guard accountSession != nil, !localProxyBusy, !fullTunBusy else { return }
+        guard accountSession != nil, !localProxyBusy, !fullTunBusy,
+              !wireGuardProbeBusy else { return }
+        if activeProtocol == "wireguard" {
+            requestWireGuardProbe()
+            return
+        }
         if openVPNAppSessionActive {
             stopPersistentOpenVPN()
             return
