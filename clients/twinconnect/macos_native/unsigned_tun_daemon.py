@@ -9,6 +9,7 @@ general release. The daemon does not claim a verified VPN connection.
 """
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -55,11 +56,25 @@ def allowed_uid(peer_uid: int, console_uid: int) -> bool:
     return console_uid > 0 and peer_uid == console_uid
 
 
+def unix_peer_uid(conn: socket.socket) -> int:
+    """Query kernel-authenticated UID; macOS Python 3.9 omits getpeereid()."""
+    if sys.platform != "darwin":
+        raise ValueError("DARWIN_UNIX_PEER_REQUIRED")
+    libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    func = libc.getpeereid
+    func.argtypes = [ctypes.c_int,
+                     ctypes.POINTER(ctypes.c_uint),
+                     ctypes.POINTER(ctypes.c_uint)]
+    func.restype = ctypes.c_int
+    uid = ctypes.c_uint()
+    gid = ctypes.c_uint()
+    if func(conn.fileno(), ctypes.byref(uid), ctypes.byref(gid)) != 0:
+        raise OSError(ctypes.get_errno(), "UNIX_PEER_CREDENTIALS_UNAVAILABLE")
+    return uid.value
+
+
 def authorized_peer(conn: socket.socket) -> bool:
-    # getpeereid() is available on Darwin UNIX-domain sockets.
-    if not hasattr(conn, "getpeereid"):
-        return False
-    peer_uid, _ = conn.getpeereid()
+    peer_uid = unix_peer_uid(conn)
     return allowed_uid(peer_uid, os.stat("/dev/console").st_uid)
 
 
@@ -335,7 +350,7 @@ def handle(conn: socket.socket, session: Session) -> None:
     try:
         if not authorized_peer(conn):
             raise ValueError("TUN_CONSOLE_OWNER_REQUIRED")
-        uid, _ = conn.getpeereid()
+        uid = unix_peer_uid(conn)
         data = bytearray()
         while len(data) <= MAX_REQUEST:
             chunk = conn.recv(min(8192, MAX_REQUEST + 1 - len(data)))
