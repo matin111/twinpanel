@@ -21,6 +21,7 @@ STATE = ROOT / "state.json"
 LOCK = ROOT / "lock"
 TTL = 30
 PROBE_DEST = "1.1.1.1"
+PROBE_DESTINATIONS = frozenset(("1.1.1.1", "8.8.8.8"))
 PROBE_SECONDS = 22
 LEASE_SECONDS = 45
 SPLIT_NETWORKS = ("0.0.0.0/1", "128.0.0.0/1")
@@ -151,21 +152,22 @@ def rollback() -> str:
     # Remove a single temporary HTTPS test route first. The baseline
     # default and the service's DNS/IP settings are never modified.
     if data.get("probe_dest") is not None:
-        if data.get("probe_dest") != PROBE_DEST or not re.fullmatch(
+        if data.get("probe_dest") not in PROBE_DESTINATIONS or not re.fullmatch(
                 r"utun[0-9]{1,4}", data.get("probe_interface", "")):
             return "CISCO_MANAGEMENT_RECOVERY_STATE_INVALID"
         probe_interface = data["probe_interface"]
         exact = exact_routes()
         if exact is None:
             return "CISCO_MANAGEMENT_ROUTE_OBSERVATION_FAILED"
-        if PROBE_DEST in exact:
-            observed = route(PROBE_DEST)
+        destination = data["probe_dest"]
+        if destination in exact:
+            observed = route(destination)
             if observed.get("interface") != probe_interface:
                 return "CISCO_PROBE_ROUTE_OWNERSHIP_CHANGED"
-            run(ROUTE, "-n", "delete", "-host", PROBE_DEST,
+            run(ROUTE, "-n", "delete", "-host", destination,
                 "-interface", probe_interface)
             after = exact_routes()
-            if after is None or PROBE_DEST in after:
+            if after is None or destination in after:
                 return "CISCO_PROBE_ROUTE_ROLLBACK_FAILED"
     # Recovery of temporary /1 routes must precede the removal of
     # management and server bypasses; otherwise Termalin could be lost.
@@ -273,8 +275,8 @@ def trial() -> str:
     return "CISCO_MANAGEMENT_PIN_TRIAL_30_SECONDS"
 
 
-def probe_host(interface: str) -> str:
-    """Route ONLY 1.1.1.1 through an established Cisco utun for 22 seconds.
+def probe_host(interface: str, destination: str = PROBE_DEST) -> str:
+    """Route one whitelisted HTTPS host through Cisco for 22 seconds.
 
     Requires independent watchdog and active Termalin. The default gateway,
     DNS, physical interface and all other destinations remain untouched.
@@ -282,6 +284,8 @@ def probe_host(interface: str) -> str:
     """
     if not re.fullmatch(r"utun[0-9]{1,4}", interface):
         return "CISCO_PROBE_INTERFACE_INVALID"
+    if destination not in PROBE_DESTINATIONS:
+        return "CISCO_PROBE_DESTINATION_REFUSED"
     result, peers, gateway, original_interface = preflight()
     if result != "CISCO_MANAGEMENT_PRECHECK_READY":
         return result
@@ -292,21 +296,21 @@ def probe_host(interface: str) -> str:
     if info.returncode or not re.search(
             r"(?m)^\s*inet\s+(?:10\.|172\.|192\.168\.)", info.stdout):
         return "CISCO_PROBE_TUNNEL_NOT_CONFIGURED"
-    base_route = route(PROBE_DEST)
+    base_route = route(destination)
     if (base_route.get("interface") != original_interface or
             base_route.get("gateway") != gateway):
         return "CISCO_PROBE_NOT_ON_BASELINE"
     exact = exact_routes()
-    if exact is None or PROBE_DEST in exact:
+    if exact is None or destination in exact:
         return "CISCO_PROBE_EXISTING_ROUTE_REFUSED"
     # Persist restoration intent before the routing socket is modified.
     state = {"peers": [], "gateway": gateway, "interface": original_interface,
              "deadline": time.time() + PROBE_SECONDS,
-             "probe_dest": PROBE_DEST, "probe_interface": interface}
+             "probe_dest": destination, "probe_interface": interface}
     store(state)
-    applied = run(ROUTE, "-n", "add", "-host", PROBE_DEST,
+    applied = run(ROUTE, "-n", "add", "-host", destination,
                   "-interface", interface)
-    if applied.returncode or route(PROBE_DEST).get("interface") != interface:
+    if applied.returncode or route(destination).get("interface") != interface:
         return "CISCO_PROBE_ADD_FAILED_" + rollback()
     return "CISCO_HOST_EGRESS_TRIAL_ACTIVE"
 
@@ -551,6 +555,8 @@ def main() -> int:
             result = heartbeat(int(sys.argv[2]))
             if result != "CISCO_SYSTEM_IPV4_CONNECTED":
                 rollback()
+        elif len(sys.argv) == 4 and sys.argv[1] == "probe-host":
+            result = probe_host(sys.argv[2], sys.argv[3])
         elif len(sys.argv) == 3 and sys.argv[1] == "probe-host":
             result = probe_host(sys.argv[2])
         elif sys.argv[1:] == ["rollback"]:
