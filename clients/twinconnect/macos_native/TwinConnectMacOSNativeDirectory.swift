@@ -884,13 +884,20 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         request(endpointURL, payload: ["protocol": "v2ray"],
                 bearer: session.accessToken, maxBytes: 1048576) { [weak self] result in
             guard let self = self else { return }
-            guard case .success(let response) = result,
-                  self.validEnvelope(response, session.namespace),
+            let response: [String: Any]
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+                return
+            case .success(let payload):
+                response = payload
+            }
+            guard self.validEnvelope(response, session.namespace),
                   (response["protocol"] as? String) == "v2ray",
                   let groups = response["server_groups"] as? [[String: Any]],
                   groups.count <= 200 else {
                 completion(.failure(TwinMacNativeError.failure(
-                    "XRAY_SERVER_PROFILES_UNAVAILABLE")))
+                    "XRAY_PROFILE_RESPONSE_INVALID")))
                 return
             }
             let allowedIDs = ["websocket_tls", "xhttp_reality", "tcp_tls"]
@@ -950,17 +957,39 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         request(endpoint(panel, "v1/central-app/session/protocols"),
                 payload: nil, bearer: token) { [weak self] response in
             guard let self = self else { return }
-            guard case .success(let catalog) = response,
-                  self.validEnvelope(catalog, session.namespace),
+            // An HTTP failure, stale namespace or malformed catalog must
+            // NEVER masquerade as an actual revoked protocol entitlement.
+            let catalog: [String: Any]
+            switch response {
+            case .failure(let error):
+                completion(.failure(error))
+                return
+            case .success(let accepted):
+                catalog = accepted
+            }
+            guard self.validEnvelope(catalog, session.namespace),
                   let rows = catalog["protocols"] as? [[String: Any]],
-                  rows.count <= 16,
-                  rows.filter({
-                      ($0["code"] as? String) == protocolCode &&
-                      ($0["selected"] as? Bool) == true &&
-                      ($0["config_record_present"] as? Bool) == true
-                  }).count == 1 else {
+                  rows.count <= 16 else {
                 completion(.failure(TwinMacNativeError.failure(
-                    "PROTOCOL_NOT_ALLOWED")))
+                    "PROTOCOL_CATALOG_INVALID")))
+                return
+            }
+            let matching = rows.filter { ($0["code"] as? String) == protocolCode }
+            guard matching.count == 1,
+                  let allowed = matching[0]["selected"] as? Bool,
+                  let configured = matching[0]["config_record_present"] as? Bool else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "PROTOCOL_CATALOG_INVALID")))
+                return
+            }
+            guard allowed else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "PROTOCOL_NOT_SELECTED")))
+                return
+            }
+            guard configured else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "PROTOCOL_CONFIG_MISSING")))
                 return
             }
             self.request(self.endpoint(panel, "v1/central-app/session/servers"),
@@ -978,13 +1007,22 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                 self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
                              payload: ["protocol": protocolCode], bearer: token,
                              maxBytes: 1048576) { profiles in
-                    guard case .success(let response) = profiles,
-                          self.validEnvelope(response, session.namespace),
+                    let response: [String: Any]
+                    switch profiles {
+                    case .failure(let error):
+                        // A transport or HTTP failure is not a revoked
+                        // entitlement or a missing user configuration.
+                        completion(.failure(error))
+                        return
+                    case .success(let payload):
+                        response = payload
+                    }
+                    guard self.validEnvelope(response, session.namespace),
                           (response["protocol"] as? String) == protocolCode,
                           let items = response["items"] as? [[String: Any]],
                           items.count <= 200 else {
                         completion(.failure(TwinMacNativeError.failure(
-                            "PROFILE_UNAVAILABLE")))
+                            "PROFILE_RESPONSE_INVALID")))
                         return
                     }
                     let matches = items.filter { item in
