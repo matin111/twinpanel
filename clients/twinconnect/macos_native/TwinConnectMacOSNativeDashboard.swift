@@ -1589,16 +1589,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // not as a long line beneath the primary connection button.
 
 
-        // Keep V2Ray inbound selectable from Quick Connect as well as Locations.
-        if activeProtocol == "v2ray" {
-            let inboundTitle = text("V2RAY INBOUND", size: 11,
-                                    weight: .bold, color: muted)
-            main.addArrangedSubview(inboundTitle)
-            let inboundRow = v2rayInboundChips()
-            main.addArrangedSubview(inboundRow)
-            inboundRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        }
-
         // NSStackView with .leading alignment does not automatically
         // stretch this nested account card. Pin it to the full hero width.
         let subscription = homeSubscriptionSummary()
@@ -1959,7 +1949,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let key = selectionPreferenceKey(session)
         UserDefaults.standard.set([
             "server": activeServer ?? "",
-            "protocol": activeProtocol ?? ""
+            "protocol": activeProtocol ?? "",
+            "v2ray_inbound": activeV2RayInbound
         ], forKey: key)
     }
 
@@ -1974,6 +1965,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let savedProtocol = record["protocol"] as? String ?? ""
         activeServer = savedServer.isEmpty ? nil : savedServer
         activeProtocol = savedProtocol.isEmpty ? nil : savedProtocol
+        let savedInbound = record["v2ray_inbound"] as? String ?? "tcp_tls"
+        activeV2RayInbound = v2rayInboundIDs.contains(savedInbound) ?
+            savedInbound : "tcp_tls"
     }
 
     private func countryName(_ code: String) -> String {
@@ -2059,24 +2053,29 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return group
     }
 
-    private func v2rayInboundChips() -> NSView {
-        let row = stack(.horizontal, spacing: 8)
-        for (index, name) in v2rayInboundLabels.enumerated() {
-            let selected = activeV2RayInbound == v2rayInboundIDs[index]
-            let choice = button(name, action: #selector(selectV2RayInbound(_:)),
-                                tag: index, primary: selected, mutedButton: !selected)
-            choice.heightAnchor.constraint(equalToConstant: 34).isActive = true
-            row.addArrangedSubview(choice)
-        }
-        return row
-    }
-
-    @objc private func selectV2RayInbound(_ sender: NSButton) {
-        guard v2rayInboundIDs.indices.contains(sender.tag),
+    // A server's V2Ray routes are separate rows within that server card.
+    // No globally selectable inlet or Quick Connect transport selector.
+    @objc private func selectServerV2RayInbound(_ sender: NSButton) {
+        let serverIndex = sender.tag / v2rayInboundIDs.count
+        let inboundIndex = sender.tag % v2rayInboundIDs.count
+        guard locationRowIDs.indices.contains(serverIndex),
+              v2rayInboundIDs.indices.contains(inboundIndex),
               !localProxyBusy, !fullTunBusy, !fullTunActive,
               !ciscoTunnelBusy else { return }
-        activeV2RayInbound = v2rayInboundIDs[sender.tag]
-        status = "V2Ray " + v2rayInboundLabels[sender.tag] + " selected."
+        let selectedServerID = locationRowIDs[serverIndex]
+        if activeServer != selectedServerID && localProxyActive {
+            activeServer = selectedServerID
+            activeV2RayInbound = v2rayInboundIDs[inboundIndex]
+            activeProtocol = "v2ray"
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeServer = selectedServerID
+        activeV2RayInbound = v2rayInboundIDs[inboundIndex]
+        activeProtocol = "v2ray"
+        persistCurrentSelection()
+        status = "Server and V2Ray " + v2rayInboundLabels[inboundIndex] + " selected."
         view = build()
     }
 
@@ -2132,15 +2131,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let chips = protocolChips()
         wrapper.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
-        if activeProtocol == "v2ray" {
-            let inboundTitle = text("V2RAY INBOUND", size: 11,
-                                    weight: .bold, color: muted)
-            wrapper.addArrangedSubview(inboundTitle)
-            let inboundRow = v2rayInboundChips()
-            wrapper.addArrangedSubview(inboundRow)
-            inboundRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
-        }
-
         // A fastest-node action must use real local ICMP measurements,
         // never panel estimates or synthetic timers.
         let fastest = visibleLocationServers().filter { server in
@@ -2291,7 +2281,37 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     row.addArrangedSubview(probe)
                     row.addArrangedSubview(select)
 
-                    let tile = card([row], radius: 15, padding: 13)
+                    let tileContent = stack(spacing: 8)
+                    tileContent.alignment = .leading
+                    tileContent.addArrangedSubview(row)
+                    row.widthAnchor.constraint(equalTo: tileContent.widthAnchor)
+                        .isActive = true
+                    if activeProtocol == "v2ray" {
+                        // Every node owns its three independently selectable routes.
+                        // A route is never silently replaced by another inbound.
+                        let inboundRows = stack(spacing: 6)
+                        inboundRows.alignment = .leading
+                        for (inboundIndex, inboundLabel) in v2rayInboundLabels.enumerated() {
+                            let isSelected = selected &&
+                                activeV2RayInbound == v2rayInboundIDs[inboundIndex]
+                            let inboundButton = button(
+                                (isSelected ? "✓  " : "›  ") + inboundLabel,
+                                action: #selector(selectServerV2RayInbound(_:)),
+                                tag: serverIndex * v2rayInboundIDs.count + inboundIndex,
+                                primary: isSelected, mutedButton: !isSelected)
+                            inboundButton.heightAnchor.constraint(equalToConstant: 33)
+                                .isActive = true
+                            inboundButton.toolTip = "Select this server's " + inboundLabel +
+                                " inbound. Connection requires a valid panel profile."
+                            inboundRows.addArrangedSubview(inboundButton)
+                            inboundButton.widthAnchor.constraint(
+                                equalTo: inboundRows.widthAnchor).isActive = true
+                        }
+                        tileContent.addArrangedSubview(inboundRows)
+                        inboundRows.widthAnchor.constraint(
+                            equalTo: tileContent.widthAnchor).isActive = true
+                    }
+                    let tile = card([tileContent], radius: 15, padding: 13)
                     tile.wantsLayer = true
                     tile.layer?.backgroundColor = (selected ?
                         tint().withAlphaComponent(0.25) :
