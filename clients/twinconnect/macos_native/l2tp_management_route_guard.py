@@ -457,6 +457,12 @@ def rollback() -> str:
             if run(NETWORKSETUP, "-setdnsservers", server,
                    *(before if before else ["Empty"])).returncode:
                 return "L2TP_DNS_RECOVERY_FAILED"
+    # Do not remove Termalin/SSH bypasses until the original physical
+    # default is restored; PPP may itself have injected a default route.
+    original = route("default")
+    if (original.get("gateway") != state.get("gateway") or
+            original.get("interface") != state.get("interface")):
+        return "L2TP_PHYSICAL_DEFAULT_NOT_RESTORED"
     # Do not delete a host route owned by the administrator or other VPN.
     for peer in state.get("owned_pins", []):
         if not public_ip(peer):
@@ -474,15 +480,22 @@ def rollback() -> str:
 
 
 def stop() -> str:
-    # Terminate PPP first while pinning management routes. Once PPP is down,
-    # native routing must have returned before the bypass routes are removed.
+    # Restore owned /1 routes and DNS while the PPP interface still exists.
+    # If macOS installed a native default route, retain our management pins,
+    # stop PPP, and retry rollback after the physical gateway is restored.
     current = load()
-    if current:
-        run(NATIVE, "stop", timeout=8)
     result = rollback()
+    if result == "L2TP_PHYSICAL_DEFAULT_NOT_RESTORED" and current:
+        run(NATIVE, "stop", timeout=8)
+        result = rollback()
     if result in ("L2TP_MANAGEMENT_PIN_ROLLBACK_VERIFIED",
                   "L2TP_MANAGEMENT_PIN_IDLE"):
+        if current:
+            run(NATIVE, "stop", timeout=8)
         return "L2TP_SYSTEM_DISCONNECTED"
+    # Recovery failed: keep route ownership state for independent retry.
+    if current:
+        run(NATIVE, "stop", timeout=8)
     return result
 
 
