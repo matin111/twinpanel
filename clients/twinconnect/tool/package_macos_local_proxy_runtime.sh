@@ -23,7 +23,7 @@ if [[ -e "$destination" &&
       ! -f "$destination/macos_native/standalone_connection_manager.py" ]]; then
   echo "UNRECOGNIZED_EXISTING_RUNTIME_REFUSED" >&2; exit 2
 fi
-for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/l2tp_native_preflight.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
+for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/unsigned_tun_policy.py macos_native/xray_unsigned_tun_candidate.py macos_native/l2tp_native_preflight.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
   if [[ ! -f "$source" || -L "$source" ]]; then
     echo "MISSING_OR_UNSAFE_RUNTIME_SOURCE: $source" >&2; exit 2
   fi
@@ -42,6 +42,10 @@ install -m 0755 macos_native/cisco_openconnect_auth.py \
   "$stage/macos_native/cisco_openconnect_auth.py"
 install -m 0755 macos_native/unsigned_tun_client.py \
   "$stage/macos_native/unsigned_tun_client.py"
+install -m 0644 macos_native/unsigned_tun_policy.py \
+  "$stage/macos_native/unsigned_tun_policy.py"
+install -m 0755 macos_native/xray_unsigned_tun_candidate.py \
+  "$stage/macos_native/xray_unsigned_tun_candidate.py"
 install -m 0755 macos_native/l2tp_native_preflight.py \
   "$stage/macos_native/l2tp_native_preflight.py"
 install -m 0644 macos_native/openvpn_profile_review.py \
@@ -205,6 +209,8 @@ if [[ "$wg_packaged" -eq 1 ]]; then
 fi
 test -r "$destination/macos_native/standalone_connection_manager.py" ||
   { echo "PACKAGED_MANAGER_MISSING" >&2; exit 3; }
+test -r "$destination/macos_native/xray_unsigned_tun_candidate.py" || { echo "PACKAGED_VLESS_TUN_CONVERTER_MISSING" >&2; exit 3; }
+test -r "$destination/macos_native/unsigned_tun_policy.py" || { echo "PACKAGED_TUN_POLICY_MISSING" >&2; exit 3; }
 echo "MACOS_LOCAL_PROXY_RUNTIME_PACKAGED"
 echo "Runtime: $destination"
 echo "Engines: $installed"
