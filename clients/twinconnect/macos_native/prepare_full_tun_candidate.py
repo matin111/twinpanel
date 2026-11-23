@@ -49,7 +49,7 @@ def convert(profile: dict) -> dict:
         "log": {"level": "error"},
         "inbounds": [{
             "type": "tun", "tag": "twinconnect-tun",
-            "interface_name": "twinconnect",
+            # macOS allocates utunN; a custom interface name is invalid.
             "address": ["172.19.0.1/30"],
             "auto_route": True,
             "auto_redirect": False,
