@@ -1433,6 +1433,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private var verifiedHeroConnectionLabel: String {
+        // The unsigned V2Ray TUN is asynchronous. Show the pending request
+        // immediately, not Offline, until the controller confirms its result.
+        if fullTunBusy && activeProtocol != "openvpn" {
+            return fullTunActive ? "◌  Disconnecting…" : "◌  Connecting…"
+        }
         if localProxyActive { return "◉  " + connectedProtocolTitle + " proxy active" }
         if openVPNSystemRouteVerified { return "◉  Connected · OpenVPN" }
         if l2tpSystemRouteVerified { return "◉  Connected · L2TP" }
@@ -1456,6 +1461,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private var verifiedNetworkConnectionLabel: String {
+        if fullTunBusy && activeProtocol != "openvpn" {
+            return fullTunActive ? "Disconnecting…" : "Connecting…"
+        }
         if localProxyActive { return connectedProtocolTitle + " · Proxy" }
         if openVPNSystemRouteVerified { return "Connected · OpenVPN" }
         if l2tpSystemRouteVerified { return "Connected · L2TP" }
@@ -1490,7 +1498,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             verifiedHeroConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-                    l2tpSystemRouteVerified) ? sea : muted))
+                    l2tpSystemRouteVerified || fullTunBusy) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1519,7 +1527,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button(activeProtocol == "l2tp" ?
+        let connect = button(fullTunBusy && activeProtocol != "openvpn" ?
+                             (fullTunActive ? "Disconnecting…" : "Connecting…") :
+                             activeProtocol == "l2tp" ?
                              ((l2tpTask != nil || l2tpSystemRouteVerified) ?
                               "Disconnect" : (l2tpBusy ? "Connecting…" : "Connect")) :
                              activeProtocol == "wireguard" ?
@@ -1538,7 +1548,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (status.contains("FAILED") || status.contains("REJECTED") ||
              status.contains("UNAVAILABLE") || status.contains("NOT_INSTALLED") ||
              status.contains("not verified"))
-        connect.toolTip = l2tpHasDiagnostic ? l2tpStatus :
+        connect.toolTip = fullTunBusy ? "Waiting for the TUN controller; connection not yet verified." :
+            l2tpHasDiagnostic ? l2tpStatus :
             activeProtocol == "l2tp" ?
             "Review authorized L2TP settings and native macOS VPN service." :
             activeProtocol == "wireguard" ?
