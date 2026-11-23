@@ -261,8 +261,8 @@ class TUNDaemonControlTests(unittest.TestCase):
 
     def test_unverified_engine_is_not_claimed_as_vpn_connected(self):
         self.assertIn("TUN route running; checking HTTPS.", DASHBOARD)
-        self.assertIn('if fullTunHTTPSConnected { return "◉  Connected" }', DASHBOARD)
-        self.assertIn('if fullTunActive { return "◉  TUN running · unverified" }', DASHBOARD)
+        self.assertIn('return "◉  Connected" + fullTunConnectedSuffix', DASHBOARD)
+        self.assertIn('return "◉  TUN running · unverified" + fullTunConnectedSuffix', DASHBOARD)
         self.assertIn('"system_vpn_verified": False', (DIR /
                          "unsigned_tun_daemon.py").read_text())
 
