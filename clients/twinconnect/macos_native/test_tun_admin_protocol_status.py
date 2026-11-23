@@ -52,6 +52,37 @@ class TUNAdminProtocolTests(unittest.TestCase):
                 self.assertIsNone(protocol.current_protocol(
                     root, f"{root}/sing-box run -c {config}"))
 
+    def test_shadowtls_is_attested_from_exact_two_stage_chain(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "active-1234.json"
+            profile = {
+                "inbounds": [{"type": "tun"}],
+                "outbounds": [
+                    {"type": "shadowsocks", "tag": "proxy", "method": "aes-256-gcm",
+                     "detour": "shadowtls-transport"},
+                    {"type": "shadowtls", "tag": "shadowtls-transport", "version": 3}
+                ]}
+            config.write_text(json.dumps(profile))
+            config.chmod(0o600)
+            ps = f"{root}/sing-box run -c {config}\n"
+            with patch.object(protocol.os, "geteuid", return_value=0), \
+                 patch.object(protocol.Path, "lstat", autospec=True) as st:
+                meta = config.stat()
+                st.return_value.st_uid = 0
+                st.return_value.st_mode = meta.st_mode
+                st.return_value.st_size = meta.st_size
+                self.assertEqual(protocol.current_protocol(root, ps), "shadowtls")
+                profile["outbounds"][0]["detour"] = "unknown-tag"
+                config.write_text(json.dumps(profile))
+                st.return_value.st_size = config.stat().st_size
+                self.assertIsNone(protocol.current_protocol(root, ps))
+                profile["outbounds"][0]["detour"] = "shadowtls-transport"
+                profile["outbounds"][1]["version"] = 2
+                config.write_text(json.dumps(profile))
+                st.return_value.st_size = config.stat().st_size
+                self.assertIsNone(protocol.current_protocol(root, ps))
+
     def test_non_root_never_reads_private_profile(self):
         with patch.object(protocol.os, 'geteuid', return_value=501):
             self.assertIsNone(protocol.current_protocol())
