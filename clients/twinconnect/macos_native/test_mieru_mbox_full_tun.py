@@ -107,6 +107,15 @@ class MboxFullTunTests(unittest.TestCase):
         self.assertIn('macos_native/unsigned_mieru_profile.py', RUNTIME)
         self.assertIn('MIERU_MBOX_ENGINE_PACKAGED', RUNTIME)
 
+    def test_mieru_connect_attempt_and_failure_are_recorded(self):
+        start = UI.index('private func recordProxyAttempt(')
+        end = UI.index('private func localRuntimeRoot()', start)
+        record = UI[start:end]
+        self.assertIn('"shadowtls", "v2ray", "mieru"', record)
+        self.assertIn('recordProxyAttempt(protocolCode, "CONNECT_REQUESTED")', UI)
+        self.assertIn('self.recordProxyAttempt(protocolCode, reason)', UI)
+        self.assertIn('case "mieru": return "Mieru"', UI)
+
     def test_no_passwords_or_false_connected_on_default_cli(self):
         cmd = [sys.executable, str(ROOT / "unsigned_mieru_profile.py")]
         result = subprocess.run(cmd, input=json.dumps(source_profile()),
