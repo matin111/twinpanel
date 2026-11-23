@@ -14,7 +14,7 @@ ROOT = Path("/Library/PrivilegedHelperTools/TwinConnectTUN")
 ALLOWED = {
     "vless": "v2ray", "hysteria2": "hysteria2", "tuic": "tuic",
     "anytls": "anytls", "socks": "socks5", "snell": "snell",
-    "naive": "naive", "shadowtls": "shadowtls",
+    "naive": "naive", "shadowtls": "shadowtls", "mieru": "mieru",
 }
 
 
@@ -37,10 +37,17 @@ def current_protocol(root=ROOT, ps_output=None):
                 capture_output=True, text=True, timeout=5, check=True).stdout
         else:
             running = ps_output
-        exact_command = f"{root}/sing-box run -c {path}"
+        profile = json.loads(path.read_text(encoding="utf-8"))
+        outbounds = profile.get("outbounds")
+        # Root-selected Mieru uses the pinned mbox engine rather than the
+        # default sing-box executable. No arbitrary process path is accepted.
+        use_mbox = (isinstance(outbounds, list) and len(outbounds) == 1
+                    and isinstance(outbounds[0], dict)
+                    and outbounds[0].get("type") == "mieru")
+        engine = "mbox" if use_mbox else "sing-box"
+        exact_command = f"{root}/{engine} run -c {path}"
         if not any(line.strip() == exact_command for line in running.splitlines()):
             return None
-        profile = json.loads(path.read_text(encoding="utf-8"))
         inbounds = profile.get("inbounds")
         if not isinstance(inbounds, list) or len(inbounds) != 1:
             return None
