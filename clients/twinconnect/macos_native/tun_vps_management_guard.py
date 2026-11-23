@@ -8,6 +8,8 @@ from __future__ import annotations
 import ipaddress
 import re
 import subprocess
+import stat
+from pathlib import Path
 
 AGENT = "/usr/local/bin/termalin-agent run"
 
@@ -43,7 +45,39 @@ def control_peers() -> tuple[str, ...]:
     return tuple(sorted(peers))
 
 
-def guard_candidate(config: dict, peers: tuple[str, ...] | None = None) -> dict:
+def system_dns_resolvers(path: Path = Path("/var/run/resolv.conf")) -> tuple[str, ...]:
+    """Read only root-owned Mac system DNS; never accept app-supplied bypasses."""
+    try:
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
+                info.st_mode & 0o022 or info.st_size > 8192):
+            raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED")
+        data = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        raise ValueError("VPS_DNS_RESOLVER_UNAVAILABLE") from None
+    ips = set()
+    for line in data.splitlines():
+        fields = line.split()
+        if not fields or fields[0] != "nameserver":
+            continue
+        if len(fields) != 2:
+            raise ValueError("VPS_DNS_RESOLVER_INVALID")
+        try:
+            ip = ipaddress.IPv4Address(fields[1])
+        except ipaddress.AddressValueError:
+            raise ValueError("VPS_DNS_RESOLVER_INVALID") from None
+        # A VPS's locally supplied public resolver must remain reachable
+        # through en0, since DNS-over-UDP is not carried by VLESS WebSocket.
+        if not ip.is_global:
+            raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED")
+        ips.add(str(ip))
+    if not 1 <= len(ips) <= 4:
+        raise ValueError("VPS_DNS_RESOLVER_UNAVAILABLE")
+    return tuple(sorted(ips))
+
+
+def guard_candidate(config: dict, peers: tuple[str, ...] | None = None,
+                    dns_servers: tuple[str, ...] = ()) -> dict:
     """Modify only an already reviewed sing-box candidate; fail without peers."""
     peers = control_peers() if peers is None else peers
     if not peers or len(peers) > 8:
@@ -61,5 +95,15 @@ def guard_candidate(config: dict, peers: tuple[str, ...] | None = None) -> dict:
         raise ValueError("VPS_TUN_EXCLUSIONS_UNTRUSTED")
     # Original caller is allowed to provide the transport details, but cannot
     # control the management exclusion policy.
+    if len(dns_servers) > 4:
+        raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED")
+    for value in dns_servers:
+        try:
+            ip = ipaddress.IPv4Address(value)
+        except ipaddress.AddressValueError:
+            raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED") from None
+        if not ip.is_global:
+            raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED")
+        normalized.append(str(ip) + "/32")
     inbounds[0]["route_exclude_address"] = sorted(set(normalized))
     return config
