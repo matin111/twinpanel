@@ -17,7 +17,7 @@ class UnsignedTUNPolicyTests(unittest.TestCase):
             "inbounds": [{"type": "tun", "auto_route": True,
                           "auto_redirect": False}],
             "outbounds": [{"type": "anytls", "tag": "proxy"}],
-            "route": {"final": "proxy"},
+            "route": {"final": "proxy", "auto_detect_interface": True},
         }
         obj.update(overrides)
         file = Path(root) / "client.json"
@@ -30,6 +30,12 @@ class UnsignedTUNPolicyTests(unittest.TestCase):
             self.assertTrue(result["validated"])
             self.assertFalse(result["system_route_modified"])
             self.assertFalse(result["engine_started"])
+
+    def test_rejects_unbound_outbound_routing_loop(self):
+        with tempfile.TemporaryDirectory() as root:
+            file = self.config(root, route={"final": "proxy"})
+            with self.assertRaisesRegex(ValueError, "TUN_OUTBOUND_INTERFACE_BIND_REQUIRED"):
+                policy.validate_full_tun_config(file)
 
     def test_refuses_proxy_only_inbound(self):
         with tempfile.TemporaryDirectory() as root:
