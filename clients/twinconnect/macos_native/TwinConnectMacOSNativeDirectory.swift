@@ -1740,7 +1740,20 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     guard ["cubic", "bbr", "new_reno"].contains(cc)
                     else { return nil }
                     reviewed["congestion_control"] = cc
-                }
+                } else if outbound["congestion_control"] != nil { return nil }
+                // TwinPanel's provisioned TUIC profiles include QUIC
+                // keepalives and 0-RTT policy. Silently stripping them
+                // changes the negotiated behavior of the real server.
+                if let hb = outbound["heartbeat"] as? String {
+                    guard hb.range(
+                        of: "^[1-9][0-9]{0,2}(s|m)$",
+                        options: .regularExpression) != nil
+                    else { return nil }
+                    reviewed["heartbeat"] = hb
+                } else if outbound["heartbeat"] != nil { return nil }
+                if let zeroRTT = outbound["zero_rtt_handshake"] as? Bool {
+                    reviewed["zero_rtt_handshake"] = zeroRTT
+                } else if outbound["zero_rtt_handshake"] != nil { return nil }
                 if let udpMode = outbound["udp_relay_mode"] as? String {
                     guard ["native", "quic"].contains(udpMode),
                           outbound["udp_over_stream"] == nil else { return nil }
