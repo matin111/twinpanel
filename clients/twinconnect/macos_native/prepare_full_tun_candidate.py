@@ -57,7 +57,7 @@ def convert(profile: dict) -> dict:
             "stack": "system"
         }],
         "outbounds": outbounds,
-        "route": {"final": final}
+        "route": {"final": final, "auto_detect_interface": True}
     }
     # Fail closed on accidental direct fallback and mismatched route.
     from unsigned_tun_policy import validate_full_tun_config
