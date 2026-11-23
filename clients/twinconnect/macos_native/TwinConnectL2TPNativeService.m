@@ -115,7 +115,12 @@ static int selftest(void) {
     }
     SCNetworkServiceRef service=SCNetworkServiceCreate(prefs,iface);
     BOOL good=service != NULL;
-    if (good) good=SCNetworkServiceEstablishDefaultConfiguration(service);
+    if (!good) {
+        result(@"error",@"L2TP_NATIVE_SERVICE_MEMORY_CREATE_REJECTED");
+    } else {
+        good=SCNetworkServiceEstablishDefaultConfiguration(service);
+        if (!good) result(@"error",@"L2TP_NATIVE_SERVICE_DEFAULTS_REJECTED");
+    }
     if (good) {
         NSDictionary *ppp=@{
             (__bridge NSString*)kSCPropNetPPPAuthName:@"TWINCONNECT_PROBE_ONLY",
