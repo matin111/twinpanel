@@ -161,6 +161,21 @@ static int selftest(void) {
             good=YES;
         }
     }
+    if (good) {
+        SCNetworkSetRef set=SCNetworkSetCopyCurrent(prefs);
+        if (!set) {
+            result(@"error",@"L2TP_NATIVE_SET_MISSING");
+            good=NO;
+        } else {
+            if (!SCNetworkServiceSetName(service,CFSTR("TwinConnect L2TP Test")) ||
+                !SCNetworkSetAddService(set,service)) {
+                result(@"error",@"L2TP_NATIVE_SET_ADD_REJECTED");
+                good=NO;
+            }
+            CFRelease(set);
+        }
+    }
+    // Never COMMIT or APPLY: the real network configuration remains unchanged.
     if (service) {SCNetworkServiceRemove(service);CFRelease(service);}
     CFRelease(pppInterface);
     CFRelease(iface);
