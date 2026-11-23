@@ -13,12 +13,24 @@ class MacV2RayInboundSelectionTests(unittest.TestCase):
         self.assertIn('["TCP TLS", "WebSocket TLS", "XHTTP Reality"]', UI)
         self.assertIn("selectServerV2RayInbound", UI)
 
-    def test_each_server_has_own_inbound_rows_not_global_ui(self):
-        self.assertIn('if activeProtocol == "v2ray" {\n                        // Every node owns', UI)
+    def test_faithful_windows_server_cards_no_synthetic_inbounds(self):
+        self.assertIn("loadXrayInboundIndex", DIRECTORY)
+        self.assertIn('allowedServerIDs.contains(nodeID)', DIRECTORY)
+        self.assertIn('self.reviewedXrayVLESSUri(uri, profileID: id) != nil', DIRECTORY)
+        self.assertIn('if !choices.isEmpty { found[nodeID] = choices }', DIRECTORY)
+        self.assertIn('for inbound in xrayInboundIndex[server.id] ?? []', UI)
         self.assertIn('selectServerV2RayInbound', UI)
-        self.assertIn('serverIndex * v2rayInboundIDs.count + inboundIndex', UI)
+        self.assertIn('probeXrayInbound', UI)
+        self.assertIn('countryName(code) + " · " + v2rayInboundLabel(inbound.id)', UI)
         self.assertNotIn('showV2RayInboundMenu', UI)
         self.assertNotIn('v2rayInboundChips()', UI)
+        self.assertNotIn('serverIndex * v2rayInboundIDs.count + inboundIndex', UI)
+
+    def test_real_profile_is_needed_before_selection(self):
+        self.assertIn('xrayInboundIndex[nodeID]?.contains(where: { $0.id == inboundID })',
+                      UI)
+        self.assertIn('xrayIndexLoaded', UI)
+        self.assertIn('No verified V2Ray profiles loaded.', UI)
 
     def test_selected_id_reaches_server_profile_selection(self):
         self.assertIn('v2rayInboundID: activeV2RayInbound', UI)
