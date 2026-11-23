@@ -24,6 +24,22 @@ class CiscoUnroutedTests(TestCase):
                  "mtu", "1300", "up"],
                 capture_output=True, timeout=8, check=False)
 
+    def test_uses_only_valid_cisco_dns_and_never_stores_secrets(self):
+        env = {"INTERNAL_IP4_DNS": "10.91.0.1 1.1.1.1 bad",
+               "INTERNAL_IP4_DNS1": "10.91.0.1",
+               "INTERNAL_IP4_DNS2": "127.0.0.1"}
+        self.assertEqual(module.tunnel_dns(env), ["10.91.0.1", "1.1.1.1"])
+
+    def test_dns_metadata_only_after_successful_interface_configuration(self):
+        env = {"reason": "connect", "TUNDEV": "utun4",
+               "INTERNAL_IP4_ADDRESS": "10.91.0.63",
+               "INTERNAL_IP4_DNS": "10.91.0.1"}
+        with patch.object(module.subprocess, "run",
+                          return_value=CompletedProcess([], 0, b"", b"")), \
+             patch.object(module, "store_tunnel_dns") as store:
+            self.assertEqual(module.execute(env), "CISCO_UTUN_CONFIGURED_UNROUTED")
+            store.assert_called_once_with("utun4", "10.91.0.63", ["10.91.0.1"])
+
     def test_pre_init_and_disconnect_never_change_network(self):
         for reason in ("pre-init", "disconnect", "attempt-reconnect"):
             with self.subTest(reason=reason), patch.object(
