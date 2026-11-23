@@ -20,6 +20,31 @@ class VPSManagementGuardTests(unittest.TestCase):
         self.assertEqual(result["inbounds"][0]["route_exclude_address"],
                          ["148.113.20.109/32"])
 
+    def test_tun_bypasses_root_owned_system_dns_and_management_peer(self):
+        result = guard_candidate(self.config(), ("148.113.20.109",),
+                                 ("185.236.39.19",))
+        self.assertEqual(result["inbounds"][0]["route_exclude_address"],
+                         ["148.113.20.109/32", "185.236.39.19/32"])
+
+    def test_refuses_dns_outside_public_system_resolvers(self):
+        for ip in ("127.0.0.1", "192.168.1.1", "garbage"):
+            with self.subTest(ip=ip), self.assertRaisesRegex(
+                    ValueError, "VPS_DNS_RESOLVER_UNTRUSTED"):
+                guard_candidate(self.config(), ("148.113.20.109",), (ip,))
+
+    def test_resolver_file_requires_root_owner_and_not_writable(self):
+        with mock.patch("tun_vps_management_guard.Path.lstat") as stat_call, \
+             mock.patch("tun_vps_management_guard.Path.read_text",
+                        return_value="nameserver 185.236.39.19\n"):
+            stat_call.return_value.st_uid = 0
+            stat_call.return_value.st_mode = 0o100644
+            stat_call.return_value.st_size = 32
+            from tun_vps_management_guard import system_dns_resolvers
+            self.assertEqual(system_dns_resolvers(), ("185.236.39.19",))
+            stat_call.return_value.st_mode = 0o100666
+            with self.assertRaisesRegex(ValueError, "VPS_DNS_RESOLVER_UNTRUSTED"):
+                system_dns_resolvers()
+
     def test_fails_if_remote_peer_missing(self):
         with self.assertRaisesRegex(ValueError, "MANAGEMENT_PEERS_NOT_VERIFIED"):
             guard_candidate(self.config(), ())
