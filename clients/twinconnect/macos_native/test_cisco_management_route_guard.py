@@ -152,6 +152,28 @@ class CiscoManagementGuardTests(unittest.TestCase):
                              "CISCO_MANAGEMENT_PIN_ROLLBACK_VERIFIED")
         self.assertFalse(guard.STATE.exists())
 
+    def test_status_uptime_reads_actual_connected_at_not_lease_expiry(self):
+        with patch.object(guard, "load", return_value={
+                "mode": "leased", "connected_at": 1000,
+                "deadline": 2000}), \
+             patch.object(guard.time, "time", return_value=1100):
+            self.assertEqual(guard.status_uptime(),
+                             '{"state": "connected", "connected_at": 1000}')
+
+    def test_status_uptime_does_not_show_timer_after_disconnect(self):
+        with patch.object(guard, "load", return_value={}), \
+             patch.object(guard.time, "time", return_value=1100):
+            self.assertEqual(guard.status_uptime(),
+                             '{"state": "disconnected"}')
+
+    def test_status_uptime_does_not_count_expired_lease(self):
+        with patch.object(guard, "load", return_value={
+                "mode": "leased", "connected_at": 1000,
+                "deadline": 1050}), \
+             patch.object(guard.time, "time", return_value=1100):
+            self.assertEqual(guard.status_uptime(),
+                             '{"state": "disconnected"}')
+
     def test_full_route_rollback_restores_dns_before_bypass_removal(self):
         guard.store({"mode": "leased", "full_interface": "utun4",
                      "interface": "en0", "gateway": "185.236.39.33",
