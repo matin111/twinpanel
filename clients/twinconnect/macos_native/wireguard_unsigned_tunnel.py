@@ -84,10 +84,21 @@ def parse_profile(raw: str) -> dict:
                   peer.get("allowedips", "").split(",")]
     except ValueError:
         fail("WG_INVALID_ALLOWED_IPS")
-    if not routes or not all(isinstance(item, ipaddress.IPv4Network) for item in routes):
-        fail("WG_IPV4_ALLOWED_IPS_REQUIRED")
-    if ipaddress.IPv4Network("0.0.0.0/0") not in routes:
+    ipv4_routes = {route for route in routes
+                   if isinstance(route, ipaddress.IPv4Network)}
+    # TwinPanel deliberately issues the two /1 halves to implement full IPv4.
+    # They are exactly equivalent to 0.0.0.0/0, without overriding the
+    # management endpoint's more-specific physical route.
+    full_v4 = (ipaddress.IPv4Network("0.0.0.0/0") in ipv4_routes or
+               {ipaddress.IPv4Network("0.0.0.0/1"),
+                ipaddress.IPv4Network("128.0.0.0/1")}.issubset(ipv4_routes))
+    if not full_v4:
         fail("WG_FULL_IPV4_PROFILE_REQUIRED")
+    # ::/0 is common in dual-stack panel profiles, but this independently
+    # guarded unsigned backend intentionally configures IPv4 only.
+    if any(not isinstance(route, (ipaddress.IPv4Network, ipaddress.IPv6Network))
+           for route in routes):
+        fail("WG_INVALID_ALLOWED_IPS")
     endpoint = peer.get("endpoint", "")
     match = re.fullmatch(r"([A-Za-z0-9.-]{1,253}):([0-9]{1,5})", endpoint)
     if not match:
