@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Unprivileged, read-only macOS OpenVPN telemetry for the AppKit dashboard.
+"""Unprivileged, read-only macOS OpenVPN/Cisco/WireGuard/L2TP telemetry for the AppKit dashboard.
 
 Never reports connected based on a running process alone: a real IPv4 /1 route
-through utun is required. Traffic totals come from the tunnel interface only.
+through utun or native ppp is required. Traffic totals come from the tunnel interface only.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def active_interface() -> str | None:
     result = command("/sbin/route", "-n", "get", "1.1.1.1")
     if result is None or result.returncode:
         return None
-    found = re.search(r"^\s*interface:\s*(utun\d{1,4})\s*$",
+    found = re.search(r"^\s*interface:\s*((?:utun|ppp)\d{1,4})\s*$",
                       result.stdout, re.MULTILINE)
     return found.group(1) if found else None
 
