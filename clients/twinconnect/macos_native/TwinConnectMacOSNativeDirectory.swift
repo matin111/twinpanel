@@ -2044,6 +2044,31 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     completion(.failure(TwinMacNativeError.failure("TUN_PROFILE_INVALID")))
                     return
                 }
+                // NaiveProxy needs a single TLS-authenticated native Naive
+                // outbound with a tenant CA. A generic HTTPS-looking proxy
+                // is not interchangeable with a real Naive transport.
+                if protocolCode == "naive" {
+                    guard outbounds.count == 1,
+                          first["type"] as? String == "naive",
+                          let user = first["username"] as? String,
+                          !user.isEmpty,
+                          let password = first["password"] as? String,
+                          !password.isEmpty,
+                          let tls = first["tls"] as? [String: Any],
+                          tls["enabled"] as? Bool == true,
+                          tls["insecure"] as? Bool != true,
+                          let certs = tls["certificate"] as? [String],
+                          !certs.isEmpty,
+                          certs.allSatisfy({
+                            $0.contains("-----BEGIN CERTIFICATE-----") &&
+                            $0.contains("-----END CERTIFICATE-----")
+                          }),
+                          first["insecure_concurrency"] as? Int == 0 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "NAIVE_TUN_PROFILE_INVALID")))
+                        return
+                    }
+                }
                 // ShadowTLS is a strictly two-stage chain, not a direct
                 // Shadowsocks outbound. Reject any broken detour here as
                 // defense in depth even after review at profile ingestion.
