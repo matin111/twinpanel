@@ -26,7 +26,7 @@ rule="/etc/sudoers.d/twinconnect-tun-admin"
 }
 engine="macos_native/build/singbox/amd64/sing-box"
 [[ "$(uname -m)" == x86_64 ]] || { echo "X86_64_ENGINE_ONLY" >&2; exit 3; }
-files=(unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py tun_vps_management_guard.py)
+files=(unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py tun_vps_management_guard.py unsigned_mieru_profile.py)
 [[ -f "$engine" && ! -L "$engine" && -x "$engine" ]] || {
   echo "SING_BOX_BINARY_NOT_READY" >&2; exit 3;
 }
@@ -48,6 +48,14 @@ read -r -p "From independent provider VNC, type APPROVE-TUN-STAGING: " reply
 /usr/bin/install -d -o root -g wheel -m 0700 "$trusted"
 /usr/bin/install -d -o root -g wheel -m 0755 "$ops"
 /usr/bin/install -o root -g wheel -m 0755 "$engine" "$trusted/sing-box"
+# Optional Mieru-enabled mbox is a DISTINCT root-owned engine. Never
+# overwrite the proven sing-box executable used by existing protocols.
+mbox_source="macos_native/build/mbox/amd64/sing-box"
+if [[ -f "$mbox_source" && ! -L "$mbox_source" && -x "$mbox_source" ]]; then
+  /usr/bin/install -o root -g wheel -m 0755 "$mbox_source" "$trusted/mbox"
+  /usr/bin/install -o root -g wheel -m 0644       macos_native/unsigned_mieru_profile.py "$trusted/unsigned_mieru_profile.py"
+  echo "MIERU_UNSIGNED_ENGINE_STAGED"
+fi
 # Status-only attestation of the running engine's protocol, no secrets.
 # Install in the already protected root-owned ops directory.
 [[ -f tool/tun_admin_protocol_status.py &&
