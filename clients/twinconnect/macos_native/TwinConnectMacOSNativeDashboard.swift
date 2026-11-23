@@ -585,6 +585,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var ciscoTunnelBusy = false
     private var ciscoTunnelStatus = ""
     private var ciscoSystemRouteVerified = false
+    private var ciscoConnectedAt: Date?
+    private var openVPNConnectedAt: Date?
+    private weak var heroConnectionTimeText: NSTextField?
     private var ciscoRoutePollBusy = false
     private var ciscoRouteLastPoll = Date.distantPast
     private var ciscoTunnelTask: Process?
@@ -1376,6 +1379,30 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    private func elapsedConnectionTime(_ startedAt: Date) -> String {
+        let seconds = max(0, Int(Date().timeIntervalSince(startedAt)))
+        return String(format: "%02d:%02d:%02d",
+                      seconds / 3600, (seconds / 60) % 60, seconds % 60)
+    }
+
+    private var verifiedConnectionStart: Date? {
+        if ciscoSystemRouteVerified { return ciscoConnectedAt }
+        if openVPNSystemRouteVerified { return openVPNConnectedAt }
+        if localProxyActive { return localProxyStartedAt }
+        return nil
+    }
+
+    private func updateConnectionDuration() {
+        let value = verifiedConnectionStart.map(elapsedConnectionTime) ?? "—"
+        heroConnectionTimeText?.stringValue = value
+        if let startedAt = verifiedConnectionStart {
+            let protocolName = ciscoSystemRouteVerified ? "Cisco" :
+                (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)
+            proxyUptimeText?.stringValue = "◷  " + protocolName + "  " +
+                elapsedConnectionTime(startedAt)
+        }
+    }
+
     private func connectPage() -> NSView {
         let main = stack(spacing: 10)
         main.alignment = .leading
@@ -1467,6 +1494,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // One prominent live clock on the connection page. The start date is
+        // taken from a VERIFIED VPN session, never from tapping Connect.
+        // The existing one-second UI timer updates the label in place.
+        let durationRow = stack(.horizontal, spacing: 6)
+        let durationLeading = NSView()
+        let durationTrailing = NSView()
+        durationRow.addArrangedSubview(durationLeading)
+        durationRow.addArrangedSubview(text("Connected time", size: 12,
+                                          color: muted))
+        let clock = text(verifiedConnectionStart.map(elapsedConnectionTime) ?? "—",
+                         size: 16, weight: .semibold, color: sea)
+        clock.font = NSFont.monospacedDigitSystemFont(ofSize: 16, weight: .semibold)
+        heroConnectionTimeText = clock
+        durationRow.addArrangedSubview(clock)
+        durationRow.addArrangedSubview(durationTrailing)
+        durationLeading.widthAnchor.constraint(equalTo: durationTrailing.widthAnchor)
+            .isActive = true
+        main.addArrangedSubview(durationRow)
+        durationRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         // Keep the home page quiet: connection type is already in the pill.
         // Show only ongoing work or actionable errors beside Connect.
         if activeProtocol == "openvpn" {
@@ -1604,12 +1650,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
            ciscoSystemRouteVerified {
             // Proxy and VPN telemetry use separate verified sources.
             let timing = stack(.horizontal, spacing: 8)
-            let uptime = text(ciscoSystemRouteVerified ?
-                              "◷  Cisco" :
-                              (openVPNSystemRouteVerified ?
-                               "◷  OpenVPN" :
-                               "◷  " + connectedProtocolTitle + " proxy session"),
-                              size: 12, color: muted)
+            let uptime = text(verifiedConnectionStart.map { start in
+                "◷  " + (ciscoSystemRouteVerified ? "Cisco" :
+                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)) +
+                "  " + elapsedConnectionTime(start)
+            } ?? "◷  Connected", size: 12, color: muted)
             proxyUptimeText = uptime
             timing.addArrangedSubview(uptime)
             let timingSpace = NSView()
@@ -2846,6 +2891,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ciscoTunnelTask = nil
         ciscoTunnelBusy = false
         ciscoSystemRouteVerified = false
+        ciscoConnectedAt = nil
+        openVPNConnectedAt = nil
         ciscoTunnelStatus = ""
         directory.clearSavedSession()
         refreshGeneration += 1
@@ -3204,6 +3251,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.ciscoTunnelTask = nil
                 self.ciscoTunnelBusy = false
                 self.ciscoSystemRouteVerified = false
+                self.ciscoConnectedAt = nil
                 self.resetTrafficMetrics()
                 self.ciscoTunnelStatus = reason.range(
                     of: "^CISCO_[A-Z0-9_]{3,64}$",
@@ -3522,17 +3570,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func refreshTrafficMetrics() {
+        updateConnectionDuration()
         refreshFullTunStatus()
         refreshOpenVPNAppSession()
         refreshCiscoRouteStatus()
         refreshOpenVPNTelemetry()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
-        if let startedAt = localProxyStartedAt {
-            let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
-            proxyUptimeText?.stringValue = String(
-                format: "◷  " + connectedProtocolTitle + "  %02d:%02d:%02d",
-                elapsed / 3600, (elapsed / 60) % 60, elapsed % 60)
-        }
         trafficPollBusy = true
         let generation = localProxyGeneration
         let root = localRuntimeRoot()
@@ -3626,7 +3669,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
             task.arguments = ["-n", "/usr/bin/python3",
                 "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
-                "status"]
+                "status-uptime"]
             task.standardInput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
             let pipe = Pipe()
@@ -3640,12 +3683,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.ciscoRoutePollBusy = false
+                let status = (try? JSONSerialization.jsonObject(
+                    with: Data(response.utf8))) as? [String: Any]
                 let verified = self.ciscoTunnelTask != nil &&
-                    response.trimmingCharacters(in: .whitespacesAndNewlines) ==
-                    "CISCO_SYSTEM_IPV4_CONNECTED"
-                guard verified != self.ciscoSystemRouteVerified else { return }
+                    status?["state"] as? String == "connected"
+                let newStart: Date? = verified ?
+                    (status?["connected_at"] as? NSNumber).map {
+                        Date(timeIntervalSince1970: $0.doubleValue)
+                    } : nil
+                let changed = verified != self.ciscoSystemRouteVerified
+                let changedStart = newStart != self.ciscoConnectedAt
+                guard changed || changedStart else { return }
                 self.ciscoSystemRouteVerified = verified
-                self.resetTrafficMetrics()
+                self.ciscoConnectedAt = newStart
+                if changed { self.resetTrafficMetrics() }
                 self.view = self.build()
             }
         }
@@ -3932,6 +3983,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         }
                         self.openVPNSystemRouteVerified =
                             result.0 == 0 && result.1 == "connected"
+                        self.openVPNConnectedAt = self.openVPNSystemRouteVerified ?
+                            Date() : nil
                         self.openVPNAppSessionActive = self.openVPNSystemRouteVerified
                         self.resetTrafficMetrics()
                         self.status = self.openVPNSystemRouteVerified ?
@@ -3957,6 +4010,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if result.0 == 0 && result.1 == "stopped" {
                     self.openVPNAppSessionActive = false
                     self.openVPNSystemRouteVerified = false
+                    self.openVPNConnectedAt = nil
                     self.resetTrafficMetrics()
                     self.status = "OpenVPN: disconnected."
                 } else {
@@ -3994,6 +4048,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     }
                     self.openVPNAppSessionActive = active
                     self.openVPNSystemRouteVerified = routed
+                    if routed && self.openVPNConnectedAt == nil {
+                        self.openVPNConnectedAt = Date()
+                    } else if !routed {
+                        self.openVPNConnectedAt = nil
+                    }
                     self.status = nextStatus
                     self.view = self.build()
                 }
