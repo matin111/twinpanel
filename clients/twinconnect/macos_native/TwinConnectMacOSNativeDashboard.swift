@@ -1470,7 +1470,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             !ciscoTunnelBusy && !wireGuardProbeBusy
-        connect.toolTip = activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
+        connect.toolTip = activeProtocol == "wireguard" ?
+            (wireGuardProbeStatus.isEmpty ?
+             "Connect to the selected WireGuard server." : wireGuardProbeStatus) :
+            activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
             "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
             activeProtocol == "openvpn" && openVPNAppSessionActive ?
             "OpenVPN tunnel only; system routing not active." :
@@ -1529,11 +1532,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         durationRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         // Keep the home page quiet: connection type is already in the pill.
         // Show only ongoing work or actionable errors beside Connect.
-        if activeProtocol == "wireguard" && !wireGuardProbeStatus.isEmpty {
-            let info = text(wireGuardProbeStatus, size: 12, color: muted)
-            main.addArrangedSubview(info)
-            info.widthAnchor.constraint(lessThanOrEqualTo: main.widthAnchor).isActive = true
-        }
+        // Match Cisco's clean hero layout: no WireGuard diagnostic/status
+        // captions below Connect. Keep the verified duration row only.
+        // Detailed errors remain available as the Connect tooltip.
         if activeProtocol == "openvpn" {
             let failed = status.contains("FAILED") ||
                          status.contains("REJECTED") ||
