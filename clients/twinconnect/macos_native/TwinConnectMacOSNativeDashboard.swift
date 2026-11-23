@@ -579,6 +579,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingRedrawScheduled = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
+    private var l2tpBusy = false
+    private var l2tpStatus = ""
     private var ciscoAuthBusy = false
     private var ciscoAuthStatus = ""
     private let ciscoSafetyHold = true // Static-IP recovery not yet verified.
@@ -1413,6 +1415,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var verifiedHeroConnectionLabel: String {
         if localProxyActive { return "◉  " + connectedProtocolTitle + " proxy active" }
         if openVPNSystemRouteVerified { return "◉  Connected · OpenVPN" }
+        if activeProtocol == "l2tp" && l2tpBusy { return "◌  Checking L2TP…" }
         if activeProtocol == "openvpn" && fullTunBusy {
             return openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…"
         }
@@ -1428,6 +1431,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var verifiedNetworkConnectionLabel: String {
         if localProxyActive { return connectedProtocolTitle + " · Proxy" }
         if openVPNSystemRouteVerified { return "Connected · OpenVPN" }
+        if activeProtocol == "l2tp" && l2tpBusy { return "Checking L2TP…" }
         if activeProtocol == "openvpn" && fullTunBusy {
             return openVPNAppSessionActive ? "Disconnecting…" : "Connecting…"
         }
@@ -1488,12 +1492,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
-            !ciscoTunnelBusy && !wireGuardProbeBusy
+            !ciscoTunnelBusy && !wireGuardProbeBusy && !l2tpBusy
+        let l2tpHasDiagnostic = activeProtocol == "l2tp" &&
+            !l2tpStatus.isEmpty
         let openVPNHasDiagnostic = activeProtocol == "openvpn" &&
             (status.contains("FAILED") || status.contains("REJECTED") ||
              status.contains("UNAVAILABLE") || status.contains("NOT_INSTALLED") ||
              status.contains("not verified"))
-        connect.toolTip = activeProtocol == "wireguard" ?
+        connect.toolTip = l2tpHasDiagnostic ? l2tpStatus :
+            activeProtocol == "l2tp" ?
+            "Review authorized L2TP settings and native macOS VPN service." :
+            activeProtocol == "wireguard" ?
             (wireGuardProbeStatus.isEmpty ?
              "Connect to the selected WireGuard server." : wireGuardProbeStatus) :
             activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
@@ -4549,9 +4558,81 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    // L2TP preflight is deliberately NOT a connected VPN. The current Mac has
+    // no installed native L2TP service. Never start one while Cisco is active.
+    private func requestL2TPPreflight() {
+        guard !l2tpBusy, let session = accountSession,
+              let serverID = activeServer,
+              !ciscoSystemRouteVerified && !openVPNSystemRouteVerified &&
+              !wireGuardSystemRouteVerified && !localProxyActive,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "l2tp" && $0.configured
+              }) == true else {
+            l2tpStatus = "L2TP_SELECT_SERVER_OR_DISCONNECT_VPN"
+            view = build()
+            return
+        }
+        l2tpBusy = true
+        l2tpStatus = ""
+        view = build()
+        directory.prepareL2TPProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                self.l2tpBusy = false
+                let reason = error.localizedDescription
+                self.l2tpStatus = reason.range(of: "^L2TP_[A-Z0-9_]{3,80}$",
+                                               options: .regularExpression) != nil ?
+                    reason : "L2TP_PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let profile):
+                let helper = self.localRuntimeRoot() +
+                    "/macos_native/l2tp_native_preflight.py"
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+                    task.arguments = [helper, "review"]
+                    let input = Pipe(), output = Pipe()
+                    task.standardInput = input
+                    task.standardOutput = output
+                    task.standardError = FileHandle.nullDevice
+                    var reason = "L2TP_PREFLIGHT_LAUNCH_FAILED"
+                    do {
+                        try task.run()
+                        input.fileHandleForWriting.write(profile)
+                        input.fileHandleForWriting.closeFile()
+                        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+                        task.waitUntilExit()
+                        if let json = (try? JSONSerialization.jsonObject(
+                                with: Data(bytes.prefix(4096)))) as? [String: Any] {
+                            if task.terminationStatus == 0 {
+                                reason = json["native_service"] as? String ??
+                                    "L2TP_NATIVE_SERVICE_NOT_CONFIGURED"
+                            } else {
+                                reason = json["reason"] as? String ??
+                                    "L2TP_PROFILE_INVALID"
+                            }
+                        }
+                    } catch { input.fileHandleForWriting.closeFile() }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.l2tpBusy = false
+                        self.l2tpStatus = reason
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
     @objc private func requestVPNConnection(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy, !fullTunBusy,
               !wireGuardProbeBusy else { return }
+        if activeProtocol == "l2tp" {
+            requestL2TPPreflight()
+            return
+        }
         if activeProtocol == "wireguard" {
             requestWireGuardProbe()
             return
