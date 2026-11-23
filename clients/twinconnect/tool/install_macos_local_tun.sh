@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# TwinConnect TUN local Mac deployment. NEVER RUN ON A REMOTE/CLOUD MAC.
-# Stage only by default. Activation requires explicit local physical-console
-# recovery acknowledgement. No network/routing changes during installation.
+# TwinConnect unsigned TUN installer. Local activation requires independent
+# physical recovery. stage-vps safely stages FILES ONLY from an independently
+# controlled hypervisor console; it cannot activate TUN or change routes.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -11,13 +11,14 @@ label="com.twinconnect.localtun"
 socket="/var/run/twinconnect-tun.sock"
 
 usage() {
-  echo "Usage: bash tool/install_macos_local_tun.sh {check|stage|activate|stop|remove}"
-  echo "WARNING: never execute stage/activate on cloud/VPS or SSH-managed Mac"
+  echo "Usage: bash tool/install_macos_local_tun.sh {check|stage|stage-vps|activate|stop|remove}"
+  echo "stage-vps: files-only staging from independent provider VNC; NO VPN/route changes"
+  echo "activate is LOCAL PHYSICAL MAC ONLY; VPS activation is not yet supported"
 }
 
 [[ $# -eq 1 ]] || { usage; exit 2; }
 action="$1"
-case "$action" in check|stage|activate|stop|remove) ;; *) usage; exit 2;; esac
+case "$action" in check|stage|stage-vps|activate|stop|remove) ;; *) usage; exit 2;; esac
 [[ "$(uname -s)" == "Darwin" ]] || { echo "MACOS_ONLY" >&2; exit 2; }
 if [[ -n "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}${TWINCONNECT_REMOTE_VPS:-}" ]]; then
   echo "REMOTE_SESSION_REFUSED" >&2; exit 2
@@ -38,8 +39,19 @@ fi
 [[ "$(stat -f '%Su' /dev/console)" == "$SUDO_USER" ]] ||
   { echo "CONSOLE_USER_MISMATCH" >&2; exit 2; }
 [[ -t 0 && -t 1 ]] || { echo "INTERACTIVE_CONSOLE_REQUIRED" >&2; exit 2; }
-# A remote Mac can have a logged-in console. The following is an additional,
-# explicit human safety acknowledgment, not technical proof of local access.
+# stage-vps never activates the daemon, changes routes, or starts sing-box.
+# Require explicit opt-in from the independent hypervisor-console operator.
+if [[ "$action" == "stage-vps" ]]; then
+  [[ -z "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ]] ||
+    { echo "VPS_STAGING_REQUIRES_PROVIDER_CONSOLE_NOT_SSH" >&2; exit 2; }
+  echo "Files-only stage: no tunnel, daemon, network, routing, or DNS changes."
+  echo "Proceed ONLY from the hosting provider's out-of-band VNC console."
+  read -r -p "Type STAGE-VPS-FILES-ONLY to confirm: " confirmation
+  [[ "$confirmation" == "STAGE-VPS-FILES-ONLY" ]] ||
+    { echo "VPS_STAGING_NOT_CONFIRMED" >&2; exit 2; }
+fi
+# A remote Mac can have a logged-in console. Physical-machine activation
+# remains separate; do not misrepresent a VPS as a physical computer.
 if [[ "$action" == "stage" || "$action" == "activate" ]]; then
   echo "Do NOT proceed on a VPS, cloud Mac or remotely managed computer."
   echo "Do NOT proceed without an independent console and recovery plan."
@@ -66,7 +78,7 @@ fi
 if [[ -e "$plist" ]]; then
   echo "EXISTING_LAUNCHD_PLIST_REFUSED; stop and remove first" >&2; exit 2
 fi
-if [[ "$action" == "stage" && -e "$root" ]]; then
+if [[ ( "$action" == "stage" || "$action" == "stage-vps" ) && -e "$root" ]]; then
   echo "EXISTING_TUN_RUNTIME_REFUSED; stop and remove first" >&2; exit 2
 fi
 if [[ "$action" == "activate" && ! -d "$root" ]]; then
@@ -89,7 +101,7 @@ done
 /usr/bin/python3 -c 'import sys; assert sys.version_info >= (3,9)' ||
   { echo "PYTHON_39_OR_NEWER_REQUIRED_FOR_DAEMON" >&2; exit 2; }
 
-if [[ "$action" == "stage" ]]; then
+if [[ "$action" == "stage" || "$action" == "stage-vps" ]]; then
   mkdir -m 0700 "$root"
   chown root:wheel "$root"
   install -o root -g wheel -m 0755 "$engine" "$root/sing-box"
@@ -120,7 +132,7 @@ else
   done
 fi
 # install is staging only: NO activation, no root background service.
-if [[ "$action" == "stage" ]]; then
+if [[ "$action" == "stage" || "$action" == "stage-vps" ]]; then
   echo "LOCAL_TUN_FILES_STAGED; SERVICE_NOT_STARTED; ROUTES_UNCHANGED"
   exit 0
 fi
