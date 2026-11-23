@@ -25,6 +25,7 @@ class XrayVlessTunCandidateTests(unittest.TestCase):
         result = convert(self.data)
         self.assertEqual(result["inbounds"][0]["type"], "tun")
         self.assertEqual(result["route"]["final"], "proxy")
+        self.assertIs(result["route"]["auto_detect_interface"], True)
         self.assertEqual(len(result["outbounds"]), 1)
         self.assertEqual(result["outbounds"][0]["type"], "vless")
 
