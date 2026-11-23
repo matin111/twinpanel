@@ -95,7 +95,7 @@ def convert(data: dict) -> dict:
                       "auto_route": True, "auto_redirect": False,
                       "strict_route": False, "stack": "system"}],
         "outbounds": [proxy],
-        "route": {"final": "proxy"},
+        "route": {"final": "proxy", "auto_detect_interface": True},
     }
     return candidate
 
