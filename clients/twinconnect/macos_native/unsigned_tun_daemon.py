@@ -41,15 +41,33 @@ OPENVPN_REVIEW = TRUSTED_ROOT / "openvpn_profile_review.py"
 MAX_REQUEST = 262144
 MAX_SESSION = 600
 VPS_SESSION = 45
+# A distinct root-owned approval mode for the owner-authorized remote VPS.
+# Retain a watchdog deadline; do not create an unlimited unattended tunnel.
+VPS_EXTENDED_SESSION = 30 * 24 * 60 * 60
+VPS_EXTENDED_APPROVAL = "VPS_OOB_CONSOLE_LONG_SESSION_30_DAYS"
+VPS_TRIAL_APPROVAL = "VPS_OOB_CONSOLE_45_SECONDS"
+
+
+def approval_mode() -> str:
+    try:
+        return APPROVAL.read_text(encoding="ascii").strip()
+    except OSError:
+        return ""
+
+
+def vps_mode() -> bool:
+    # Both VPS approval modes MUST keep the Termalin management peer outside
+    # the TUN route, even when the user accepts temporary network disruption.
+    return approval_mode() in (VPS_TRIAL_APPROVAL, VPS_EXTENDED_APPROVAL)
 
 
 def session_limit() -> int:
-    """VPS experiments must expire even if the GUI never sends Stop."""
-    try:
-        if APPROVAL.read_text(encoding="ascii").strip() == "VPS_OOB_CONSOLE_45_SECONDS":
-            return VPS_SESSION
-    except OSError:
-        pass
+    """The chosen root-owned approval controls the independent watchdog TTL."""
+    mode = approval_mode()
+    if mode == VPS_TRIAL_APPROVAL:
+        return VPS_SESSION
+    if mode == VPS_EXTENDED_APPROVAL:
+        return VPS_EXTENDED_SESSION
     return MAX_SESSION
 
 
@@ -95,7 +113,8 @@ def daemon_preflight() -> None:
     if not trusted_root_file(APPROVAL):
         raise ValueError("LOCAL_CONSOLE_APPROVAL_MISSING")
     approval = APPROVAL.read_text(encoding="ascii").strip()
-    if approval not in ("LOCAL_MAC_WITH_RECOVERY", "VPS_OOB_CONSOLE_45_SECONDS"):
+    if approval not in ("LOCAL_MAC_WITH_RECOVERY", VPS_TRIAL_APPROVAL,
+                        VPS_EXTENDED_APPROVAL):
         raise ValueError("LOCAL_CONSOLE_APPROVAL_INVALID")
     # Fail closed if there is no signed-in physical console owner.
     if os.stat("/dev/console").st_uid <= 0:
@@ -303,9 +322,10 @@ class Session:
                                "--route-nopull"]
                 else:
                     validate_full_tun_config(path)
-                    if session_limit() == VPS_SESSION:
+                    if vps_mode():
                         # Preserve the independent Termalin control transport
-                        # outside sing-box routing; reject if no active peer.
+                        # outside sing-box routing in BOTH VPS modes.
+                        # Fail closed if there is no validated active peer.
                         profile = guard_candidate(profile)
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
