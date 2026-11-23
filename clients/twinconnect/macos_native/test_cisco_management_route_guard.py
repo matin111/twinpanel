@@ -94,6 +94,42 @@ class CiscoManagementGuardTests(unittest.TestCase):
             [("/sbin/route", "-n", "add", "-host", "1.1.1.1",
               "-interface", "utun4")])
 
+    def test_probe_second_destination_only_creates_fixed_host_route(self):
+        seen = set()
+        commands = []
+        def fake_run(*args):
+            commands.append(args)
+            if args[:2] == ("/sbin/ifconfig", "-l"):
+                return ok("lo0 en0 utun4")
+            if args[:2] == ("/sbin/ifconfig", "utun4"):
+                return ok("utun4: flags=8051\n    inet 10.91.0.63 --> 10.91.0.63\n")
+            if "-host" in args and "add" in args:
+                seen.add("8.8.8.8")
+            return ok()
+        def fake_route(ip):
+            if ip == "8.8.8.8" and ip in seen:
+                return {"interface": "utun4"}
+            return {"interface": "en0", "gateway": "185.236.39.33"}
+        with patch.object(guard, "preflight", return_value=(
+                "CISCO_MANAGEMENT_PRECHECK_READY", ["188.114.97.3"],
+                "185.236.39.33", "en0")), \
+             patch.object(guard, "run", side_effect=fake_run), \
+             patch.object(guard, "route", side_effect=fake_route), \
+             patch.object(guard, "exact_routes", side_effect=lambda: set(seen)):
+            self.assertEqual(guard.probe_host("utun4", "8.8.8.8"),
+                             "CISCO_HOST_EGRESS_TRIAL_ACTIVE")
+        self.assertEqual(guard.load()["probe_dest"], "8.8.8.8")
+        self.assertEqual(
+            [x for x in commands if "-host" in x and "add" in x],
+            [("/sbin/route", "-n", "add", "-host", "8.8.8.8",
+              "-interface", "utun4")])
+
+    def test_probe_refuses_unlisted_ipv4_without_changes(self):
+        with patch.object(guard, "run") as commands:
+            self.assertEqual(guard.probe_host("utun4", "9.9.9.9"),
+                             "CISCO_PROBE_DESTINATION_REFUSED")
+            commands.assert_not_called()
+
     def test_probe_rejects_physical_interface_without_routing(self):
         with patch.object(guard, "run") as commands:
             self.assertEqual(guard.probe_host("en0"),
