@@ -19,7 +19,7 @@ class NativeFullTUNProfileTests(unittest.TestCase):
             "private func localHysteria2Config(", 1)[0]
         for required in ('"type": "tun"', '"auto_route": true',
                          '"auto_redirect": false', '"strict_route": false',
-                         '"route": ["final": "proxy"]'):
+                         '"route": ["final": "proxy", "auto_detect_interface": true]'):
             self.assertIn(required, section)
 
     def test_denies_direct_fallback_and_unreviewed_dns(self):
