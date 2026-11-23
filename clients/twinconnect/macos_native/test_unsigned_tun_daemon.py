@@ -64,6 +64,24 @@ class TUNDaemonControlTests(unittest.TestCase):
                                mock.Mock(read_text=lambda **_: "LOCAL_MAC_WITH_RECOVERY")):
             self.assertEqual(server.session_limit(), 600)
 
+    def test_extended_vps_mode_keeps_management_route_guard(self):
+        with mock.patch.object(server, "APPROVAL",
+                               mock.Mock(read_text=lambda **_:
+                                         "VPS_OOB_CONSOLE_LONG_SESSION_30_DAYS")):
+            self.assertTrue(server.vps_mode())
+            self.assertEqual(server.session_limit(), 30 * 24 * 60 * 60)
+        with mock.patch.object(server, "APPROVAL",
+                               mock.Mock(read_text=lambda **_:
+                                         "VPS_OOB_CONSOLE_45_SECONDS")):
+            self.assertTrue(server.vps_mode())
+        with mock.patch.object(server, "APPROVAL",
+                               mock.Mock(read_text=lambda **_: "LOCAL_MAC_WITH_RECOVERY")):
+            self.assertFalse(server.vps_mode())
+        source = (DIR / "unsigned_tun_daemon.py").read_text()
+        self.assertIn("if vps_mode():", source)
+        self.assertIn("profile = guard_candidate(profile)", source)
+        self.assertNotIn("if session_limit() == VPS_SESSION:", source)
+
     def test_unix_peer_uid_uses_kernel_credentials(self):
         import socket
         with mock.patch.object(server.sys, "platform", "darwin"):
@@ -238,7 +256,7 @@ class TUNDaemonControlTests(unittest.TestCase):
     def test_app_refreshes_stale_tun_state(self):
         self.assertIn("private func refreshFullTunStatus()", DASHBOARD)
         self.assertIn('self.runFullTunClient("status")', DASHBOARD)
-        self.assertIn('self.status = "TUN trial stopped (45-second limit or engine exit)."', DASHBOARD)
+        self.assertIn('self.status = "TUN session stopped or engine exited."', DASHBOARD)
 
     def test_unverified_engine_is_not_claimed_as_vpn_connected(self):
         self.assertIn("TUN route running; HTTPS egress not yet verified.", DASHBOARD)
