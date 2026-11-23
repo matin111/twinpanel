@@ -57,6 +57,8 @@ test -r "$app/Contents/Info.plist" || { echo "APP_INFO_MISSING" >&2; exit 3; }
 runtime="$app/Contents/Resources/twinconnect-runtime"
 manager="$runtime/macos_native/standalone_connection_manager.py"
 test -r "$manager" || { echo "PACKAGED_MANAGER_MISSING" >&2; exit 3; }
+test -r "$runtime/macos_native/xray_unsigned_tun_candidate.py" || { echo "PACKAGED_VLESS_TUN_CONVERTER_MISSING" >&2; exit 3; }
+test -r "$runtime/macos_native/unsigned_tun_policy.py" || { echo "PACKAGED_TUN_POLICY_MISSING" >&2; exit 3; }
 case "$(uname -m)" in
   x86_64) arch=amd64; macarch=x86_64;;
   arm64) arch=arm64; macarch=arm64;;
