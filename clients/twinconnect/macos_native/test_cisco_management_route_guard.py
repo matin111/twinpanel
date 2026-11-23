@@ -220,6 +220,31 @@ class CiscoManagementGuardTests(unittest.TestCase):
                              "CISCO_TRANSPORT_ENDPOINT_CHANGED")
             saved.assert_not_called()
 
+    def test_named_https_requires_dns_answer_before_fetch(self):
+        with patch.object(guard, "run", return_value=ok("", 0)), \
+             patch.object(guard.subprocess, "run") as fetch:
+            self.assertEqual(guard.verify_named_https_and_dns(),
+                             "CISCO_TUNNEL_DNS_INVALID")
+            fetch.assert_not_called()
+
+    def test_named_https_fails_when_dns_unreachable(self):
+        with patch.object(guard, "run", return_value=ok("", 1)), \
+             patch.object(guard.subprocess, "run") as fetch:
+            self.assertEqual(guard.verify_named_https_and_dns(),
+                             "CISCO_TUNNEL_DNS_UNREACHABLE")
+            fetch.assert_not_called()
+
+    def test_named_https_requires_real_https_request(self):
+        from subprocess import CompletedProcess
+        with patch.object(guard, "run",
+                          return_value=ok("93.184.215.14\n")), \
+             patch.object(guard.subprocess, "run",
+                          return_value=CompletedProcess([], 28, "", "")) as fetch:
+            self.assertEqual(guard.verify_named_https_and_dns(),
+                             "CISCO_NAMED_HTTPS_FAILED")
+            self.assertIn("https://example.com", fetch.call_args.args[0])
+            self.assertNotIn("--resolve", fetch.call_args.args[0])
+
     def test_full_guard_refuses_unverified_engine_pid_without_routes(self):
         with patch.object(guard, "openconnect_endpoint",
                           return_value=None), \
