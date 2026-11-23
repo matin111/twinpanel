@@ -4497,7 +4497,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func recordProxyAttempt(_ protocolCode: String, _ reason: String) {
         let allowed: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
-            "snell", "naive", "shadowtls", "v2ray"
+            "snell", "naive", "shadowtls", "v2ray", "mieru"
         ]
         guard allowed.contains(protocolCode) else { return }
         let safeCode = reason.range(
@@ -5091,6 +5091,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             view = build()
             return
         }
+        // Record a reason-only attempt before the profile fetch or root
+        // helper runs. For Mieru this also makes clock/auth failures
+        // diagnosable, without retaining user credentials.
+        recordProxyAttempt(protocolCode, "CONNECT_REQUESTED")
         fullTunStatusUncertain = false
         fullTunStatusMisses = 0
         fullTunBusy = true
