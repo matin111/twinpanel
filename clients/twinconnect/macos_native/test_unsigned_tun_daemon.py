@@ -26,6 +26,14 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def test_engine_errors_are_specific_and_do_not_expose_secrets(self):
+        source = (DIR / "unsigned_tun_daemon.py").read_text()
+        self.assertIn('raise ValueError("SINGBOX_CONFIG_REJECTED")', source)
+        self.assertIn('raise ValueError("SINGBOX_CONFIG_CHECK_TIMEOUT")', source)
+        self.assertIn('raise ValueError("TUN_ENGINE_EXITED_BEFORE_ROUTE")', source)
+        self.assertIn('raise ValueError("TUN_WATCHDOG_EXITED_BEFORE_ROUTE")', source)
+        self.assertIn('for _ in range(32):', source)
+
     def test_vps_trial_session_is_bounded(self):
         with mock.patch.object(server, "APPROVAL",
                                mock.Mock(read_text=lambda **_: "VPS_OOB_CONSOLE_45_SECONDS")):
