@@ -26,7 +26,7 @@ rule="/etc/sudoers.d/twinconnect-tun-admin"
 }
 engine="macos_native/build/singbox/amd64/sing-box"
 [[ "$(uname -m)" == x86_64 ]] || { echo "X86_64_ENGINE_ONLY" >&2; exit 3; }
-files=(unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py)
+files=(unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py openvpn_profile_review.py tun_vps_management_guard.py)
 [[ -f "$engine" && ! -L "$engine" && -x "$engine" ]] || {
   echo "SING_BOX_BINARY_NOT_READY" >&2; exit 3;
 }
