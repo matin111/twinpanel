@@ -11,10 +11,14 @@ class MacV2RayInboundSelectionTests(unittest.TestCase):
     def test_user_can_choose_each_inbound(self):
         self.assertIn('["tcp_tls", "websocket_tls", "xhttp_reality"]', UI)
         self.assertIn('["TCP TLS", "WebSocket TLS", "XHTTP Reality"]', UI)
-        self.assertIn("selectV2RayInbound", UI)
+        self.assertIn("selectServerV2RayInbound", UI)
 
-    def test_choices_in_quick_connect_and_locations(self):
-        self.assertGreaterEqual(UI.count('v2rayInboundChips()'), 3)
+    def test_each_server_has_own_inbound_rows_not_global_ui(self):
+        self.assertIn('if activeProtocol == "v2ray" {\n                        // Every node owns', UI)
+        self.assertIn('selectServerV2RayInbound', UI)
+        self.assertIn('serverIndex * v2rayInboundIDs.count + inboundIndex', UI)
+        self.assertNotIn('showV2RayInboundMenu', UI)
+        self.assertNotIn('v2rayInboundChips()', UI)
 
     def test_selected_id_reaches_server_profile_selection(self):
         self.assertIn('v2rayInboundID: activeV2RayInbound', UI)
