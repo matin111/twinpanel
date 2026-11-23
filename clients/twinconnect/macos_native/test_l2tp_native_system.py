@@ -15,7 +15,7 @@ class NativeSystemTests(unittest.TestCase):
     def test_invalid_json_rejected_without_route_operation(self):
         with patch.object(module, "guard") as guard:
             with self.assertRaisesRegex(ValueError, "L2TP_PROFILE_INVALID_JSON"):
-                module.parse_profile(b"not json")
+                module.parse_profile(b"not valid json")
             guard.assert_not_called()
 
     def test_short_input_rejected(self):
