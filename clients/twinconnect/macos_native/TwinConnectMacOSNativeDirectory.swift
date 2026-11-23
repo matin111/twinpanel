@@ -943,7 +943,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
             return
         }
         let supported: Set<String> = [
-            "tuic", "anytls", "socks5", "snell", "naive", "shadowtls", "v2ray"
+            "tuic", "anytls", "socks5", "snell", "naive",
+            "shadowtls", "v2ray", "mieru"
         ]
         guard supported.contains(protocolCode),
               serverID.range(of: "^[0-9]{1,20}$",
@@ -1059,6 +1060,29 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     guard matches.count == 1 else {
                         completion(.failure(TwinMacNativeError.failure(
                             "LOCAL_NODE_PROFILE_AMBIGUOUS")))
+                        return
+                    }
+                    if protocolCode == "mieru" {
+                        // Relay the exact panel-supplied, entitled node
+                        // profile only; the unsigned Mieru converter
+                        // validates its public endpoint and returns mbox
+                        // TUN JSON in memory. No secrets in logs/argv.
+                        var original: Any? = matches[0]["config"]
+                        if let text = original as? String,
+                           text.utf8.count <= 131072 {
+                            original = try? JSONSerialization.jsonObject(
+                                with: Data(text.utf8))
+                        }
+                        guard let object = original as? [String: Any],
+                              JSONSerialization.isValidJSONObject(object),
+                              let core = try? JSONSerialization.data(
+                                withJSONObject: object),
+                              !core.isEmpty, core.count <= 131072 else {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "MIERU_PROFILE_INVALID")))
+                            return
+                        }
+                        completion(.success(core))
                         return
                     }
                     guard let config = self.reviewedSingBoxProxyConfig(
