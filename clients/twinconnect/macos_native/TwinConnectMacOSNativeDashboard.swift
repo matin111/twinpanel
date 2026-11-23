@@ -631,6 +631,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Experimental, separately installed root-owned local-console TUN service.
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
+    // Attested by the root-owned engine's ACTIVE configuration, never the
+    // current protocol picker (which can change while VPN is running).
+    private var fullTunConnectedProtocol: String?
     private var fullTunObservedExitIP: String?
     private var fullTunEgressConfirmedAt: Date?
     private var fullTunProbeBusy = false
@@ -1445,6 +1448,28 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    private func fullTunProtocolTitle(_ code: String) -> String? {
+        switch code {
+        case "v2ray": return "V2Ray"
+        case "hysteria2": return "Hysteria2"
+        case "tuic": return "TUIC"
+        case "anytls": return "AnyTLS"
+        case "socks5": return "SOCKS5"
+        case "snell": return "Snell"
+        case "naive": return "Naive"
+        case "shadowtls": return "ShadowTLS"
+        default: return nil
+        }
+    }
+
+    private var activeFullTunTitle: String? {
+        return fullTunConnectedProtocol.flatMap { fullTunProtocolTitle($0) }
+    }
+
+    private var fullTunConnectedSuffix: String {
+        return activeFullTunTitle.map { " · " + $0 } ?? ""
+    }
+
     private func elapsedConnectionTime(_ startedAt: Date) -> String {
         let seconds = max(0, Int(Date().timeIntervalSince(startedAt)))
         return String(format: "%02d:%02d:%02d",
@@ -1462,7 +1487,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func updateConnectionDuration() {
         if fullTunActive, let startedAt = fullTunStartedAt {
-            proxyUptimeText?.stringValue = "◷  TUN session  " +
+            proxyUptimeText?.stringValue = "◷  " +
+                (activeFullTunTitle ?? "TUN session") + "  " +
                 elapsedConnectionTime(startedAt)
             return
         }
@@ -1512,8 +1538,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "◌  Connecting…" }
         if ciscoSystemRouteVerified { return "◉  Connected · Cisco" }
         if ciscoTunnelTask != nil { return "◌  Connecting…" }
-        if fullTunHTTPSConnected { return "◉  Connected" }
-        if fullTunActive { return "◉  TUN running · unverified" }
+        if fullTunHTTPSConnected {
+            return "◉  Connected" + fullTunConnectedSuffix
+        }
+        if fullTunActive {
+            return "◉  TUN running · unverified" + fullTunConnectedSuffix
+        }
         return "◌  Offline"
     }
 
@@ -1540,8 +1570,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "Connecting…" }
         if ciscoSystemRouteVerified { return "Connected · Cisco" }
         if ciscoTunnelTask != nil { return "Connecting…" }
-        if fullTunHTTPSConnected { return "Connected" }
-        if fullTunActive { return "TUN running · unverified" }
+        if fullTunHTTPSConnected {
+            return "Connected" + fullTunConnectedSuffix
+        }
+        if fullTunActive {
+            return "TUN running · unverified" + fullTunConnectedSuffix
+        }
         return "Disconnected"
     }
 
@@ -1782,7 +1816,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             // TUN route existence is not proof of a verified VPN egress.
             let timing = stack(.horizontal, spacing: 8)
             let uptime = text(fullTunActive ?
-                (fullTunStartedAt.map { "◷  TUN session  " +
+                (fullTunStartedAt.map { "◷  " +
+                    (activeFullTunTitle ?? "TUN session") + "  " +
                     elapsedConnectionTime($0) } ?? "◷  TUN session") :
                 verifiedConnectionStart.map { start in
                 "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
@@ -3477,6 +3512,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Always request removal of both connection modes on logout.
         // The root daemon independently enforces TUN ownership.
         fullTunActive = false
+        fullTunConnectedProtocol = nil
         openVPNAppSessionActive = false
         openVPNSystemRouteVerified = false
         fullTunBusy = false
@@ -4577,6 +4613,48 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         } catch { return (nil, "VLESS_CONVERTER_EXEC_FAILED") }
     }
 
+    private func readActiveFullTunProtocol() -> String? {
+        // The limited-sudo status operation is read-only; the root-owned
+        // helper looks at the actual running sing-box process and its active
+        // 0600 config. It outputs only a fixed protocol code, not credentials.
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n",
+            "/Library/PrivilegedHelperTools/TwinConnectOps/tun-admin", "status"]
+        task.standardInput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        let output = Pipe()
+        task.standardOutput = output
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard data.count < 8192,
+                  let content = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            let prefix = "TUN_PROTOCOL="
+            let codes = content.split(separator: "\n")
+                .compactMap { line -> String? in
+                    let value = String(line).trimmingCharacters(in:
+                        .whitespacesAndNewlines)
+                    return value.hasPrefix(prefix) ?
+                        String(value.dropFirst(prefix.count)) : nil
+                }
+            let allowed: Set<String> = [
+                "v2ray", "hysteria2", "tuic", "anytls",
+                "socks5", "snell", "naive", "shadowtls"
+            ]
+            guard codes.count == 1, allowed.contains(codes[0]) else {
+                return nil
+            }
+            return codes[0]
+        } catch {
+            return nil
+        }
+    }
+
     private func tunRouteIsRunning(_ raw: String) -> Bool {
         guard tunResponseIs(raw, state: "engine_running_unverified"),
               let data = raw.data(using: .utf8),
@@ -5001,6 +5079,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     let observed: (Int32, String) =
                         reviewed != nil && !self.tunRouteIsRunning(response.1) ?
                             self.runFullTunClient("status") : response
+                    let realProtocol = self.tunRouteIsRunning(observed.1) ?
+                        self.readActiveFullTunProtocol() : nil
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.fullTunBusy = false
@@ -5013,6 +5093,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         }
                         self.fullTunActive = reviewed != nil &&
                             self.tunRouteIsRunning(observed.1)
+                        self.fullTunConnectedProtocol = self.fullTunActive ?
+                            realProtocol : nil
                         if self.fullTunActive {
                             self.fullTunStartedAt = Date()
                             self.fullTunProbeLastAt = .distantPast
@@ -5217,8 +5299,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Never assign an already-running session to another selected protocol.
         guard accountSession != nil, !fullTunBusy, !localProxyBusy,
               !fullTunStatusPollBusy,
-              (fullTunActive || activeProtocol == "v2ray" ||
-               activeProtocol == "hysteria2"),
+              // Discover an existing TUN even if the user changed the picker
+              // or reopened the app while TUIC/Hysteria2/V2Ray was running.
               (fullTunActive || fullTunServicePresent()),
               Date().timeIntervalSince(fullTunStatusLastPoll) >= 5 else { return }
         fullTunStatusLastPoll = Date()
@@ -5228,17 +5310,23 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             let result = self.runFullTunClient("status")
+            let observedRoute = result.0 == 0 &&
+                self.tunRouteIsRunning(result.1)
+            let realProtocol = observedRoute ?
+                self.readActiveFullTunProtocol() : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.fullTunStatusPollBusy = false
                 guard self.localProxyGeneration == generation,
                       self.accountSession?.accessToken == token else { return }
-                let observed = result.0 == 0 &&
-                    self.tunRouteIsRunning(result.1)
+                let observed = observedRoute
                 let confirmedStopped = result.0 == 0 &&
                     self.tunResponseIs(result.1, state: "stopped")
                 if observed {
                     let wasUncertain = self.fullTunStatusUncertain
+                    let protocolChanged =
+                        self.fullTunConnectedProtocol != realProtocol
+                    self.fullTunConnectedProtocol = realProtocol
                     self.fullTunStatusUncertain = false
                     self.fullTunStatusMisses = 0
                     if !self.fullTunActive {
@@ -5250,11 +5338,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.fullTunProbeLastAt = .distantPast
                         self.view = self.build()
                         self.refreshFullTunEgress()
-                    } else if wasUncertain {
+                    } else if wasUncertain || protocolChanged {
                         self.status = "TUN route active; system VPN unverified."
                         self.view = self.build()
                     }
                 } else if confirmedStopped {
+                    self.fullTunConnectedProtocol = nil
                     self.fullTunStatusUncertain = false
                     self.fullTunStatusMisses = 0
                     if self.fullTunActive {
@@ -5277,6 +5366,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.status = "TUN status temporarily unavailable; rechecking."
                     if self.fullTunStatusMisses >= 3 {
                         self.fullTunActive = false
+                        self.fullTunConnectedProtocol = nil
                         self.fullTunStatusUncertain = false
                         self.fullTunStartedAt = nil
                         self.status = "TUN status could not be verified."
@@ -5301,6 +5391,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if response.0 == 0 &&
                    self.tunResponseIs(response.1, state: "stopped") {
                     self.fullTunActive = false
+                    self.fullTunConnectedProtocol = nil
                     self.fullTunStatusUncertain = false
                     self.fullTunStatusMisses = 0
                     self.fullTunObservedExitIP = nil
