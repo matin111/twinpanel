@@ -18,7 +18,7 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.fullTunObservedExitIP = address', UI)
         self.assertIn('fullTunActive ? (fullTunObservedExitIP ?? "—")', UI)
         self.assertIn('Full VPN not yet verified.', UI)
-        self.assertIn('TUN trial', UI)
+        self.assertIn('TUN session', UI)
 
     def test_app_restart_recovers_existing_tun_without_new_connection(self):
         start = UI.index('private func refreshFullTunStatus()')
@@ -39,7 +39,7 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.fullTunStatusMisses += 1', poll)
         self.assertIn('self.fullTunStatusUncertain = true', poll)
         self.assertIn('self.fullTunStatusMisses >= 3', poll)
-        self.assertIn('TUN trial stopped (45-second limit or engine exit).', poll)
+        self.assertIn('TUN session stopped or engine exited.', poll)
         self.assertIn('if fullTunStatusUncertain { return "◌  Checking TUN…" }', UI)
         self.assertIn('if fullTunStatusUncertain { return "Checking TUN…" }', UI)
         self.assertIn('!fullTunStatusUncertain && !ciscoTunnelBusy', UI)
@@ -47,7 +47,7 @@ class UnsignedTunStatusTests(unittest.TestCase):
     def test_stopped_trial_clears_stale_ip_and_timer(self):
         self.assertIn('self.fullTunObservedExitIP = nil', UI)
         self.assertIn('self.fullTunStartedAt = nil', UI)
-        self.assertIn('TUN trial stopped (45-second limit or engine exit).', UI)
+        self.assertIn('TUN session stopped or engine exited.', UI)
 
 if __name__ == "__main__":
     unittest.main()
