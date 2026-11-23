@@ -1929,7 +1929,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         "stack": "system"
                     ]],
                     "outbounds": outbounds,
-                    "route": ["final": "proxy"]
+                    "route": ["final": "proxy", "auto_detect_interface": true]
                 ]
                 guard let encoded = try? JSONSerialization.data(withJSONObject: config)
                 else {
