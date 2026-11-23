@@ -13,7 +13,8 @@ import signal
 import sys
 import time
 
-MAX_SECONDS = 600
+# 30-day cap for the owner-approved VPS mode; terminate on daemon death sooner.
+MAX_SECONDS = 30 * 24 * 60 * 60
 
 
 def valid_pid(value: int) -> bool:
