@@ -4423,9 +4423,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let completion: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self else { return }
             switch result {
-            case .failure:
+            case .failure(let error):
                 self.fullTunBusy = false
-                self.status = "TUN profile unavailable; no network changes."
+                let message = String(describing: error)
+                let safeCode = message.range(
+                    of: "[A-Z][A-Z0-9_]{2,63}",
+                    options: .regularExpression).map {
+                        String(message[$0])
+                    } ?? "PROFILE_FETCH_FAILED"
+                self.status = "VPN profile request failed: " + safeCode
+                self.recordProxyAttempt(protocolCode, safeCode)
                 self.view = self.build()
             case .success(let profile):
                 self.status = "Starting local-console TUN engine…"
@@ -4449,11 +4456,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.fullTunActive = response.0 == 0 &&
                             self.tunResponseIs(response.1,
                                                state: "engine_running_unverified")
-                        self.status = self.fullTunActive ?
-                            "TUN engine running; system VPN NOT verified." :
-                            (reviewed == nil ?
-                             "V2Ray TUN profile rejected; proxy mode remains available." :
-                             "TUN start rejected; no connection confirmed.")
+                        if self.fullTunActive {
+                            self.status = "TUN engine running; system VPN NOT verified."
+                        } else if reviewed == nil {
+                            self.status = "V2Ray TUN profile conversion failed."
+                            self.recordProxyAttempt(protocolCode, "TUN_PROFILE_CONVERSION_FAILED")
+                        } else {
+                            let reason: String
+                            if let data = response.1.data(using: .utf8),
+                               let object = try? JSONSerialization.jsonObject(with: data)
+                                    as? [String: Any],
+                               let code = object["reason"] as? String,
+                               code.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                          options: .regularExpression) != nil {
+                                reason = code
+                            } else {
+                                reason = "TUN_START_REJECTED"
+                            }
+                            self.status = "TUN connection failed: " + reason
+                            self.recordProxyAttempt(protocolCode, reason)
+                        }
                         self.view = self.build()
                         if self.fullTunActive {
                             DispatchQueue.global(qos: .utility).async {
