@@ -23,6 +23,7 @@ import stat
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 import urllib.request
 
@@ -169,6 +170,29 @@ def probe_system_https() -> dict:
         return {"https_state": "unreachable"}
 
 
+def classify_engine_stderr(raw: bytes) -> str:
+    """Return only fixed reason codes; NEVER echo raw sing-box output."""
+    # Error streams can include private endpoints or profile values.
+    # Inspect in memory, keep only a category and discard the original.
+    message = raw[:16384].decode("utf-8", errors="replace").lower()
+    if "operation not permitted" in message or "permission denied" in message:
+        return "TUN_ENGINE_PERMISSION_DENIED"
+    if ("no such device" in message or "device not configured" in message
+            or "create tun" in message or "configure tun" in message
+            or "utun" in message):
+        return "TUN_ENGINE_INTERFACE_FAILED"
+    if "address already in use" in message or "file exists" in message:
+        return "TUN_ENGINE_CONFLICT"
+    if "route" in message and ("failed" in message or "error" in message):
+        return "TUN_ENGINE_ROUTE_ERROR"
+    if "network is unreachable" in message or "no route to host" in message:
+        return "TUN_ENGINE_NETWORK_UNREACHABLE"
+    if ("invalid" in message or "unsupported" in message or
+            "unknown field" in message):
+        return "TUN_ENGINE_RUNTIME_CONFIG_INVALID"
+    return "TUN_ENGINE_EXITED_BEFORE_ROUTE"
+
+
 class Session:
     def __init__(self) -> None:
         self.lock = threading.RLock()
@@ -177,6 +201,7 @@ class Session:
         self.config: Path | None = None
         self.owner: int | None = None
         self.started: float | None = None
+        self.engine_stderr = None
 
     def console_owner_present(self) -> bool:
         """Kill the tunnel when console ownership changes or user logs out."""
@@ -209,6 +234,9 @@ class Session:
                 self.config = None
                 self.owner = None
                 self.started = None
+                if self.engine_stderr is not None:
+                    self.engine_stderr.close()
+                    self.engine_stderr = None
 
     def status(self) -> dict:
         with self.lock:
@@ -292,10 +320,13 @@ class Session:
                     except subprocess.TimeoutExpired:
                         raise ValueError("SINGBOX_CONFIG_CHECK_TIMEOUT") from None
                     command = [str(engine), "run", "-c", str(path)]
+                # The runtime error stream stays in an anonymous tempfile:
+                # never write sensitive sing-box errors to logs or disk paths.
+                self.engine_stderr = tempfile.TemporaryFile(mode="w+b")
                 child = subprocess.Popen(command,
                                          stdin=subprocess.DEVNULL,
                                          stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL,
+                                         stderr=self.engine_stderr,
                                          start_new_session=True)
                 self.process = child
                 self.config = path
@@ -324,7 +355,13 @@ class Session:
                 route_observed = False
                 for _ in range(32):
                     if child.poll() is not None:
-                        raise ValueError("TUN_ENGINE_EXITED_BEFORE_ROUTE")
+                        error_code = "TUN_ENGINE_EXITED_BEFORE_ROUTE"
+                        if self.engine_stderr is not None:
+                            self.engine_stderr.flush()
+                            self.engine_stderr.seek(0)
+                            error_code = classify_engine_stderr(
+                                self.engine_stderr.read(16384))
+                        raise ValueError(error_code)
                     if watcher.poll() is not None:
                         raise ValueError("TUN_WATCHDOG_EXITED_BEFORE_ROUTE")
                     if observe_route()["route_state"] == "utun_route_observed_unverified":
