@@ -1763,6 +1763,9 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     reviewed["udp_over_stream"] = uos
                 }
             } else if protocolCode == "anytls" {
+                // Match the installed sing-box 1.14 AnyTLS schema. Refuse
+                // malformed optional settings instead of silently discarding
+                // them: a different idle policy can break server sessions.
                 for key in ["idle_session_check_interval",
                             "idle_session_timeout"] {
                     if let value = outbound[key] as? String {
@@ -1771,12 +1774,27 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             options: .regularExpression) != nil
                         else { return nil }
                         reviewed[key] = value
-                    }
+                    } else if outbound[key] != nil { return nil }
                 }
                 if let idle = outbound["min_idle_session"] as? Int {
-                    guard (0...100).contains(idle) else { return nil }
+                    guard !(outbound["min_idle_session"] is Bool),
+                          (0...100).contains(idle) else { return nil }
                     reviewed["min_idle_session"] = idle
-                }
+                } else if outbound["min_idle_session"] != nil { return nil }
+                // An optional metadata greeting is supported by our local
+                // binary, but user-controlled control chars and CR/LF aren't.
+                if let metadata = outbound["client_metadata"] as? String {
+                    guard metadata.utf8.count <= 128,
+                          !metadata.contains("\n"),
+                          !metadata.contains("\r"),
+                          !metadata.contains("\u{0000}")
+                    else { return nil }
+                    reviewed["client_metadata"] = metadata
+                } else if outbound["client_metadata"] != nil { return nil }
+                // These are documented for newer variants, but the shipped
+                // 1.14.4 engine rejects them. Don't claim compatibility.
+                guard outbound["disable_reuse"] == nil,
+                      outbound["network"] == nil else { return nil }
             }
         }
         let config: [String: Any] = [
