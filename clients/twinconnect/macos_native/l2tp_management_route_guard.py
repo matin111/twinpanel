@@ -243,8 +243,15 @@ def arm(endpoint: str) -> str:
     if (route_to_server.get("gateway") != info["gateway"] or
             route_to_server.get("interface") != info["interface"]):
         return "L2TP_ENDPOINT_NOT_ON_ORIGINAL_UPLINK"
+    baseline_trace = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
+                         "--connect-timeout", "3", "--max-time", "8",
+                         "https://1.1.1.1/cdn-cgi/trace", timeout=10)
+    match = re.search(r"(?m)^ip=([0-9.]+)$", baseline_trace.stdout)
+    if baseline_trace.returncode or not match or not public_ip(match.group(1)):
+        return "L2TP_BASELINE_EGRESS_UNAVAILABLE"
     pinned = sorted(set(info["peers"] + [ip]))
     state = {**info, "mode": "arming", "endpoint": ip,
+             "baseline_exit": match.group(1), "verified_probes": [],
              "owned_pins": [], "full_interface": None,
              "probe_destination": None, "deadline": time.time() + INITIAL_TTL}
     # Store intent before every mutation. Watchdog always sees a recoverable
@@ -304,6 +311,46 @@ def probe_host(interface: str, destination: str) -> str:
     return "L2TP_PROBE_HOST_ACTIVE"
 
 
+def verify_probe() -> str:
+    state = verified_state()
+    if state is None or state.get("mode") != "probing":
+        return "L2TP_PROBE_NOT_ACTIVE"
+    dest = state.get("probe_destination")
+    interface = state.get("full_interface")
+    if dest not in PROBES or not re.fullmatch(r"ppp[0-9]{1,4}", interface or ""):
+        return "L2TP_PROBE_STATE_UNTRUSTED"
+    if route(dest).get("interface") != interface:
+        return "L2TP_PROBE_ROUTE_MISSING"
+    if dest == "1.1.1.1":
+        response = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
+                       "--connect-timeout", "3", "--max-time", "8",
+                       "https://1.1.1.1/cdn-cgi/trace", timeout=10)
+        match = re.search(r"(?m)^ip=([0-9.]+)$", response.stdout)
+        if (response.returncode or not match or
+                not public_ip(match.group(1)) or
+                match.group(1) == state.get("baseline_exit")):
+            return "L2TP_VPN_EXIT_NOT_VERIFIED"
+    elif dest == "8.8.8.8":
+        response = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
+                       "--resolve", "dns.google:443:8.8.8.8",
+                       "--connect-timeout", "3", "--max-time", "8",
+                       "https://dns.google/resolve?name=example.com&type=A", timeout=10)
+        try:
+            answer = json.loads(response.stdout)
+        except (ValueError, TypeError):
+            return "L2TP_SECOND_EXIT_INVALID"
+        if response.returncode or answer.get("Status") != 0 or not answer.get("Answer"):
+            return "L2TP_SECOND_EXIT_NOT_VERIFIED"
+    marked = state.get("verified_probes", [])
+    if not isinstance(marked, list) or len(marked) > 2:
+        return "L2TP_PROBE_PROOF_INVALID"
+    if dest not in marked:
+        marked.append(dest)
+    state["verified_probes"] = marked
+    store(state)
+    return "L2TP_PROBE_EGRESS_VERIFIED"
+
+
 def rollback_probe() -> str:
     state = load()
     if state.get("mode") != "probing":
@@ -336,6 +383,8 @@ def activate(interface: str) -> str:
     if native_status() != "L2TP_NATIVE_LINK_CONNECTED_UNROUTED" or (
             ppp_interface() != interface):
         return "L2TP_PPP_NOT_ESTABLISHED"
+    if set(state.get("verified_probes", [])) != PROBES:
+        return "L2TP_TWO_EGRESS_PROBES_REQUIRED"
     for dest, _ in ((x, y) for x, y in (("1.0.0.1", "0"), ("129.0.0.1", "0"))):
         if route(dest).get("interface") != state["interface"]:
             return "L2TP_BEFORE_FULL_ROUTE_NOT_ORIGINAL"
@@ -494,6 +543,8 @@ def main() -> int:
             answer = arm(args[1])
         elif len(args) == 3 and args[0] == "probe-host":
             answer = probe_host(args[1], args[2])
+        elif args == ["verify-probe"]:
+            answer = verify_probe()
         elif args == ["rollback-probe"]:
             answer = rollback_probe()
         elif len(args) == 2 and args[0] == "activate":
@@ -509,6 +560,7 @@ def main() -> int:
     print(answer, flush=True)
     successful = {"L2TP_MANAGEMENT_PRECHECK_READY", "L2TP_MANAGEMENT_PIN_IDLE",
                   "L2TP_MANAGEMENT_PIN_ARMED", "L2TP_PROBE_HOST_ACTIVE",
+                  "L2TP_PROBE_EGRESS_VERIFIED",
                   "L2TP_PROBE_ROLLBACK_VERIFIED", "L2TP_SYSTEM_IPV4_CONNECTED",
                   "L2TP_SYSTEM_DISCONNECTED"}
     return 0 if answer in successful else 1
