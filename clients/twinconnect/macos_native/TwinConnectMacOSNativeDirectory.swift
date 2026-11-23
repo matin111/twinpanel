@@ -972,6 +972,104 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // L2TP/IPsec manual credentials: fetch only the selected, entitled node.
+    // Never print or persist passwords/PSK; the caller owns the in-memory data.
+    func prepareL2TPProfile(_ session: TwinMacNativeSession,
+                            serverID: String,
+                            completion: @escaping (Result<Data, Error>) -> Void) {
+        guard serverID.range(of: "^[0-9]{1,20}$",
+                             options: .regularExpression) != nil else {
+            completion(.failure(TwinMacNativeError.failure("L2TP_SERVER_ID_INVALID")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] catalogResult in
+            guard let self = self else { return }
+            guard case .success(let catalog) = catalogResult,
+                  self.validEnvelope(catalog, session.namespace),
+                  let protocols = catalog["protocols"] as? [[String: Any]],
+                  protocols.count <= 16,
+                  protocols.filter({
+                      ($0["code"] as? String) == "l2tp" &&
+                      ($0["selected"] as? Bool) == true &&
+                      ($0["config_record_present"] as? Bool) == true
+                  }).count == 1 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "L2TP_PROTOCOL_NOT_ALLOWED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventory in
+                guard case .success(let response) = inventory,
+                      self.validEnvelope(response, session.namespace),
+                      let servers = response["servers"] as? [[String: Any]],
+                      servers.filter({
+                          if let id = $0["id"] as? String { return id == serverID }
+                          if let id = $0["id"] as? Int { return String(id) == serverID }
+                          return false
+                      }).count == 1 else {
+                    completion(.failure(TwinMacNativeError.failure(
+                        "L2TP_SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": "l2tp"], bearer: token,
+                             maxBytes: 1048576) { profiles in
+                    guard case .success(let response) = profiles,
+                          self.validEnvelope(response, session.namespace),
+                          response["protocol"] as? String == "l2tp",
+                          let items = response["items"] as? [[String: Any]],
+                          items.count <= 200 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "L2TP_PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let matches = items.filter { item in
+                        if let id = item["node_id"] as? String { return id == serverID }
+                        if let id = item["node_id"] as? Int { return String(id) == serverID }
+                        return false
+                    }
+                    guard matches.count == 1,
+                          let profile = self.reviewedL2TPProfile(matches[0])
+                    else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "L2TP_PROFILE_INVALID")))
+                        return
+                    }
+                    completion(.success(profile))
+                }
+            }
+        }
+    }
+
+    private func reviewedL2TPProfile(_ item: [String: Any]) -> Data? {
+        guard let server = (item["server"] ?? item["server_ip"]) as? String,
+              server.range(of: "^[A-Za-z0-9.-]{1,253}$",
+                           options: .regularExpression) != nil,
+              !server.hasPrefix("-"), !server.hasSuffix("."),
+              !server.contains(".."),
+              let username = item["username"] as? String,
+              let password = item["password"] as? String,
+              let psk = item["psk"] as? String else {
+            return nil
+        }
+        for (secret, maxBytes) in [(username, 256), (password, 256), (psk, 256)] {
+            if secret.isEmpty || secret.utf8.count > maxBytes ||
+                secret.unicodeScalars.contains(where: {
+                    CharacterSet.controlCharacters.contains($0)
+                }) {
+                return nil
+            }
+        }
+        let obj: [String: String] = [
+            "server": server, "username": username,
+            "password": password, "psk": psk
+        ]
+        return try? JSONSerialization.data(withJSONObject: obj)
+    }
+
     // OpenVPN: retrieve a profile only for the current authenticated tenant,
     // entitled protocol and selected node. Never trust a remote-supplied
     // executable command, file path or routing instruction.
