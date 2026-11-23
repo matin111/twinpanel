@@ -114,6 +114,98 @@ def prepare_unsigned_profile(panel_config: dict[str, Any]) -> tuple[dict, dict]:
     return native, tun
 
 
+def prepare_mbox_tun(panel_config: dict[str, Any]) -> dict:
+    """Review the current profile into an unsigned mbox Mieru native TUN.
+
+    Separate root-owned engine: existing sing-box remains untouched.
+    A direct Mieru outbound avoids loopback SOCKS and endpoint route recursion.
+    Credentials only leave memory in the authenticated root TUN socket.
+    """
+    native, _ = prepare_unsigned_profile(panel_config)
+    profile = native["profiles"][0]
+    endpoint = profile["servers"][0]
+    selected = [x for x in endpoint["portBindings"]
+                if x.get("protocol") == "TCP"]
+    if not selected:
+        raise ValueError("MIERU_TCP_BINDING_REQUIRED")
+    if profile.get("handshakeMode") not in (
+            None, "HANDSHAKE_STANDARD"):
+        raise ValueError("MIERU_UNSUPPORTED_HANDSHAKE")
+    multiplex = profile.get("multiplexing")
+    if multiplex is not None and multiplex != {"level": "MULTIPLEXING_LOW"}:
+        raise ValueError("MIERU_UNSUPPORTED_MULTIPLEXING")
+    if profile.get("mtu") not in (None, 1400):
+        raise ValueError("MIERU_UNSUPPORTED_MTU")
+    out = {
+        "type": "mieru", "tag": "proxy",
+        "server": endpoint["ipAddress"],
+        "server_port": selected[0]["port"],
+        "transport": "TCP",
+        "username": profile["user"]["name"],
+        "password": profile["user"]["password"],
+    }
+    # Isolated native mbox engine, no other outbounds/direct fallback.
+    return {
+        "log": {"level": "error"},
+        "inbounds": [{
+            "type": "tun", "tag": "twinconnect-tun",
+            "address": ["172.19.0.1/30"],
+            "auto_route": True, "auto_redirect": False,
+            "strict_route": False, "stack": "system",
+        }],
+        "outbounds": [out],
+        "route": {"final": "proxy", "auto_detect_interface": True},
+    }
+
+
+def validate_mbox_tun_config(value: dict) -> None:
+    """Defense in depth in the ROOT daemon: reject arbitrary Mieru configs."""
+    if not isinstance(value, dict) or set(value) != {
+            "log", "inbounds", "outbounds", "route"}:
+        raise ValueError("MIERU_TUN_SCHEMA_INVALID")
+    if not isinstance(value["outbounds"], list) or len(value["outbounds"]) != 1:
+        raise ValueError("MIERU_TUN_OUTBOUNDS_INVALID")
+    outbound = value["outbounds"][0]
+    if not isinstance(outbound, dict) or set(outbound) != {
+            "type", "tag", "server", "server_port", "transport",
+            "username", "password"}:
+        raise ValueError("MIERU_TUN_OUTBOUND_INVALID")
+    if outbound["type"] != "mieru" or outbound["tag"] != "proxy":
+        raise ValueError("MIERU_TUN_OUTBOUND_INVALID")
+    try:
+        if not ipaddress.IPv4Address(outbound["server"]).is_global:
+            raise ValueError
+    except (ValueError, ipaddress.AddressValueError, TypeError):
+        raise ValueError("MIERU_TUN_ENDPOINT_INVALID") from None
+    if type(outbound["server_port"]) is not int or not 1 <= outbound["server_port"] <= 65535:
+        raise ValueError("MIERU_TUN_PORT_INVALID")
+    if outbound["transport"] != "TCP":
+        raise ValueError("MIERU_TUN_TRANSPORT_INVALID")
+    if not isinstance(outbound["username"], str) or (
+            not 1 <= len(outbound["username"].encode("utf-8")) <= 64):
+        raise ValueError("MIERU_TUN_USER_INVALID")
+    if not isinstance(outbound["password"], str) or (
+            not 1 <= len(outbound["password"].encode("utf-8")) <= 64):
+        raise ValueError("MIERU_TUN_PASSWORD_INVALID")
+    inbound = value["inbounds"]
+    if (not isinstance(inbound, list) or len(inbound) != 1 or
+            not isinstance(inbound[0], dict) or
+            set(inbound[0]) != {"type", "tag", "address", "auto_route",
+                                "auto_redirect", "strict_route", "stack"} or
+            inbound[0] != {
+                "type": "tun", "tag": "twinconnect-tun",
+                "address": ["172.19.0.1/30"], "auto_route": True,
+                "auto_redirect": False, "strict_route": False,
+                "stack": "system"}):
+        raise ValueError("MIERU_TUN_INBOUND_INVALID")
+    if value["route"] != {"final": "proxy", "auto_detect_interface": True}:
+        # The root-only management guard will later append exact /32
+        # exclusions to the validated inbound. They are NOT user supplied.
+        raise ValueError("MIERU_TUN_ROUTE_INVALID")
+    # No filesystem side effect: call the shared full-TUN route validator
+    # only in the root daemon after writing the private 0600 config file.
+
+
 def safe_preflight_summary(config: dict[str, Any]) -> dict:
     core, _ = prepare_unsigned_profile(config)
     return {
@@ -130,11 +222,16 @@ def safe_preflight_summary(config: dict[str, Any]) -> dict:
 
 def main() -> int:
     import sys
+    candidate = len(sys.argv) == 2 and sys.argv[1] == "--candidate"
+    if len(sys.argv) > 1 and not candidate:
+        print(json.dumps({"state": "rejected", "reason": "MIERU_INVALID_ACTION"}))
+        return 2
     try:
         data = sys.stdin.buffer.read(MAX_CONFIG_BYTES + 1)
         if len(data) > MAX_CONFIG_BYTES:
             raise ValueError("MIERU_CONFIG_TOO_LARGE")
-        summary = safe_preflight_summary(json.loads(data))
+        profile = json.loads(data)
+        summary = prepare_mbox_tun(profile) if candidate else safe_preflight_summary(profile)
     except (UnicodeError, ValueError, TypeError) as exc:
         code = str(exc)
         if not code.startswith("MIERU_") or not code.isupper():
