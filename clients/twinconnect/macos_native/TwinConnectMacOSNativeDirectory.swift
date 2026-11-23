@@ -2044,6 +2044,21 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     completion(.failure(TwinMacNativeError.failure("TUN_PROFILE_INVALID")))
                     return
                 }
+                // ShadowTLS is a strictly two-stage chain, not a direct
+                // Shadowsocks outbound. Reject any broken detour here as
+                // defense in depth even after review at profile ingestion.
+                if protocolCode == "shadowtls" {
+                    guard outbounds.count == 2,
+                          first["type"] as? String == "shadowsocks",
+                          first["detour"] as? String == "shadowtls-transport",
+                          outbounds[1]["type"] as? String == "shadowtls",
+                          outbounds[1]["tag"] as? String == "shadowtls-transport",
+                          outbounds[1]["version"] as? Int == 3 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "SHADOWTLS_CHAIN_INVALID")))
+                        return
+                    }
+                }
                 // Preserve the complete already-reviewed ShadowTLS detour
                 // and the remote credentials without exposing them to logs.
                 let config: [String: Any] = [
