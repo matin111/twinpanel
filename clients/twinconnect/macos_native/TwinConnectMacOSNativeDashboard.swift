@@ -5217,7 +5217,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Never assign an already-running session to another selected protocol.
         guard accountSession != nil, !fullTunBusy, !localProxyBusy,
               !fullTunStatusPollBusy,
-              (fullTunActive || activeProtocol == "v2ray"),
+              (fullTunActive || activeProtocol == "v2ray" ||
+               activeProtocol == "hysteria2"),
               (fullTunActive || fullTunServicePresent()),
               Date().timeIntervalSince(fullTunStatusLastPoll) >= 5 else { return }
         fullTunStatusLastPoll = Date()
