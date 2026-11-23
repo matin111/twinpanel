@@ -20,6 +20,16 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('Full VPN not yet verified.', UI)
         self.assertIn('TUN trial', UI)
 
+    def test_app_restart_recovers_existing_tun_without_new_connection(self):
+        start = UI.index('private func refreshFullTunStatus()')
+        end = UI.index('private func stopFullTun()', start)
+        poll = UI[start:end]
+        self.assertIn('Existing TUN route detected; destination unverified.', poll)
+        self.assertIn('self.tunRouteIsRunning(result.1)', poll)
+        self.assertIn('self.runFullTunClient("status")', poll)
+        self.assertNotIn('self.runFullTunClient("start"', poll)
+        self.assertIn('(fullTunActive || activeProtocol == "v2ray")', poll)
+
     def test_stopped_trial_clears_stale_ip_and_timer(self):
         self.assertIn('self.fullTunObservedExitIP = nil', UI)
         self.assertIn('self.fullTunStartedAt = nil', UI)
