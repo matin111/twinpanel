@@ -569,6 +569,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var protocolChipCodes = [String?]()
     private var showAllProtocolChips = true
     private var activeProtocol: String?
+    // The three V2Ray transport choices map to distinct server_groups IDs.
+    private let v2rayInboundIDs = ["tcp_tls", "websocket_tls", "xhttp_reality"]
+    private let v2rayInboundLabels = ["TCP TLS", "WebSocket TLS", "XHTTP Reality"]
+    private var activeV2RayInbound = "tcp_tls"
     private var activeServer: String?
     private var nodePingResults = [String: TwinMacNativePingResult]()
     private var nodePingBusy = Set<String>()
@@ -1585,6 +1589,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // not as a long line beneath the primary connection button.
 
 
+        // Keep V2Ray inbound selectable from Quick Connect as well as Locations.
+        if activeProtocol == "v2ray" {
+            let inboundTitle = text("V2RAY INBOUND", size: 11,
+                                    weight: .bold, color: muted)
+            main.addArrangedSubview(inboundTitle)
+            let inboundRow = v2rayInboundChips()
+            main.addArrangedSubview(inboundRow)
+            inboundRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        }
+
         // NSStackView with .leading alignment does not automatically
         // stretch this nested account card. Pin it to the full hero width.
         let subscription = homeSubscriptionSummary()
@@ -2045,6 +2059,27 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return group
     }
 
+    private func v2rayInboundChips() -> NSView {
+        let row = stack(.horizontal, spacing: 8)
+        for (index, name) in v2rayInboundLabels.enumerated() {
+            let selected = activeV2RayInbound == v2rayInboundIDs[index]
+            let choice = button(name, action: #selector(selectV2RayInbound(_:)),
+                                tag: index, primary: selected, mutedButton: !selected)
+            choice.heightAnchor.constraint(equalToConstant: 34).isActive = true
+            row.addArrangedSubview(choice)
+        }
+        return row
+    }
+
+    @objc private func selectV2RayInbound(_ sender: NSButton) {
+        guard v2rayInboundIDs.indices.contains(sender.tag),
+              !localProxyBusy, !fullTunBusy, !fullTunActive,
+              !ciscoTunnelBusy else { return }
+        activeV2RayInbound = v2rayInboundIDs[sender.tag]
+        status = "V2Ray " + v2rayInboundLabels[sender.tag] + " selected."
+        view = build()
+    }
+
     // Locations follow Flutter's Search -> protocol chips -> country accordion.
     // All data is scoped to the authenticated panel session. Node inventory
     // alone never guarantees a protocol-specific connection profile.
@@ -2097,6 +2132,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let chips = protocolChips()
         wrapper.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        if activeProtocol == "v2ray" {
+            let inboundTitle = text("V2RAY INBOUND", size: 11,
+                                    weight: .bold, color: muted)
+            wrapper.addArrangedSubview(inboundTitle)
+            let inboundRow = v2rayInboundChips()
+            wrapper.addArrangedSubview(inboundRow)
+            inboundRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        }
 
         // A fastest-node action must use real local ICMP measurements,
         // never panel estimates or synthetic timers.
@@ -4506,7 +4549,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if protocolCode == "v2ray" {
             directory.prepareLocalSingBox(session, serverID: serverID,
-                                          protocolCode: "v2ray", completion: completion)
+                                          protocolCode: "v2ray",
+                                          v2rayInboundID: activeV2RayInbound,
+                                          completion: completion)
         } else {
             directory.prepareFullTUNCandidate(session, serverID: serverID,
                                               protocolCode: protocolCode,
@@ -4929,7 +4974,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         localProxyStatus = status
         view = build()
         directory.prepareLocalSingBox(
-            session, serverID: serverID, protocolCode: selectedProtocol) {
+            session, serverID: serverID, protocolCode: selectedProtocol,
+            v2rayInboundID: selectedProtocol == "v2ray" ? activeV2RayInbound : nil) {
             [weak self] response in
             guard let self = self,
                   self.localProxyGeneration == generation,
