@@ -241,7 +241,8 @@ class TUNDaemonControlTests(unittest.TestCase):
         self.assertIn('self.status = "TUN service stopped or unavailable."', DASHBOARD)
 
     def test_unverified_engine_is_not_claimed_as_vpn_connected(self):
-        self.assertIn("TUN engine running; system VPN NOT verified.", DASHBOARD)
+        self.assertIn("TUN route running; HTTPS egress not yet verified.", DASHBOARD)
+        self.assertIn("Full VPN not yet verified.", DASHBOARD)
         self.assertIn('"system_vpn_verified": False', (DIR /
                          "unsigned_tun_daemon.py").read_text())
 
