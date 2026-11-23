@@ -1,13 +1,17 @@
 """Unsigned Mieru must never claim connection from a validated JSON alone."""
 from pathlib import Path
+from unittest.mock import patch
+import subprocess
 import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
-from unsigned_mieru_profile import (prepare_unsigned_profile,
-                                    safe_preflight_summary)
+from unsigned_mieru_profile import (
+    prepare_unsigned_profile, prepare_mbox_tun,
+    resolve_authenticated_ingress_domain,
+    safe_preflight_summary)
 from unsigned_tun_policy import validate_full_tun_config
 
 
@@ -70,6 +74,51 @@ class MieruUnsignedPreflight(unittest.TestCase):
         bad["profiles"][0]["user"]["password"] = ""
         with self.assertRaises(ValueError):
             prepare_unsigned_profile(bad)
+
+    def test_domain_only_profile_pins_iran_ingress_not_exit(self):
+        profile = fixture()
+        server = profile["profiles"][0]["servers"][0]
+        server["ipAddress"] = ""
+        server["domainName"] = "tunel8.in88.sbs"
+        server["portBindings"] = [{"port": 35031, "protocol": "TCP"}]
+        with patch('unsigned_mieru_profile.resolve_authenticated_ingress_domain',
+                   return_value="185.211.58.224") as resolver:
+            native, _ = prepare_unsigned_profile(profile)
+            tun = prepare_mbox_tun(profile)
+        self.assertEqual(native["profiles"][0]["servers"][0]["ipAddress"],
+                         "185.211.58.224")
+        self.assertEqual(tun["outbounds"][0]["server"], "185.211.58.224")
+        self.assertEqual(tun["outbounds"][0]["server_port"], 35031)
+        self.assertEqual(native["profiles"][0]["servers"][0]["domainName"], "")
+        self.assertEqual(profile["profiles"][0]["servers"][0]["ipAddress"], "")
+        resolver.assert_called_with("tunel8.in88.sbs")
+
+    def test_resolver_requires_valid_public_hostname_and_public_ipv4(self):
+        for hostname in ("localhost", "127.0.0.1", "private",
+                         "evil;command.example", "-bad.example.com"):
+            with self.assertRaises(ValueError):
+                resolve_authenticated_ingress_domain(hostname)
+        fake = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout="not-an-ip.example.\n192.168.1.5\n185.211.58.224\n",
+            stderr="")
+        with patch('unsigned_mieru_profile.subprocess.run', return_value=fake):
+            self.assertEqual(resolve_authenticated_ingress_domain(
+                "tunel8.in88.sbs"), "185.211.58.224")
+        private_only = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="127.0.0.1\n", stderr="")
+        with patch('unsigned_mieru_profile.subprocess.run',
+                   return_value=private_only):
+            with self.assertRaisesRegex(
+                    ValueError, "MIERU_INGRESS_PUBLIC_IPV4_REQUIRED"):
+                resolve_authenticated_ingress_domain("tunel8.in88.sbs")
+
+    def test_missing_ip_and_domain_fail_closed(self):
+        profile = fixture()
+        profile["profiles"][0]["servers"][0].update(
+            {"ipAddress": "", "domainName": ""})
+        with self.assertRaisesRegex(ValueError, "MIERU_INGRESS_DOMAIN_INVALID"):
+            prepare_mbox_tun(profile)
 
     def test_profile_not_a_running_connection(self):
         result = safe_preflight_summary(fixture())
