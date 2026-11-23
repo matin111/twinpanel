@@ -28,8 +28,8 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.tunRouteIsRunning(result.1)', poll)
         self.assertIn('self.runFullTunClient("status")', poll)
         self.assertNotIn('self.runFullTunClient("start"', poll)
-        self.assertIn('activeProtocol == "v2ray" ||', poll)
-        self.assertIn('activeProtocol == "hysteria2"', poll)
+        self.assertIn('(fullTunActive || fullTunServicePresent())', poll)
+        self.assertIn('self.readActiveFullTunProtocol()', poll)
 
     def test_transient_status_error_does_not_fake_offline_or_connected(self):
         start = UI.index('private func refreshFullTunStatus()')
@@ -49,13 +49,38 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('private var fullTunHTTPSConnected: Bool', UI)
         self.assertIn('fullTunActive && !fullTunStatusUncertain', UI)
         self.assertIn('fullTunObservedExitIP != nil', UI)
-        self.assertIn('if fullTunHTTPSConnected { return "◉  Connected" }', UI)
-        self.assertIn('if fullTunHTTPSConnected { return "Connected" }', UI)
+        self.assertIn('return "◉  Connected" + fullTunConnectedSuffix', UI)
+        self.assertIn('return "Connected" + fullTunConnectedSuffix', UI)
         self.assertIn('payload["https_state"] as? String == "system_https_reachable"', UI)
         self.assertIn('self.fullTunEgressConfirmedAt = Date()', UI)
         self.assertIn('self.tunRouteIsRunning(response.1)', UI)
         self.assertIn('self.refreshFullTunEgress()', UI)
         self.assertIn('Date().timeIntervalSince(fullTunProbeLastAt) >= 15', UI)
+
+    def test_attested_protocol_not_selected_picker(self):
+        self.assertIn('private var fullTunConnectedProtocol: String?', UI)
+        self.assertIn('private var activeFullTunTitle: String?', UI)
+        self.assertIn('return "◉  Connected" + fullTunConnectedSuffix', UI)
+        self.assertIn('return "Connected" + fullTunConnectedSuffix', UI)
+        self.assertIn('case "v2ray": return "V2Ray"', UI)
+        self.assertIn('case "hysteria2": return "Hysteria2"', UI)
+        self.assertIn('case "tuic": return "TUIC"', UI)
+        self.assertIn('let realProtocol = observedRoute ?', UI)
+        self.assertIn('self.fullTunConnectedProtocol = realProtocol', UI)
+        self.assertIn('self.fullTunConnectedProtocol = nil', UI)
+        self.assertNotIn('return "Connected" + (activeProtocol', UI)
+
+    def test_read_only_root_status_does_not_modify_daemon(self):
+        start = UI.index('private func readActiveFullTunProtocol()')
+        end = UI.index('private func tunRouteIsRunning(', start)
+        read = UI[start:end]
+        self.assertIn('/Library/PrivilegedHelperTools/TwinConnectOps/tun-admin', read)
+        self.assertIn('task.arguments = ["-n",', read)
+        self.assertIn('task.standardInput = FileHandle.nullDevice', read)
+        self.assertIn('let prefix = "TUN_PROTOCOL="', read)
+        self.assertIn('guard codes.count == 1, allowed.contains(codes[0])', read)
+        self.assertNotIn('start"', read)
+        self.assertNotIn('stop"', read)
 
     def test_network_metrics_read_real_tun_counters(self):
         self.assertIn('private func refreshFullTunTelemetry()', UI)
