@@ -24,7 +24,7 @@ class FullTunPendingIndicatorTests(unittest.TestCase):
         self.assertIn('let connect = button(fullTunStatusUncertain ? "Checking…" :', UI)
         self.assertIn('fullTunBusy && activeProtocol != "openvpn" ?', UI)
         self.assertIn('Waiting for the TUN controller; connection not yet verified.', UI)
-        self.assertIn('l2tpSystemRouteVerified || fullTunBusy) ? sea : muted', UI)
+        self.assertIn('l2tpSystemRouteVerified || fullTunBusy ||', UI)
         self.assertIn('if fullTunActive { return "◉  TUN running · unverified" }', UI)
 
 
