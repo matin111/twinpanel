@@ -27,7 +27,7 @@ ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconn
 NETWORK_GUARD = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_network_recovery.py"
 CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
 CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED = False  # Strict production safety interlock.
-CISCO_SYSTEM_ROUTE_ENABLED = False  # Disabled after real macOS internet loss.
+CISCO_SYSTEM_ROUTE_ENABLED = True  # Only after verified dual-HTTPS egress plus watchdog-protected DNS and named-HTTPS checks.
 
 
 CISCO_RESULT_FILE = ("/private/var/run/twinconnect-cisco-route-guard/"
