@@ -101,6 +101,43 @@ static int capabilities(void) {
     return 0;
 }
 
+static int selftest(void) {
+    // Construct a complete native service in the in-memory preferences view;
+    // do not call SCPreferencesCommitChanges/ApplyChanges, connect or touch
+    // network routes. This verifies the native API accepts our settings.
+    SCPreferencesRef prefs=SCPreferencesCreate(NULL, CFSTR("TwinConnectL2TPTest"), NULL);
+    if (!prefs) {result(@"error",@"L2TP_PREFS_MEMORY_TEST_FAILED");return 2;}
+    SCNetworkInterfaceRef iface=SCNetworkInterfaceCreateWithInterface(
+        kSCNetworkInterfaceIPv4,kSCNetworkInterfaceTypeL2TP);
+    if (!iface) {
+        result(@"error",@"L2TP_NATIVE_INTERFACE_UNAVAILABLE");
+        CFRelease(prefs); return 2;
+    }
+    SCNetworkServiceRef service=SCNetworkServiceCreate(prefs,iface);
+    BOOL good=service != NULL;
+    if (good) good=SCNetworkServiceEstablishDefaultConfiguration(service);
+    if (good) {
+        NSDictionary *ppp=@{
+            (__bridge NSString*)kSCPropNetPPPAuthName:@"TWINCONNECT_PROBE_ONLY",
+            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:@"198.51.100.11",
+            (__bridge NSString*)kSCPropNetPPPOverridePrimary:@NO
+        };
+        NSDictionary *ipsec=@{
+            (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
+                (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
+        };
+        good=SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp)
+             && SCNetworkInterfaceSetExtendedConfiguration(iface,kSCEntNetIPSec,
+                                                           (__bridge CFDictionaryRef)ipsec);
+    }
+    if (service) {SCNetworkServiceRemove(service);CFRelease(service);}
+    CFRelease(iface);
+    CFRelease(prefs);
+    result(good?@"tested":@"error",good?@"L2TP_NATIVE_SETTINGS_ACCEPTED_NO_COMMIT":
+           @"L2TP_NATIVE_SETTINGS_REJECTED");
+    return good?0:2;
+}
+
 static int prepareService(NSDictionary *profile) {
     if (geteuid()!=0) {
         result(@"error",@"L2TP_ROOT_REQUIRED");
@@ -278,6 +315,7 @@ int main(int argc,const char *argv[]) {
         if (argc!=2) {result(@"error",@"L2TP_OPERATION_NOT_ALLOWED");return 2;}
         NSString *arg=[NSString stringWithUTF8String:argv[1]];
         if ([arg isEqualToString:@"capabilities"]) return capabilities();
+        if ([arg isEqualToString:@"selftest"]) return selftest();
         if ([arg isEqualToString:@"status"]) return currentStatus();
         if ([arg isEqualToString:@"stop"]) return stopService();
         if (![arg isEqualToString:@"prepare"] && ![arg isEqualToString:@"start"]) {
