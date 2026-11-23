@@ -1441,7 +1441,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "anytls": return "AnyTLS"
         case "socks5": return "SOCKS5"
         case "snell": return "Snell"
-        case "naive": return "Naive"
+        case "naive": return "NaiveProxy"
         case "shadowtls": return "ShadowTLS"
         case "v2ray": return "V2Ray"
         default: return "Proxy"
@@ -1456,7 +1456,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "anytls": return "AnyTLS"
         case "socks5": return "SOCKS5"
         case "snell": return "Snell"
-        case "naive": return "Naive"
+        case "naive": return "NaiveProxy"
         case "shadowtls": return "ShadowTLS"
         default: return nil
         }
