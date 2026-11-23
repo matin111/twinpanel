@@ -385,9 +385,17 @@ def handle(conn: socket.socket, session: Session) -> None:
             result = session.stop(uid)
         reply(conn, result)
     except (ValueError, OSError, subprocess.SubprocessError,
-            UnicodeError, json.JSONDecodeError):
+            UnicodeError, json.JSONDecodeError) as error:
+        # The daemon never echoes secrets or arbitrary error messages.
+        # Only fixed uppercase machine codes are eligible for client display.
+        detail = str(error)
+        safe = (detail if isinstance(error, ValueError) and
+                3 <= len(detail) <= 64 and
+                detail.replace("_", "").isalnum() and
+                detail == detail.upper() else "TUN_RUNTIME_REJECTED")
         try:
-            reply(conn, {"state": "rejected", "system_vpn_verified": False})
+            reply(conn, {"state": "rejected", "system_vpn_verified": False,
+                         "reason": safe})
         except OSError:
             pass
 
