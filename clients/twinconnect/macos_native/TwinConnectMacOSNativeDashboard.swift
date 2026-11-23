@@ -572,7 +572,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // The three V2Ray transport choices map to distinct server_groups IDs.
     private let v2rayInboundIDs = ["tcp_tls", "websocket_tls", "xhttp_reality"]
     private let v2rayInboundLabels = ["TCP TLS", "WebSocket TLS", "XHTTP Reality"]
-    private var activeV2RayInbound = "tcp_tls"
+    private var activeV2RayInbound = "websocket_tls"
     private var xrayInboundIndex = [String: [TwinMacNativeXrayInbound]]()
     private var xrayIndexLoaded = false
     private var xrayIndexLoading = false
@@ -2007,9 +2007,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let savedProtocol = record["protocol"] as? String ?? ""
         activeServer = savedServer.isEmpty ? nil : savedServer
         activeProtocol = savedProtocol.isEmpty ? nil : savedProtocol
-        let savedInbound = record["v2ray_inbound"] as? String ?? "tcp_tls"
+        let savedInbound = record["v2ray_inbound"] as? String ?? "websocket_tls"
         activeV2RayInbound = v2rayInboundIDs.contains(savedInbound) ?
-            savedInbound : "tcp_tls"
+            savedInbound : "websocket_tls"
     }
 
     private func countryName(_ code: String) -> String {
@@ -2104,7 +2104,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               !localProxyBusy, !fullTunBusy, !fullTunActive,
               !ciscoTunnelBusy else { return }
         let (nodeID, inboundID) = xrayInboundChoices[sender.tag]
-        guard xrayInboundIndex[nodeID]?.contains(where: { $0.id == inboundID })
+        guard v2rayTunInboundSupported(inboundID),
+              xrayInboundIndex[nodeID]?.contains(where: { $0.id == inboundID })
                 == true else { return }
         if localProxyActive { stopVerifiedLocalProxy() }
         activeServer = nodeID
@@ -2114,6 +2115,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         tab = 0
         status = "V2Ray " + (v2rayInboundLabel(inboundID)) + " selected."
         view = build()
+    }
+
+    private func v2rayTunInboundSupported(_ id: String) -> Bool {
+        // The installed sing-box TUN converter supports TCP TLS and WS TLS.
+        // XHTTP Reality requires a separately integrated Xray engine; it must
+        // remain visible as a panel profile, but not as a Connect action.
+        return id == "websocket_tls" || id == "tcp_tls"
     }
 
     private func v2rayInboundLabel(_ id: String) -> String {
@@ -2192,6 +2200,24 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.xrayInboundIndex = found
                 self.xrayIndexLoaded = true
                 self.xrayIndexError = nil
+                // A previous app version allowed selecting XHTTP and used
+                // TCP TLS by default even when the panel had no TCP inbound.
+                // For the SAME chosen server, migrate only an unavailable
+                // choice to an actually delivered and TUN-supported inbound.
+                if let serverID = self.activeServer,
+                   let available = found[serverID],
+                   !available.contains(where: {
+                       $0.id == self.activeV2RayInbound &&
+                       self.v2rayTunInboundSupported($0.id)
+                   }),
+                   let usable = available.first(where: {
+                       self.v2rayTunInboundSupported($0.id)
+                   }) {
+                    self.activeV2RayInbound = usable.id
+                    self.persistCurrentSelection()
+                    self.status = "Selected " + self.v2rayInboundLabel(usable.id) +
+                        " for this server; XHTTP is not supported by this Mac TUN."
+                }
             case .failure:
                 self.xrayInboundIndex = [:]
                 self.xrayIndexLoaded = false
@@ -2363,7 +2389,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 for server in items {
                     for inbound in xrayInboundIndex[server.id] ?? [] {
                         let key = xrayPingKey(server.id, inbound.id)
-                        let selected = activeServer == server.id &&
+                        let tunSupported = v2rayTunInboundSupported(inbound.id)
+                        let selected = tunSupported &&
+                            activeServer == server.id &&
                             activeV2RayInbound == inbound.id
                         let row = stack(.horizontal, spacing: 10)
                         row.alignment = .centerY
@@ -2372,7 +2400,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         let detail = stack(spacing: 3)
                         detail.alignment = .leading
                         detail.addArrangedSubview(text(
-                            countryName(code) + " · " + v2rayInboundLabel(inbound.id),
+                            countryName(code) + " · " +
+                                v2rayInboundLabel(inbound.id) +
+                                (tunSupported ? "" : " · Unsupported in TUN"),
                             size: 13, weight: .semibold))
                         detail.addArrangedSubview(text("V2Ray / Xray",
                                                        size: 10, color: muted))
@@ -2407,9 +2437,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             tag: index, primary: selected, mutedButton: !selected)
                         choose.widthAnchor.constraint(equalToConstant: 39).isActive = true
                         choose.heightAnchor.constraint(equalToConstant: 34).isActive = true
-                        choose.toolTip = "Select " + countryName(code) + " " +
-                            v2rayInboundLabel(inbound.id) + " for Quick Connect"
-                        choose.isEnabled = index >= 0
+                        choose.toolTip = tunSupported ?
+                            ("Select " + countryName(code) + " " +
+                             v2rayInboundLabel(inbound.id) + " for Quick Connect") :
+                            "XHTTP Reality requires a compatible Xray TUN engine."
+                        choose.isEnabled = index >= 0 && tunSupported
                         row.addArrangedSubview(choose)
                         let tile = card([row], radius: 16, padding: 13)
                         tile.layer?.borderColor = (selected ? sea : tint())
@@ -4716,6 +4748,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                               serverID: String, protocolCode: String) {
         fullTunObservedExitIP = nil
         fullTunStartedAt = nil
+        // Do not issue a doomed privileged start for an unsupported transport.
+        if protocolCode == "v2ray" &&
+           !v2rayTunInboundSupported(activeV2RayInbound) {
+            status = "Choose WebSocket TLS in Locations; XHTTP Reality is not supported."
+            recordProxyAttempt(protocolCode, "VLESS_TRANSPORT_UNSUPPORTED")
+            view = build()
+            return
+        }
         fullTunStatusUncertain = false
         fullTunStatusMisses = 0
         fullTunBusy = true
