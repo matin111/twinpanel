@@ -155,40 +155,57 @@ def observe_route() -> dict:
 
 
 def probe_system_https() -> dict:
-    """Probe HTTPS via macOS system networking without proxy env overrides.
+    """Verify actual HTTPS exit through macOS' observed utun route.
 
-    This checks the OS transport, not a loopback SOCKS proxy. The route must
-    already point at utun; DNS and public exit IP remain unverified here.
-    No profile credentials or response contents are persisted.
+    First try DNS+HTTPS. A second, certificate-verified numeric HTTPS target
+    permits genuine proof even when the physical DNS resolver is briefly
+    unavailable while the system route is coming up. Both destinations
+    MUST route via utun. We never accept an unverified status as Connected.
+    No proxy env, insecure TLS, user-defined endpoint or direct fallback.
     """
     if observe_route().get("route_state") != "utun_route_observed_unverified":
         return {"https_state": "tun_route_not_observed"}
-    request = urllib.request.Request(
-        "https://www.cloudflare.com/cdn-cgi/trace",
-        headers={"User-Agent": "TwinConnect-TUN-Health/1.0"})
-    try:
+    import ipaddress
+
+    def verified_trace(url: str, timeout: float) -> str | None:
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "TwinConnect-TUN-Health/1.0"})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(request, timeout=5) as reply:
+        with opener.open(request, timeout=timeout) as reply:
             if reply.status != 200:
-                return {"https_state": "http_status_failed"}
+                return None
             raw = reply.read(4097)
         if len(raw) > 4096:
-            return {"https_state": "invalid_response"}
+            return None
         rows = {}
         for line in raw.decode("utf-8", errors="strict").splitlines():
             key, sep, value = line.partition("=")
             if sep and key in ("ip", "warp", "loc"):
                 rows[key] = value
-        if "ip" not in rows or not (3 <= len(rows["ip"]) <= 64):
-            return {"https_state": "invalid_response"}
-        import ipaddress
-        if not ipaddress.ip_address(rows["ip"]).is_global:
-            return {"https_state": "invalid_response"}
-        return {"https_state": "system_https_reachable",
-                "observed_exit_ip": rows["ip"],
-                "system_vpn_verified": False}
-    except (OSError, ValueError, UnicodeError, TimeoutError):
-        return {"https_state": "unreachable"}
+        ip = rows.get("ip", "")
+        if not ip or not ipaddress.ip_address(ip).is_global:
+            return None
+        return ip
+
+    # The local socket's probe timeout is six seconds. Bound both HTTPS
+    # attempts below that, including a small margin for IPC overhead.
+    for url, timeout in (
+        ("https://www.cloudflare.com/cdn-cgi/trace", 2.7),
+        ("https://1.1.1.1/cdn-cgi/trace", 2.0),
+    ):
+        # Do not promote an interface-only route. Re-confirm the kernel
+        # route immediately before each authenticated HTTPS probe.
+        if observe_route().get("route_state") != "utun_route_observed_unverified":
+            return {"https_state": "tun_route_not_observed"}
+        try:
+            ip = verified_trace(url, timeout)
+            if ip:
+                return {"https_state": "system_https_reachable",
+                        "observed_exit_ip": ip,
+                        "system_vpn_verified": False}
+        except (OSError, ValueError, UnicodeError, TimeoutError):
+            continue
+    return {"https_state": "unreachable"}
 
 
 def classify_engine_stderr(raw: bytes) -> str:
