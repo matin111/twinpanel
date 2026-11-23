@@ -1470,6 +1470,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             !ciscoTunnelBusy && !wireGuardProbeBusy
+        let openVPNHasDiagnostic = activeProtocol == "openvpn" &&
+            (status.contains("FAILED") || status.contains("REJECTED") ||
+             status.contains("UNAVAILABLE") || status.contains("NOT_INSTALLED") ||
+             status.contains("not verified"))
         connect.toolTip = activeProtocol == "wireguard" ?
             (wireGuardProbeStatus.isEmpty ?
              "Connect to the selected WireGuard server." : wireGuardProbeStatus) :
@@ -1477,6 +1481,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
             activeProtocol == "openvpn" && openVPNAppSessionActive ?
             "OpenVPN tunnel only; system routing not active." :
+            activeProtocol == "openvpn" && openVPNHasDiagnostic ? status :
             activeProtocol == "openvpn" && !fullTunServicePresent() ?
             "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
@@ -1535,21 +1540,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Match Cisco's clean hero layout: no WireGuard diagnostic/status
         // captions below Connect. Keep the verified duration row only.
         // Detailed errors remain available as the Connect tooltip.
-        if activeProtocol == "openvpn" {
-            let failed = status.contains("FAILED") ||
-                         status.contains("REJECTED") ||
-                         status.contains("UNAVAILABLE") ||
-                         status.contains("NOT_INSTALLED") ||
-                         status.contains("not verified")
-            if fullTunBusy || (!openVPNAppSessionActive && failed) {
-                let feedback = fullTunBusy ? "Connecting…" : status
-                let connectionFeedback = text(feedback, size: 12,
-                                              color: failed ? amber : muted)
-                main.addArrangedSubview(connectionFeedback)
-                connectionFeedback.widthAnchor.constraint(
-                    lessThanOrEqualTo: main.widthAnchor).isActive = true
-            }
-        }
          // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
