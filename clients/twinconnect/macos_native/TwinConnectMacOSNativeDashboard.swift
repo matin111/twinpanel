@@ -587,7 +587,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var ciscoSystemRouteVerified = false
     private var ciscoConnectedAt: Date?
     private var openVPNConnectedAt: Date?
-    private weak var heroConnectionTimeText: NSTextField?
     private var ciscoRoutePollBusy = false
     private var ciscoRouteLastPoll = Date.distantPast
     private var wireGuardProbeTask: Process?
@@ -1402,8 +1401,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func updateConnectionDuration() {
-        let value = verifiedConnectionStart.map(elapsedConnectionTime) ?? "—"
-        heroConnectionTimeText?.stringValue = value
         if let startedAt = verifiedConnectionStart {
             let protocolName = wireGuardSystemRouteVerified ? "WireGuard" :
                 (ciscoSystemRouteVerified ? "Cisco" :
@@ -1538,25 +1535,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // One prominent live clock on the connection page. The start date is
-        // taken from a VERIFIED VPN session, never from tapping Connect.
-        // The existing one-second UI timer updates the label in place.
-        let durationRow = stack(.horizontal, spacing: 6)
-        let durationLeading = NSView()
-        let durationTrailing = NSView()
-        durationRow.addArrangedSubview(durationLeading)
-        durationRow.addArrangedSubview(text("Connected time", size: 12,
-                                          color: muted))
-        let clock = text(verifiedConnectionStart.map(elapsedConnectionTime) ?? "—",
-                         size: 16, weight: .semibold, color: sea)
-        clock.font = NSFont.monospacedDigitSystemFont(ofSize: 16, weight: .semibold)
-        heroConnectionTimeText = clock
-        durationRow.addArrangedSubview(clock)
-        durationRow.addArrangedSubview(durationTrailing)
-        durationLeading.widthAnchor.constraint(equalTo: durationTrailing.widthAnchor)
-            .isActive = true
-        main.addArrangedSubview(durationRow)
-        durationRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // Connected duration is shown once, in the Network panel only.
         // Keep the home page quiet: connection type is already in the pill.
         // Show only ongoing work or actionable errors beside Connect.
         // Match Cisco's clean hero layout: no WireGuard diagnostic/status
