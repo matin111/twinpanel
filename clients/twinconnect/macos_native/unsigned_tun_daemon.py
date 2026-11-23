@@ -31,9 +31,11 @@ from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
                                  validate_full_tun_config)
 from openvpn_profile_review import review as review_openvpn
 from tun_vps_management_guard import guard_candidate, system_dns_resolvers
+from unsigned_mieru_profile import validate_mbox_tun_config
 
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
+MIERU_ENGINE = TRUSTED_ROOT / "mbox"
 APPROVAL = TRUSTED_ROOT / "local-console-approval"
 WATCHDOG = TRUSTED_ROOT / "unsigned_tun_watchdog.py"
 OPENVPN = TRUSTED_ROOT / "openvpn/bin/openvpn"
@@ -284,6 +286,18 @@ class Session:
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
             use_openvpn = profile.get("mode") == "openvpn"
+            # Only a single, tightly-reviewed Mieru outbound can select the
+            # separately staged mbox build. All existing VPNs keep sing-box.
+            outbounds = profile.get("outbounds")
+            use_mieru = (not use_openvpn and
+                         isinstance(outbounds, list) and len(outbounds) == 1 and
+                         isinstance(outbounds[0], dict) and
+                         outbounds[0].get("type") == "mieru")
+            if use_mieru:
+                validate_mbox_tun_config(profile)
+                if (not trusted_root_file(MIERU_ENGINE) or
+                        not os.access(MIERU_ENGINE, os.X_OK)):
+                    raise ValueError("MIERU_ROOT_ENGINE_NOT_INSTALLED")
             if use_openvpn:
                 if set(profile) != {"mode", "profile"} or not isinstance(
                         profile.get("profile"), str):
@@ -301,7 +315,7 @@ class Session:
                 engine = OPENVPN
             else:
                 encoded = json.dumps(profile, separators=(",", ":")).encode("utf-8")
-                engine = ENGINE
+                engine = MIERU_ENGINE if use_mieru else ENGINE
             if len(encoded) > MAX_REQUEST - 1024:
                 raise ValueError("TUN_CONFIG_TOO_LARGE")
             # Existing utun routes may belong to another VPN: do not mistake
