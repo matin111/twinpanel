@@ -626,6 +626,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
     private var fullTunObservedExitIP: String?
+    private var fullTunEgressConfirmedAt: Date?
+    private var fullTunProbeBusy = false
+    private var fullTunProbeLastAt = Date.distantPast
+    private var fullTunTrafficBusy = false
+    private var fullTunTrafficLastAt = Date.distantPast
+    private var fullTunTrafficInterface: String?
     private var fullTunStartedAt: Date?
     private var openVPNAppSessionActive = false
     private var openVPNSystemRouteVerified = false
@@ -1443,6 +1449,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    // "Connected" is grounded in a recent system HTTPS exit probe AND the
+    // locally observed kernel utun route. It does not imply a 30-day uptime.
+    private var fullTunHTTPSConnected: Bool {
+        fullTunActive && !fullTunStatusUncertain &&
+            fullTunObservedExitIP != nil &&
+            fullTunEgressConfirmedAt.map {
+                Date().timeIntervalSince($0) >= 0 &&
+                Date().timeIntervalSince($0) < 45
+            } == true
+    }
+
     private var verifiedHeroConnectionLabel: String {
         // The unsigned V2Ray TUN is asynchronous. Show the pending request
         // immediately, not Offline, until the controller confirms its result.
@@ -1468,6 +1485,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "◌  Connecting…" }
         if ciscoSystemRouteVerified { return "◉  Connected · Cisco" }
         if ciscoTunnelTask != nil { return "◌  Connecting…" }
+        if fullTunHTTPSConnected { return "◉  Connected" }
         if fullTunActive { return "◉  TUN running · unverified" }
         return "◌  Offline"
     }
@@ -1495,6 +1513,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "Connecting…" }
         if ciscoSystemRouteVerified { return "Connected · Cisco" }
         if ciscoTunnelTask != nil { return "Connecting…" }
+        if fullTunHTTPSConnected { return "Connected" }
         if fullTunActive { return "TUN running · unverified" }
         return "Disconnected"
     }
@@ -1511,7 +1530,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             verifiedHeroConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-                    l2tpSystemRouteVerified || fullTunBusy) ? sea : muted))
+                    l2tpSystemRouteVerified || fullTunBusy ||
+                    fullTunHTTPSConnected) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1523,7 +1543,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         fabric.translatesAutoresizingMaskIntoConstraints = false
         fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified ||
             ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-            l2tpSystemRouteVerified
+            l2tpSystemRouteVerified || fullTunHTTPSConnected
         fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
@@ -1579,13 +1599,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
             activeProtocol == "cisco" ?
             "Connect to the selected Cisco server." :
-            (fullTunActive ? "TUN engine started; network egress NOT verified." :
+            (fullTunHTTPSConnected ? "HTTPS exit verified via TUN; ICMP and interface counters measured locally." :
+             fullTunActive ? "TUN engine started; checking network egress." :
                 (fullTunServicePresent() ? "Experimental local-console TUN service." :
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         if localProxyActive || ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-           l2tpSystemRouteVerified {
+           l2tpSystemRouteVerified || fullTunHTTPSConnected {
             // More vivid green state like the shared Windows design, while
             // still representing ONLY a verified SOCKS proxy.
             let mint = NSColor(calibratedRed: 0.07, green: 0.82,
@@ -1723,7 +1744,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             verifiedNetworkConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-                    fullTunBusy) ? sea : muted))
+                    fullTunBusy || fullTunHTTPSConnected) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
@@ -1753,7 +1774,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
-                value: fullTunActive ? "—" :
+                value: fullTunActive ? (openVPNPing.map {
+                    String(format: "%.1f ms", $0)
+                } ?? "—") :
                     ((openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
                         wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     (openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—") :
@@ -3959,6 +3982,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         refreshWireGuardRouteStatus()
         refreshL2TPRouteStatus()
         refreshOpenVPNTelemetry()
+        if fullTunActive {
+            refreshFullTunEgress()
+            if tab == 0 { refreshFullTunTelemetry() }
+            return
+        }
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         trafficPollBusy = true
         let generation = localProxyGeneration
@@ -4747,6 +4775,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func startFullTun(_ session: TwinMacNativeSession,
                               serverID: String, protocolCode: String) {
         fullTunObservedExitIP = nil
+        fullTunEgressConfirmedAt = nil
+        fullTunTrafficInterface = nil
         fullTunStartedAt = nil
         // Do not issue a doomed privileged start for an unsupported transport.
         if protocolCode == "v2ray" &&
@@ -4809,7 +4839,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             self.tunRouteIsRunning(observed.1)
                         if self.fullTunActive {
                             self.fullTunStartedAt = Date()
-                            self.status = "TUN route running; HTTPS egress not yet verified."
+                            self.fullTunProbeLastAt = .distantPast
+                            self.status = "TUN route running; checking HTTPS."
                         } else if reviewed == nil {
                             self.status = "V2Ray TUN: " + conversionReason
                             self.recordProxyAttempt(protocolCode, conversionReason)
@@ -4830,28 +4861,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         }
                         self.view = self.build()
                         if self.fullTunActive {
-                            DispatchQueue.global(qos: .utility).async {
-                                let probe = self.runFullTunClient("probe")
-                                DispatchQueue.main.async { [weak self] in
-                                    guard let self = self, self.fullTunActive,
-                                          self.localProxyGeneration == generation else { return }
-                                    if probe.0 == 0,
-                                       let data = probe.1.data(using: .utf8),
-                                       let state = (try? JSONSerialization.jsonObject(
-                                           with: data)) as? [String: Any],
-                                       state["https_state"] as? String ==
-                                           "system_https_reachable",
-                                       let address = state["observed_exit_ip"] as? String,
-                                       address.count <= 64 {
-                                        self.fullTunObservedExitIP = address
-                                        self.status = "System HTTPS reachable via TUN route; exit IP: " +
-                                            address + ". Full VPN not yet verified."
-                                    } else {
-                                        self.status = "TUN route active; system HTTPS probe not verified."
-                                    }
-                                    self.view = self.build()
-                                }
-                            }
+                            self.refreshFullTunEgress()
                         }
                     }
                 }
@@ -4866,6 +4876,162 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             directory.prepareFullTUNCandidate(session, serverID: serverID,
                                               protocolCode: protocolCode,
                                               completion: completion)
+        }
+    }
+
+    private func refreshFullTunEgress() {
+        // Only a live system HTTPS request through the currently observed
+        // utun route can promote the UI from TUN running to Connected.
+        guard fullTunActive, !fullTunBusy, !fullTunProbeBusy,
+              Date().timeIntervalSince(fullTunProbeLastAt) >= 15 else { return }
+        fullTunProbeBusy = true
+        fullTunProbeLastAt = Date()
+        let generation = localProxyGeneration
+        let token = accountSession?.accessToken
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runFullTunClient("probe")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunProbeBusy = false
+                guard self.fullTunActive && !self.fullTunBusy,
+                      self.localProxyGeneration == generation &&
+                      self.accountSession?.accessToken == token else { return }
+                let wasConnected = self.fullTunHTTPSConnected
+                let oldIP = self.fullTunObservedExitIP
+                if response.0 == 0,
+                   let data = response.1.data(using: .utf8),
+                   let payload = (try? JSONSerialization.jsonObject(with: data))
+                       as? [String: Any],
+                   self.tunRouteIsRunning(response.1),
+                   payload["https_state"] as? String == "system_https_reachable",
+                   let address = payload["observed_exit_ip"] as? String,
+                   address.range(
+                     of: #"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"#,
+                     options: .regularExpression) != nil {
+                    self.fullTunObservedExitIP = address
+                    self.fullTunEgressConfirmedAt = Date()
+                    self.status = "Connected · HTTPS exit checked via TUN."
+                } else {
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
+                    self.status = "TUN route active; checking HTTPS connectivity."
+                }
+                if wasConnected != self.fullTunHTTPSConnected ||
+                   oldIP != self.fullTunObservedExitIP {
+                    self.view = self.build()
+                } else {
+                    self.openVPNIPText?.stringValue =
+                        self.fullTunObservedExitIP ?? "—"
+                }
+            }
+        }
+    }
+
+    private func refreshFullTunTelemetry() {
+        guard fullTunActive, !fullTunBusy, !fullTunTrafficBusy,
+              Date().timeIntervalSince(fullTunTrafficLastAt) >= 3 else { return }
+        fullTunTrafficBusy = true
+        fullTunTrafficLastAt = Date()
+        let generation = localProxyGeneration
+        let token = accountSession?.accessToken
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_tun_telemetry.py"
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            task.arguments = [script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var raw = Data()
+            var ok = false
+            if (try? task.run()) != nil {
+                raw = pipe.fileHandleForReading.readDataToEndOfFile()
+                task.waitUntilExit()
+                ok = task.terminationStatus == 0 && raw.count < 8192
+            }
+            let result = ok ?
+                (try? JSONSerialization.jsonObject(with: raw))
+                    as? [String: Any] : nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunTrafficBusy = false
+                guard self.fullTunActive && self.tab == 0 &&
+                    self.localProxyGeneration == generation &&
+                    self.accountSession?.accessToken == token else { return }
+                guard result?["state"] as? String == "measured",
+                      result?["mode"] as? String == "system_tun_interface",
+                      let iface = result?["interface"] as? String,
+                      iface.range(of: "^utun[0-9]{1,4}$",
+                                  options: .regularExpression) != nil,
+                      let down = result?["download_bytes"] as? NSNumber,
+                      let up = result?["upload_bytes"] as? NSNumber,
+                      down.int64Value >= 0, up.int64Value >= 0 else {
+                    // Never fabricate counters from local ethernet traffic.
+                    self.lastTraffic = nil
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                    self.downloadSpeedText?.stringValue = "—"
+                    self.uploadSpeedText?.stringValue = "—"
+                    return
+                }
+                if self.fullTunTrafficInterface != iface ||
+                   self.lastTraffic.map({
+                     down.int64Value < $0.download || up.int64Value < $0.upload
+                   }) == true {
+                    self.recentTraffic.removeAll()
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.fullTunTrafficInterface = iface
+                let now = Date()
+                self.recentTraffic.append((down.int64Value, up.int64Value, now))
+                self.recentTraffic.removeAll {
+                    now.timeIntervalSince($0.at) > 7.0
+                }
+                if let baseline = self.recentTraffic.first,
+                   now.timeIntervalSince(baseline.at) > 0.4 {
+                    let elapsed = now.timeIntervalSince(baseline.at)
+                    let d = Double(down.int64Value - baseline.download) / elapsed
+                    let u = Double(up.int64Value - baseline.upload) / elapsed
+                    self.downloadSpeed = self.transferRate(d)
+                    self.uploadSpeed = self.transferRate(u)
+                    self.downloadHistory.append(max(0, d))
+                    self.uploadHistory.append(max(0, u))
+                    if self.downloadHistory.count > 36 {
+                        self.downloadHistory.removeFirst()
+                    }
+                    if self.uploadHistory.count > 36 {
+                        self.uploadHistory.removeFirst()
+                    }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
+                } else {
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                }
+                self.lastTraffic = (down.int64Value, up.int64Value, now)
+                self.downloadedTotal = self.transferTotal(down.int64Value)
+                self.uploadedTotal = self.transferTotal(up.int64Value)
+                if let ping = result?["ping_ms"] as? NSNumber,
+                   ping.doubleValue > 0 && ping.doubleValue < 10000 {
+                    self.openVPNPing = ping.doubleValue
+                    self.openVPNPingText?.stringValue =
+                        String(format: "%.1f ms", ping.doubleValue)
+                } else {
+                    self.openVPNPing = nil
+                    self.openVPNPingText?.stringValue = "—"
+                }
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " +
+                    self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " +
+                    self.uploadedTotal
+            }
         }
     }
 
@@ -4903,8 +5069,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.fullTunStartedAt = Date()
                         // The kernel confirms a TUN route; identity of the
                         // previously selected server is NOT established.
-                        self.status = "Existing TUN route detected; destination unverified."
+                        self.status = "TUN route detected; verifying HTTPS."
+                        self.fullTunProbeLastAt = .distantPast
                         self.view = self.build()
+                        self.refreshFullTunEgress()
                     } else if wasUncertain {
                         self.status = "TUN route active; system VPN unverified."
                         self.view = self.build()
@@ -4915,7 +5083,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     if self.fullTunActive {
                         self.fullTunActive = false
                         self.fullTunObservedExitIP = nil
+                        self.fullTunEgressConfirmedAt = nil
+                        self.fullTunTrafficInterface = nil
                         self.fullTunStartedAt = nil
+                        self.resetTrafficMetrics()
                         self.status = "TUN session stopped or engine exited."
                         self.view = self.build()
                     }
@@ -4925,6 +5096,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.fullTunStatusMisses += 1
                     self.fullTunStatusUncertain = true
                     self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
                     self.status = "TUN status temporarily unavailable; rechecking."
                     if self.fullTunStatusMisses >= 3 {
                         self.fullTunActive = false
@@ -4955,7 +5127,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.fullTunStatusUncertain = false
                     self.fullTunStatusMisses = 0
                     self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
+                    self.fullTunTrafficInterface = nil
                     self.fullTunStartedAt = nil
+                    self.resetTrafficMetrics()
                     self.status = "TUN stopped."
                 } else {
                     self.status = "TUN stop unverified; check local service."
