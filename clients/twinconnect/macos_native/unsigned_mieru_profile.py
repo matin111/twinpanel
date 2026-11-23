@@ -10,12 +10,51 @@ from __future__ import annotations
 import copy
 import ipaddress
 import json
+import re
+import subprocess
 from typing import Any
 
 LOCAL_SOCKS_PORT = 17091
 MAX_CONFIG_BYTES = 131072
 VALID_BIND_PROTOCOLS = {"TCP", "UDP"}
 ALLOWED_HANDSHAKE = {"HANDSHAKE_STANDARD", "HANDSHAKE_NO_WAIT"}
+
+
+def resolve_authenticated_ingress_domain(hostname: str) -> str:
+    """Pin the panel-authorized Iran ingress DNS before activating any TUN.
+
+    The panel may deliver a modern Iran->Exit Mieru endpoint as domainName,
+    with ipAddress deliberately empty. Falling back to the Exit probe IP
+    corrupts the tunnel binding (35000+node_id) and never reaches Iran NAT.
+    Only resolve a well-formed public hostname from the authenticated
+    subscription profile; refuse private, loopback, or DNS-less endpoints.
+    """
+    if not isinstance(hostname, str) or not re.fullmatch(
+            r"(?=.{4,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}",
+            hostname):
+        raise ValueError("MIERU_INGRESS_DOMAIN_INVALID")
+    try:
+        result = subprocess.run(
+            ["/usr/bin/dig", "+short", "+time=2", "+tries=1",
+             "-t", "A", hostname],
+            capture_output=True, text=True, timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        raise ValueError("MIERU_INGRESS_DNS_UNAVAILABLE") from None
+    if result.returncode != 0 or len(result.stdout) > 4096:
+        raise ValueError("MIERU_INGRESS_DNS_UNAVAILABLE")
+    resolved = []
+    for value in result.stdout.splitlines():
+        try:
+            ip = ipaddress.IPv4Address(value.strip())
+            if ip.is_global:
+                resolved.append(str(ip))
+        except ipaddress.AddressValueError:
+            # Ignore CNAME lines; never treat them as a second destination.
+            continue
+    if not resolved or len(set(resolved)) > 8:
+        raise ValueError("MIERU_INGRESS_PUBLIC_IPV4_REQUIRED")
+    return sorted(set(resolved), key=lambda value: bytes(
+        int(part) for part in value.split(".")))[0]
 
 
 def prepare_unsigned_profile(panel_config: dict[str, Any]) -> tuple[dict, dict]:
@@ -62,15 +101,22 @@ def prepare_unsigned_profile(panel_config: dict[str, Any]) -> tuple[dict, dict]:
     endpoint = servers[0]
     if not isinstance(endpoint, dict):
         raise ValueError("MIERU_SERVER_INVALID")
-    try:
-        public = ipaddress.IPv4Address(endpoint.get("ipAddress"))
-        if not public.is_global:
-            raise ValueError
-    except (ValueError, TypeError, ipaddress.AddressValueError):
-        raise ValueError("MIERU_PUBLIC_IPV4_REQUIRED") from None
-    # Mieru is not TLS-based. Pin the authenticated server to a literal
-    # public IPv4 rather than letting DNS resolution leak/change the path.
     domain = endpoint.get("domainName")
+    raw_ip = endpoint.get("ipAddress")
+    if raw_ip is None or raw_ip == "":
+        # The delivered modern ingress uses an authenticated domain. Resolve
+        # BEFORE starting TUN and pin to that ingress, never to the Exit node.
+        public_ip = resolve_authenticated_ingress_domain(domain)
+    else:
+        try:
+            public = ipaddress.IPv4Address(raw_ip)
+            if not public.is_global:
+                raise ValueError
+            public_ip = str(public)
+        except (ValueError, TypeError, ipaddress.AddressValueError):
+            # An explicit private/malformed IP is not a reason to silently
+            # switch over to an unrelated hostname.
+            raise ValueError("MIERU_PUBLIC_IPV4_REQUIRED") from None
     if domain is not None and (not isinstance(domain, str) or len(domain) > 255):
         raise ValueError("MIERU_DOMAIN_INVALID")
     ports = endpoint.get("portBindings")
@@ -88,6 +134,7 @@ def prepare_unsigned_profile(panel_config: dict[str, Any]) -> tuple[dict, dict]:
             raise ValueError("MIERU_DUPLICATE_BINDINGS")
         seen.add(k)
     native = copy.deepcopy(panel_config)
+    native["profiles"][0]["servers"][0]["ipAddress"] = public_ip
     native["profiles"][0]["servers"][0]["domainName"] = ""
     native["rpcPort"] = 0
     native.pop("httpProxyPort", None)
