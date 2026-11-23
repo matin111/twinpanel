@@ -238,7 +238,7 @@ class TUNDaemonControlTests(unittest.TestCase):
     def test_app_refreshes_stale_tun_state(self):
         self.assertIn("private func refreshFullTunStatus()", DASHBOARD)
         self.assertIn('self.runFullTunClient("status")', DASHBOARD)
-        self.assertIn('self.status = "TUN service stopped or unavailable."', DASHBOARD)
+        self.assertIn('self.status = "TUN trial stopped (45-second limit or engine exit)."', DASHBOARD)
 
     def test_unverified_engine_is_not_claimed_as_vpn_connected(self):
         self.assertIn("TUN route running; HTTPS egress not yet verified.", DASHBOARD)
