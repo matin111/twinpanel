@@ -126,15 +126,23 @@ static int selftest(void) {
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
-        good=SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp)
-             && SCNetworkInterfaceSetExtendedConfiguration(iface,kSCEntNetIPSec,
-                                                           (__bridge CFDictionaryRef)ipsec);
+        BOOL pppAccepted=SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp);
+        BOOL ipsecAccepted=SCNetworkInterfaceSetExtendedConfiguration(
+            iface,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
+        if (!pppAccepted) {
+            result(@"error",@"L2TP_NATIVE_PPP_SETTINGS_REJECTED");
+            good=NO;
+        } else if (!ipsecAccepted) {
+            result(@"error",@"L2TP_NATIVE_IPSEC_SETTINGS_REJECTED");
+            good=NO;
+        } else {
+            good=YES;
+        }
     }
     if (service) {SCNetworkServiceRemove(service);CFRelease(service);}
     CFRelease(iface);
     CFRelease(prefs);
-    result(good?@"tested":@"error",good?@"L2TP_NATIVE_SETTINGS_ACCEPTED_NO_COMMIT":
-           @"L2TP_NATIVE_SETTINGS_REJECTED");
+    if (good) result(@"tested",@"L2TP_NATIVE_SETTINGS_ACCEPTED_NO_COMMIT");
     return good?0:2;
 }
 
