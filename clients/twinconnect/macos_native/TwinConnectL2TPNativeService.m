@@ -146,9 +146,11 @@ static int selftest(void) {
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
-        BOOL pppAccepted=SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp);
-        BOOL ipsecAccepted=SCNetworkInterfaceSetExtendedConfiguration(
-            pppInterface,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
+        SCNetworkInterfaceRef servicePPP=SCNetworkServiceGetInterface(service);
+        BOOL pppAccepted=servicePPP && SCNetworkInterfaceSetConfiguration(
+            servicePPP,(__bridge CFDictionaryRef)ppp);
+        BOOL ipsecAccepted=servicePPP && SCNetworkInterfaceSetExtendedConfiguration(
+            servicePPP,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
         if (!pppAccepted) {
             result(@"error",@"L2TP_NATIVE_PPP_SETTINGS_REJECTED");
             good=NO;
@@ -220,8 +222,10 @@ static int prepareService(NSDictionary *profile) {
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
-        if (!SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp) ||
-            !SCNetworkInterfaceSetExtendedConfiguration(pppInterface,kSCEntNetIPSec,
+        SCNetworkInterfaceRef servicePPP=SCNetworkServiceGetInterface(svc);
+        if (!servicePPP ||
+            !SCNetworkInterfaceSetConfiguration(servicePPP,(__bridge CFDictionaryRef)ppp) ||
+            !SCNetworkInterfaceSetExtendedConfiguration(servicePPP,kSCEntNetIPSec,
                                                          (__bridge CFDictionaryRef)ipsec) ||
             !SCNetworkSetAddService(set,svc)) {
             result(@"error",@"L2TP_SERVICE_SETTINGS_REJECTED"); break;
