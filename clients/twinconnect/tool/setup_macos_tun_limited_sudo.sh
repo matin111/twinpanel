@@ -48,6 +48,13 @@ read -r -p "From independent provider VNC, type APPROVE-TUN-STAGING: " reply
 /usr/bin/install -d -o root -g wheel -m 0700 "$trusted"
 /usr/bin/install -d -o root -g wheel -m 0755 "$ops"
 /usr/bin/install -o root -g wheel -m 0755 "$engine" "$trusted/sing-box"
+# Status-only attestation of the running engine's protocol, no secrets.
+# Install in the already protected root-owned ops directory.
+[[ -f tool/tun_admin_protocol_status.py &&
+   ! -L tool/tun_admin_protocol_status.py ]] || {
+  echo "PROTOCOL_STATUS_SOURCE_MISSING" >&2; exit 3;
+}
+/usr/bin/install -o root -g wheel -m 0644 tool/tun_admin_protocol_status.py   "$ops/tun_admin_protocol_status.py"
 for file in "${files[@]}"; do
   /usr/bin/install -o root -g wheel -m 0644 "macos_native/$file" "$trusted/$file"
 done
@@ -71,6 +78,7 @@ case "$1" in
    fi
    /bin/launchctl print system/com.twinconnect.localtun 2>/dev/null |
      /usr/bin/grep -E 'state =|pid =' || true
+   /usr/bin/python3      /Library/PrivilegedHelperTools/TwinConnectOps/tun_admin_protocol_status.py || true
    ;;
  stop)
    /bin/launchctl bootout system/com.twinconnect.localtun 2>/dev/null || true
