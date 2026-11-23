@@ -25,7 +25,7 @@ class FullTunPendingIndicatorTests(unittest.TestCase):
         self.assertIn('fullTunBusy && activeProtocol != "openvpn" ?', UI)
         self.assertIn('Waiting for the TUN controller; connection not yet verified.', UI)
         self.assertIn('l2tpSystemRouteVerified || fullTunBusy ||', UI)
-        self.assertIn('return "◉  TUN running · unverified" + fullTunConnectedSuffix', UI)
+        self.assertIn('return "◌  Verifying internet" + fullTunConnectedSuffix', UI)
 
 
 if __name__ == "__main__":
