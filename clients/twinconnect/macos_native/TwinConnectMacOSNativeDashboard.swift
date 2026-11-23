@@ -594,6 +594,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var wireGuardProbeBusy = false
     private var wireGuardProbeGeneration = 0
     private var wireGuardProbeStatus = ""
+    private var wireGuardSystemRouteVerified = false
+    private var wireGuardConnectedAt: Date?
+    private var wireGuardRoutePollBusy = false
+    private var wireGuardRouteLastPoll = Date.distantPast
     private var ciscoTunnelTask: Process?
     private var ciscoTunnelGeneration = 0
     private let proxyAttemptQueue = DispatchQueue(
@@ -1390,6 +1394,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private var verifiedConnectionStart: Date? {
+        if wireGuardSystemRouteVerified { return wireGuardConnectedAt }
         if ciscoSystemRouteVerified { return ciscoConnectedAt }
         if openVPNSystemRouteVerified { return openVPNConnectedAt }
         if localProxyActive { return localProxyStartedAt }
@@ -1400,8 +1405,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let value = verifiedConnectionStart.map(elapsedConnectionTime) ?? "—"
         heroConnectionTimeText?.stringValue = value
         if let startedAt = verifiedConnectionStart {
-            let protocolName = ciscoSystemRouteVerified ? "Cisco" :
-                (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)
+            let protocolName = wireGuardSystemRouteVerified ? "WireGuard" :
+                (ciscoSystemRouteVerified ? "Cisco" :
+                (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle))
             proxyUptimeText?.stringValue = "◷  " + protocolName + "  " +
                 elapsedConnectionTime(startedAt)
         }
@@ -1420,12 +1426,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
                "◉  OpenVPN · Tunnel only") :
-             (ciscoSystemRouteVerified ? "◉  Connected · Cisco" :
+             (wireGuardSystemRouteVerified ? "◉  Connected · WireGuard" :
+              (ciscoSystemRouteVerified ? "◉  Connected · Cisco" :
               (ciscoTunnelTask != nil ?
                "◌  Connecting…" :
-              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")))),
+              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))))),
             color: (localProxyActive || openVPNAppSessionActive ||
-                    ciscoSystemRouteVerified) ? sea : muted))
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1436,7 +1443,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
         fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified ||
-            ciscoSystemRouteVerified
+            ciscoSystemRouteVerified || wireGuardSystemRouteVerified
         fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
@@ -1453,8 +1460,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button(activeProtocol == "wireguard" && wireGuardProbeBusy ?
-                             "Connecting…" : activeProtocol == "cisco" ?
+        let connect = button(activeProtocol == "wireguard" ?
+                             ((wireGuardProbeTask != nil || wireGuardSystemRouteVerified) ?
+                              "Disconnect" : (wireGuardProbeBusy ? "Connecting…" : "Connect")) :
+                             activeProtocol == "cisco" ?
                              (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
                              (localProxyActive || fullTunActive || openVPNAppSessionActive ?
                                "Disconnect" : "Connect"),
@@ -1474,7 +1483,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
-        if localProxyActive || ciscoSystemRouteVerified {
+        if localProxyActive || ciscoSystemRouteVerified || wireGuardSystemRouteVerified {
             // More vivid green state like the shared Windows design, while
             // still representing ONLY a verified SOCKS proxy.
             let mint = NSColor(calibratedRed: 0.07, green: 0.82,
@@ -1647,9 +1656,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             localProxyActive ? connectedProtocolTitle + " · Proxy" :
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
-             (ciscoSystemRouteVerified ? "Connected · Cisco" :
+             (wireGuardSystemRouteVerified ? "Connected · WireGuard" :
+              (ciscoSystemRouteVerified ? "Connected · Cisco" :
               (ciscoTunnelTask != nil ? "Connecting…" :
-               (fullTunActive ? "TUN running · unverified" : "Disconnected")))),
+               (fullTunActive ? "TUN running · unverified" : "Disconnected"))))),
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
@@ -1657,12 +1667,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
         if localProxyActive || openVPNSystemRouteVerified ||
-           ciscoSystemRouteVerified {
+           ciscoSystemRouteVerified || wireGuardSystemRouteVerified {
             // Proxy and VPN telemetry use separate verified sources.
             let timing = stack(.horizontal, spacing: 8)
             let uptime = text(verifiedConnectionStart.map { start in
-                "◷  " + (ciscoSystemRouteVerified ? "Cisco" :
-                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)) +
+                "◷  " + (wireGuardSystemRouteVerified ? "WireGuard" :
+                         (ciscoSystemRouteVerified ? "Cisco" :
+                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle))) +
                 "  " + elapsedConnectionTime(start)
             } ?? "◷  Connected", size: 12, color: muted)
             proxyUptimeText = uptime
@@ -1675,13 +1686,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
-                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
+                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                        wireGuardSystemRouteVerified) ?
                     openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—" :
                     pingText(selected),
-                valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
+                valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                             wireGuardSystemRouteVerified) ?
                     sea : pingColor(selected)))
             network.addArrangedSubview(networkMetric("IP Address",
-                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified) ?
+                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                        wireGuardSystemRouteVerified) ?
                     (openVPNExitIP ?? "—") :
                     (localProxyExitIP ?? "—")))
             content.addArrangedSubview(network)
@@ -2888,6 +2902,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         wireGuardProbeTask = nil
         wireGuardProbeBusy = false
         wireGuardProbeStatus = ""
+        wireGuardSystemRouteVerified = false
+        wireGuardConnectedAt = nil
         ciscoTunnelGeneration += 1
         if ciscoTunnelTask != nil {
             DispatchQueue.global(qos: .utility).async {
@@ -3589,6 +3605,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         refreshFullTunStatus()
         refreshOpenVPNAppSession()
         refreshCiscoRouteStatus()
+        refreshWireGuardRouteStatus()
         refreshOpenVPNTelemetry()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         trafficPollBusy = true
@@ -3720,7 +3737,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Real network metrics: read utun interface counters, actual IPv4 exit,
     // and a real ICMP latency probe. Never synthesize readings.
     private func refreshOpenVPNTelemetry() {
-        guard tab == 0, (openVPNSystemRouteVerified || ciscoSystemRouteVerified),
+        guard tab == 0, (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                         wireGuardSystemRouteVerified),
               !openVPNTelemetryBusy,
               Date().timeIntervalSince(openVPNTelemetryAt) >= 5 else { return }
         openVPNTelemetryBusy = true
@@ -3748,7 +3766,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 guard let self = self else { return }
                 self.openVPNTelemetryBusy = false
                 guard (self.openVPNSystemRouteVerified ||
-                       self.ciscoSystemRouteVerified),
+                       self.ciscoSystemRouteVerified ||
+                       self.wireGuardSystemRouteVerified),
                       self.localProxyGeneration == generation else { return }
                 guard metrics?["state"] as? String == "measured",
                       let down = (metrics?["download_bytes"] as? NSNumber)?.int64Value,
