@@ -29,6 +29,7 @@ class HysteriaGuardedCandidateTests(unittest.TestCase):
         data = json.loads(hy2.convert(sample(), physical_interface="en0"))
         inbound = data["inbounds"][0]
         self.assertEqual(inbound["type"], "tun")
+        self.assertNotIn("interface_name", inbound)
         self.assertIs(inbound["auto_route"], False)
         self.assertIs(inbound["auto_redirect"], False)
         self.assertEqual(inbound["stack"], "system")
