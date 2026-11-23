@@ -34,6 +34,31 @@ class TUNDaemonControlTests(unittest.TestCase):
                                mock.Mock(read_text=lambda **_: "LOCAL_MAC_WITH_RECOVERY")):
             self.assertEqual(server.session_limit(), 600)
 
+    def test_unix_peer_uid_uses_kernel_credentials(self):
+        import socket
+        with mock.patch.object(server.sys, "platform", "darwin"):
+            left, right = socket.socketpair()
+            try:
+                self.assertEqual(server.unix_peer_uid(left), os.getuid())
+                self.assertEqual(server.unix_peer_uid(right), os.getuid())
+            finally:
+                left.close()
+                right.close()
+
+    def test_authorized_peer_checks_console_owner(self):
+        import socket
+        with mock.patch.object(server.sys, "platform", "darwin"), \
+             mock.patch.object(server.os, "stat") as stat_call:
+            stat_call.return_value.st_uid = os.getuid()
+            left, right = socket.socketpair()
+            try:
+                self.assertTrue(server.authorized_peer(left))
+                stat_call.return_value.st_uid = os.getuid() + 1
+                self.assertFalse(server.authorized_peer(left))
+            finally:
+                left.close()
+                right.close()
+
     def test_console_owner_required(self):
         self.assertTrue(server.allowed_uid(501, 501))
         self.assertFalse(server.allowed_uid(502, 501))
