@@ -1413,6 +1413,36 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    private var verifiedHeroConnectionLabel: String {
+        if localProxyActive { return "◉  " + connectedProtocolTitle + " proxy active" }
+        if openVPNSystemRouteVerified { return "◉  Connected · OpenVPN" }
+        if activeProtocol == "openvpn" && fullTunBusy {
+            return openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…"
+        }
+        if openVPNAppSessionActive { return "◉  OpenVPN · Tunnel only" }
+        if wireGuardSystemRouteVerified { return "◉  Connected · WireGuard" }
+        if wireGuardProbeBusy || wireGuardProbeTask != nil { return "◌  Connecting…" }
+        if ciscoSystemRouteVerified { return "◉  Connected · Cisco" }
+        if ciscoTunnelTask != nil { return "◌  Connecting…" }
+        if fullTunActive { return "◉  TUN running · unverified" }
+        return "◌  Offline"
+    }
+
+    private var verifiedNetworkConnectionLabel: String {
+        if localProxyActive { return connectedProtocolTitle + " · Proxy" }
+        if openVPNSystemRouteVerified { return "Connected · OpenVPN" }
+        if activeProtocol == "openvpn" && fullTunBusy {
+            return openVPNAppSessionActive ? "Disconnecting…" : "Connecting…"
+        }
+        if openVPNAppSessionActive { return "OpenVPN · Tunnel only" }
+        if wireGuardSystemRouteVerified { return "Connected · WireGuard" }
+        if wireGuardProbeBusy || wireGuardProbeTask != nil { return "Connecting…" }
+        if ciscoSystemRouteVerified { return "Connected · Cisco" }
+        if ciscoTunnelTask != nil { return "Connecting…" }
+        if fullTunActive { return "TUN running · unverified" }
+        return "Disconnected"
+    }
+
     private func connectPage() -> NSView {
         let main = stack(spacing: 10)
         main.alignment = .leading
@@ -1422,18 +1452,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let trailingSpace = NSView()
         offlineRow.addArrangedSubview(leadingSpace)
         offlineRow.addArrangedSubview(pill(
-            localProxyActive ? "◉  " + connectedProtocolTitle + " proxy active" :
-            (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
-             (activeProtocol == "openvpn" && fullTunBusy ?
-              (openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…") :
-             (openVPNAppSessionActive ? "◉  OpenVPN · Tunnel only" :
-             (wireGuardSystemRouteVerified ? "◉  Connected · WireGuard" :
-              ((wireGuardProbeBusy || wireGuardProbeTask != nil) ?
-               "◌  Connecting…" :
-              (ciscoSystemRouteVerified ? "◉  Connected · Cisco" :
-              (ciscoTunnelTask != nil ?
-               "◌  Connecting…" :
-              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))))))),
+            verifiedHeroConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
@@ -1647,16 +1666,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill(
-            localProxyActive ? connectedProtocolTitle + " · Proxy" :
-            (openVPNSystemRouteVerified ? "Connected · OpenVPN" :
-             (activeProtocol == "openvpn" && fullTunBusy ?
-              (openVPNAppSessionActive ? "Disconnecting…" : "Connecting…") :
-             (openVPNAppSessionActive ? "OpenVPN · Tunnel only" :
-             (wireGuardSystemRouteVerified ? "Connected · WireGuard" :
-              ((wireGuardProbeBusy || wireGuardProbeTask != nil) ? "Connecting…" :
-              (ciscoSystemRouteVerified ? "Connected · Cisco" :
-              (ciscoTunnelTask != nil ? "Connecting…" :
-               (fullTunActive ? "TUN running · unverified" : "Disconnected"))))))),
+            verifiedNetworkConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
