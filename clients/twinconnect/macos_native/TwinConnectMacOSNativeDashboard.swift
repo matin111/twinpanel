@@ -1427,6 +1427,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if activeProtocol == "l2tp" && (l2tpBusy || l2tpTask != nil) {
             return "◌  Connecting…"
         }
+        if activeProtocol == "l2tp" && l2tpStatus.hasPrefix("L2TP_") &&
+           l2tpStatus != "L2TP_SYSTEM_DISCONNECTED" {
+            return "◌  L2TP · Connection failed"
+        }
         if activeProtocol == "openvpn" && fullTunBusy {
             return openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…"
         }
@@ -1445,6 +1449,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if l2tpSystemRouteVerified { return "Connected · L2TP" }
         if activeProtocol == "l2tp" && (l2tpBusy || l2tpTask != nil) {
             return "Connecting…"
+        }
+        if activeProtocol == "l2tp" && l2tpStatus.hasPrefix("L2TP_") &&
+           l2tpStatus != "L2TP_SYSTEM_DISCONNECTED" {
+            return "L2TP · Connection failed"
         }
         if activeProtocol == "openvpn" && fullTunBusy {
             return openVPNAppSessionActive ? "Disconnecting…" : "Connecting…"
