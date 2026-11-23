@@ -26,11 +26,33 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def test_engine_stderr_redacts_secret_bearing_error_details(self):
+        cases = (
+            (b'FATAL create tun: operation not permitted endpoint=secret',
+             "TUN_ENGINE_PERMISSION_DENIED"),
+            (b'FATAL initialize utun: no such device private=hidden',
+             "TUN_ENGINE_INTERFACE_FAILED"),
+            (b'FATAL interface error: address already in use uuid=secret',
+             "TUN_ENGINE_CONFLICT"),
+            (b'FATAL route add failed token=secret',
+             "TUN_ENGINE_ROUTE_ERROR"),
+            (b'FATAL unsupported feature private=secret',
+             "TUN_ENGINE_RUNTIME_CONFIG_INVALID"),
+        )
+        for raw, expected in cases:
+            with self.subTest(expected=expected):
+                actual = server.classify_engine_stderr(raw)
+                self.assertEqual(actual, expected)
+                self.assertNotIn("secret", actual)
+        self.assertEqual(server.classify_engine_stderr(b"unknown-private-key=secret"),
+                         "TUN_ENGINE_EXITED_BEFORE_ROUTE")
+
     def test_engine_errors_are_specific_and_do_not_expose_secrets(self):
         source = (DIR / "unsigned_tun_daemon.py").read_text()
         self.assertIn('raise ValueError("SINGBOX_CONFIG_REJECTED")', source)
         self.assertIn('raise ValueError("SINGBOX_CONFIG_CHECK_TIMEOUT")', source)
-        self.assertIn('raise ValueError("TUN_ENGINE_EXITED_BEFORE_ROUTE")', source)
+        self.assertIn('raise ValueError(error_code)', source)
+        self.assertIn('classify_engine_stderr(', source)
         self.assertIn('raise ValueError("TUN_WATCHDOG_EXITED_BEFORE_ROUTE")', source)
         self.assertIn('for _ in range(32):', source)
 
