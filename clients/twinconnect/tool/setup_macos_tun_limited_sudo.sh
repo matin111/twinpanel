@@ -79,7 +79,7 @@ case "$1" in
  *) echo "ALLOWED: status or stop" >&2; exit 2;;
 esac
 CONTROL
-/bin/chown root:wheel "$ops/tun-admin"
+/usr/sbin/chown root:wheel "$ops/tun-admin"
 /bin/chmod 0755 "$ops/tun-admin"
 test "$(/usr/bin/stat -f '%u' "$ops/tun-admin")" = 0
 tmp="$(/usr/bin/mktemp /etc/sudoers.d/.twinconnect-XXXXXX)"
