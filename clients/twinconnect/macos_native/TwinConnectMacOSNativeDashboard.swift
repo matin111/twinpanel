@@ -640,6 +640,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var fullTunBusy = false
     private var fullTunStatusPollBusy = false
     private var fullTunStatusLastPoll = Date.distantPast
+    // Status socket contention is not proof the tunnel stopped. Keep pending
+    // checks separate from actual "engine_running_unverified" evidence.
+    private var fullTunStatusUncertain = false
+    private var fullTunStatusMisses = 0
     // This is set only after a successful HTTPS probe and is independent
     // of the protocol currently highlighted in the location picker.
     private var verifiedProxyProtocol: String?
@@ -1445,6 +1449,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if fullTunBusy && activeProtocol != "openvpn" {
             return fullTunActive ? "◌  Disconnecting…" : "◌  Connecting…"
         }
+        if fullTunStatusUncertain { return "◌  Checking TUN…" }
         if localProxyActive { return "◉  " + connectedProtocolTitle + " proxy active" }
         if openVPNSystemRouteVerified { return "◉  Connected · OpenVPN" }
         if l2tpSystemRouteVerified { return "◉  Connected · L2TP" }
@@ -1471,6 +1476,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if fullTunBusy && activeProtocol != "openvpn" {
             return fullTunActive ? "Disconnecting…" : "Connecting…"
         }
+        if fullTunStatusUncertain { return "Checking TUN…" }
         if localProxyActive { return connectedProtocolTitle + " · Proxy" }
         if openVPNSystemRouteVerified { return "Connected · OpenVPN" }
         if l2tpSystemRouteVerified { return "Connected · L2TP" }
@@ -1534,7 +1540,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         buttonRow.addArrangedSubview(leftGap)
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
-        let connect = button(fullTunBusy && activeProtocol != "openvpn" ?
+        let connect = button(fullTunStatusUncertain ? "Checking…" :
+                             fullTunBusy && activeProtocol != "openvpn" ?
                              (fullTunActive ? "Disconnecting…" : "Connecting…") :
                              activeProtocol == "l2tp" ?
                              ((l2tpTask != nil || l2tpSystemRouteVerified) ?
@@ -1548,7 +1555,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
-            !ciscoTunnelBusy && !wireGuardProbeBusy && !l2tpBusy
+            !fullTunStatusUncertain && !ciscoTunnelBusy &&
+            !wireGuardProbeBusy && !l2tpBusy
         let l2tpHasDiagnostic = activeProtocol == "l2tp" &&
             !l2tpStatus.isEmpty
         let openVPNHasDiagnostic = activeProtocol == "openvpn" &&
@@ -4708,6 +4716,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                               serverID: String, protocolCode: String) {
         fullTunObservedExitIP = nil
         fullTunStartedAt = nil
+        fullTunStatusUncertain = false
+        fullTunStatusMisses = 0
         fullTunBusy = true
         localProxyGeneration += 1
         let generation = localProxyGeneration
@@ -4842,18 +4852,46 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       self.accountSession?.accessToken == token else { return }
                 let observed = result.0 == 0 &&
                     self.tunRouteIsRunning(result.1)
-                if observed && !self.fullTunActive {
-                    self.fullTunActive = true
-                    self.fullTunStartedAt = Date()
-                    // The kernel confirms a TUN route; identity of the
-                    // previously selected server is NOT established.
-                    self.status = "Existing TUN route detected; destination unverified."
-                    self.view = self.build()
-                } else if !observed && self.fullTunActive {
-                    self.fullTunActive = false
+                let confirmedStopped = result.0 == 0 &&
+                    self.tunResponseIs(result.1, state: "stopped")
+                if observed {
+                    let wasUncertain = self.fullTunStatusUncertain
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    if !self.fullTunActive {
+                        self.fullTunActive = true
+                        self.fullTunStartedAt = Date()
+                        // The kernel confirms a TUN route; identity of the
+                        // previously selected server is NOT established.
+                        self.status = "Existing TUN route detected; destination unverified."
+                        self.view = self.build()
+                    } else if wasUncertain {
+                        self.status = "TUN route active; system VPN unverified."
+                        self.view = self.build()
+                    }
+                } else if confirmedStopped {
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    if self.fullTunActive {
+                        self.fullTunActive = false
+                        self.fullTunObservedExitIP = nil
+                        self.fullTunStartedAt = nil
+                        self.status = "TUN trial stopped (45-second limit or engine exit)."
+                        self.view = self.build()
+                    }
+                } else if self.fullTunActive {
+                    // One rejected or timed-out status request is ambiguous.
+                    // Never show Offline or continue claiming a running route.
+                    self.fullTunStatusMisses += 1
+                    self.fullTunStatusUncertain = true
                     self.fullTunObservedExitIP = nil
-                    self.fullTunStartedAt = nil
-                    self.status = "TUN service stopped or unavailable."
+                    self.status = "TUN status temporarily unavailable; rechecking."
+                    if self.fullTunStatusMisses >= 3 {
+                        self.fullTunActive = false
+                        self.fullTunStatusUncertain = false
+                        self.fullTunStartedAt = nil
+                        self.status = "TUN status could not be verified."
+                    }
                     self.view = self.build()
                 }
             }
@@ -4874,6 +4912,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if response.0 == 0 &&
                    self.tunResponseIs(response.1, state: "stopped") {
                     self.fullTunActive = false
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunStartedAt = nil
                     self.status = "TUN stopped."
                 } else {
                     self.status = "TUN stop unverified; check local service."
