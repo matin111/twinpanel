@@ -34,6 +34,19 @@ grep -Fq 'from tun_vps_management_guard import guard_candidate' "$source"
 if /usr/bin/pgrep -fl '[s]ing-box run' >/dev/null; then
   echo "VPN_ENGINE_RUNNING; REFUSE_DAEMON_RESTART" >&2; exit 3;
 fi
+# A repeated install must not interrupt a healthy root-owned VPN daemon.
+# When the installed controller is already current, verify via console UID
+# instead of stopping and recreating launchd services.
+if /usr/bin/cmp -s "$source" "$target"; then
+  status=$(/usr/bin/sudo -n -u "$admin" /usr/bin/python3 \
+    macos_native/unsigned_tun_client.py status || true)
+  if [[ "$status" == *'"state": "stopped"'* ]]; then
+    echo "CONTROLLER_ALREADY_CURRENT_AND_READY; NO_RESTART; ROUTES_UNCHANGED"
+    exit 0
+  fi
+  echo "CONTROLLER_SOURCE_CURRENT; STATUS_NOT_READY; INSPECT_LAUNCHD" >&2
+  exit 5
+fi
 echo "Repair controller error codes only. NO VPN or network changes."
 read -r -p "Type INSTALL-TUN-ERROR-CODES: " reply
 [[ "$reply" == INSTALL-TUN-ERROR-CODES ]] || exit 2
@@ -56,7 +69,11 @@ fi
 ready=0
 for i in 1 2 3 4 5 6 7 8 9 10; do
   /bin/sleep 1
-  if /usr/bin/python3 macos_native/unsigned_tun_client.py status |
+  # Root is NOT allowed by this daemon's peer-UID policy: only the
+  # authenticated macOS console owner can query the UNIX socket.
+  # Run the readiness check as that console user, not as root.
+  if /usr/bin/sudo -n -u "$admin" /usr/bin/python3 \
+      macos_native/unsigned_tun_client.py status |
      /usr/bin/grep -q '"state": "stopped"'; then
     ready=1
     break
