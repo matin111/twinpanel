@@ -40,6 +40,32 @@ class UnsignedWireGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "WG_SINGLE_PEER_REQUIRED"):
             wg.parse_profile(profile().replace("[Peer]", "[Invalid]"))
 
+    def test_twinpanel_two_half_routes_equal_full_ipv4(self):
+        import socket
+        split = profile().replace("AllowedIPs = 0.0.0.0/0",
+                                  "AllowedIPs = 0.0.0.0/1, 128.0.0.0/1")
+        with patch.object(socket, "getaddrinfo",
+                          return_value=[(None, None, None, None,
+                                         ("1.2.3.4", 51820))]):
+            config = wg.parse_profile(split)
+            self.assertEqual(config["endpoint"], "1.2.3.4:51820")
+
+    def test_twinpanel_two_half_routes_with_ipv6_are_accepted_for_ipv4(self):
+        import socket
+        split = profile().replace("AllowedIPs = 0.0.0.0/0",
+                                  "AllowedIPs = 0.0.0.0/1, 128.0.0.0/1, ::/0")
+        with patch.object(socket, "getaddrinfo",
+                          return_value=[(None, None, None, None,
+                                         ("1.2.3.4", 51820))]):
+            self.assertEqual(wg.parse_profile(split)["address"],
+                             "10.20.30.15")
+
+    def test_single_half_route_cannot_qualify_as_full_ipv4(self):
+        partial = profile().replace("AllowedIPs = 0.0.0.0/0",
+                                    "AllowedIPs = 0.0.0.0/1")
+        with self.assertRaisesRegex(ValueError, "WG_FULL_IPV4_PROFILE_REQUIRED"):
+            wg.parse_profile(partial)
+
     def test_no_routes_without_full_ipv4_authorization(self):
         text = profile().replace("0.0.0.0/0", "10.0.0.0/8")
         with self.assertRaisesRegex(ValueError, "WG_FULL_IPV4_PROFILE_REQUIRED"):
