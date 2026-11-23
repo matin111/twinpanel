@@ -17,6 +17,12 @@ class LimitedTunAdminSetupTests(unittest.TestCase):
         self.assertNotIn('NOPASSWD: ALL', SCRIPT)
         self.assertNotIn('NOPASSWD: /bin/bash', SCRIPT)
 
+    def test_error_codes_installer_waits_for_controller_readiness(self):
+        script = (SOURCE.parent / "upgrade_macos_tun_error_codes.sh").read_text()
+        self.assertIn("CONTROLLER_NOT_READY", script)
+        self.assertIn("'\"state\": \"stopped\"'", script)
+        self.assertIn("NO_VPN_STARTED", script)
+
     def test_vps_controller_requires_oob_and_bounded_expiry(self):
         installer = (SOURCE.parent / "activate_macos_tun_vps.sh").read_text()
         self.assertIn("PROVIDER_VNC_CONSOLE_REQUIRED", installer)
