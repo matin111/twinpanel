@@ -4820,21 +4820,36 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func refreshFullTunStatus() {
-        guard fullTunActive, !fullTunBusy, !fullTunStatusPollBusy,
+        // Reconcile TUN sessions surviving an AppKit restart. This is a
+        // read-only status query, not an automatic connect or route change.
+        // Never assign an already-running session to another selected protocol.
+        guard accountSession != nil, !fullTunBusy, !localProxyBusy,
+              !fullTunStatusPollBusy,
+              (fullTunActive || activeProtocol == "v2ray"),
+              (fullTunActive || fullTunServicePresent()),
               Date().timeIntervalSince(fullTunStatusLastPoll) >= 5 else { return }
         fullTunStatusLastPoll = Date()
         fullTunStatusPollBusy = true
         let generation = localProxyGeneration
+        let token = accountSession?.accessToken
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             let result = self.runFullTunClient("status")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.fullTunStatusPollBusy = false
-                guard self.fullTunActive,
-                      self.localProxyGeneration == generation else { return }
-                if result.0 != 0 ||
-                   !self.tunResponseIs(result.1, state: "engine_running_unverified") {
+                guard self.localProxyGeneration == generation,
+                      self.accountSession?.accessToken == token else { return }
+                let observed = result.0 == 0 &&
+                    self.tunRouteIsRunning(result.1)
+                if observed && !self.fullTunActive {
+                    self.fullTunActive = true
+                    self.fullTunStartedAt = Date()
+                    // The kernel confirms a TUN route; identity of the
+                    // previously selected server is NOT established.
+                    self.status = "Existing TUN route detected; destination unverified."
+                    self.view = self.build()
+                } else if !observed && self.fullTunActive {
                     self.fullTunActive = false
                     self.fullTunObservedExitIP = nil
                     self.fullTunStartedAt = nil
