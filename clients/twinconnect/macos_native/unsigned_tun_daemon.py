@@ -37,6 +37,18 @@ OPENVPN = TRUSTED_ROOT / "openvpn/bin/openvpn"
 OPENVPN_REVIEW = TRUSTED_ROOT / "openvpn_profile_review.py"
 MAX_REQUEST = 262144
 MAX_SESSION = 600
+VPS_SESSION = 45
+
+
+def session_limit() -> int:
+    """VPS experiments must expire even if the GUI never sends Stop."""
+    try:
+        if APPROVAL.read_text(encoding="ascii").strip() == "VPS_OOB_CONSOLE_45_SECONDS":
+            return VPS_SESSION
+    except OSError:
+        pass
+    return MAX_SESSION
+
 
 
 def allowed_uid(peer_uid: int, console_uid: int) -> bool:
@@ -65,7 +77,8 @@ def daemon_preflight() -> None:
         raise ValueError("TRUSTED_WATCHDOG_NOT_INSTALLED")
     if not trusted_root_file(APPROVAL):
         raise ValueError("LOCAL_CONSOLE_APPROVAL_MISSING")
-    if APPROVAL.read_text(encoding="ascii").strip() != "LOCAL_MAC_WITH_RECOVERY":
+    approval = APPROVAL.read_text(encoding="ascii").strip()
+    if approval not in ("LOCAL_MAC_WITH_RECOVERY", "VPS_OOB_CONSOLE_45_SECONDS"):
         raise ValueError("LOCAL_CONSOLE_APPROVAL_INVALID")
     # Fail closed if there is no signed-in physical console owner.
     if os.stat("/dev/console").st_uid <= 0:
@@ -188,14 +201,14 @@ class Session:
                     self.watchdog is not None and self.watchdog.poll() is not None
                 ) or (
                     self.started is not None and
-                    time.monotonic() - self.started > MAX_SESSION
+                    time.monotonic() - self.started > session_limit()
                 ) or not self.console_owner_present():
                     self.cleanup()
             status = {
                 "state": "engine_running_unverified" if self.process else "stopped",
                 "system_vpn_verified": False,
                 "owner_present": self.owner is not None,
-                "maximum_session_seconds": MAX_SESSION,
+                "maximum_session_seconds": session_limit(),
             }
             if self.process is not None:
                 status.update(observe_route())
@@ -265,7 +278,7 @@ class Session:
                 watcher = subprocess.Popen(
                     [sys.executable, str(WATCHDOG), "--parent",
                      str(os.getpid()), "--engine", str(child.pid),
-                     "--seconds", str(MAX_SESSION)],
+                     "--seconds", str(session_limit())],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
