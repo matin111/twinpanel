@@ -95,7 +95,7 @@ def convert(profile: bytes, *, physical_interface: str) -> bytes:
         "inbounds": [{
             "type": "tun",
             "tag": "twinconnect-hysteria2",
-            "interface_name": "twinconnect-hy2",
+            # macOS allocates utunN; a custom interface name is invalid.
             "address": [TUN_NET],
             "mtu": 1280,
             "auto_route": False,
