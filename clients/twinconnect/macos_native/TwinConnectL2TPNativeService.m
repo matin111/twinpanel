@@ -107,10 +107,15 @@ static int selftest(void) {
     // network routes. This verifies the native API accepts our settings.
     SCPreferencesRef prefs=SCPreferencesCreate(NULL, CFSTR("TwinConnectL2TPTest"), NULL);
     if (!prefs) {result(@"error",@"L2TP_PREFS_MEMORY_TEST_FAILED");return 2;}
+    if (!SCPreferencesLock(prefs,TRUE)) {
+        result(@"error",@"L2TP_PREFS_TEST_LOCK_FAILED");
+        CFRelease(prefs); return 2;
+    }
     SCNetworkInterfaceRef iface=SCNetworkInterfaceCreateWithInterface(
         kSCNetworkInterfaceIPv4,kSCNetworkInterfaceTypeL2TP);
     if (!iface) {
         result(@"error",@"L2TP_NATIVE_INTERFACE_UNAVAILABLE");
+        SCPreferencesUnlock(prefs);
         CFRelease(prefs); return 2;
     }
     SCNetworkServiceRef service=SCNetworkServiceCreate(prefs,iface);
@@ -146,6 +151,7 @@ static int selftest(void) {
     }
     if (service) {SCNetworkServiceRemove(service);CFRelease(service);}
     CFRelease(iface);
+    SCPreferencesUnlock(prefs);
     CFRelease(prefs);
     if (good) result(@"tested",@"L2TP_NATIVE_SETTINGS_ACCEPTED_NO_COMMIT");
     return good?0:2;
