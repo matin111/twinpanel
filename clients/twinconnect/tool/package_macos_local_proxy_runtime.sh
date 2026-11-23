@@ -133,6 +133,28 @@ if [[ -n "$openvpn_candidate" ]]; then
 else
   echo "OPENVPN_CLI_NOT_INSTALLED; NOT_PACKAGED"
 fi
+# The unsigned WireGuard userspace daemon is packaged as an ENGINE ONLY.
+# It never starts here, and this packaging must not alter the system network.
+wg_source="macos_native/build/wireguard-userspace/$arch/wireguard-go"
+wg_packaged=0
+if [[ -f "$wg_source" && ! -L "$wg_source" && -x "$wg_source" ]]; then
+  if ! /usr/bin/lipo -archs "$wg_source" 2>/dev/null |
+       tr ' ' '\n' | grep -Fxq "$host_arch"; then
+    echo "WIREGUARD_UNSIGNED_ARCH_MISMATCH" >&2; exit 3
+  fi
+  if ! "$wg_source" --version |
+       grep -Fq "Userspace WireGuard daemon for darwin-$arch"; then
+    echo "WIREGUARD_UNSIGNED_DAEMON_INVALID" >&2; exit 3
+  fi
+  mkdir -p "$stage/macos_native/build/wireguard-userspace/$arch"
+  install -m 0755 "$wg_source" \
+    "$stage/macos_native/build/wireguard-userspace/$arch/wireguard-go"
+  wg_packaged=1
+  installed=$((installed + 1))
+  echo "WIREGUARD_UNSIGNED_ENGINE_PACKAGED: $arch"
+else
+  echo "WIREGUARD_UNSIGNED_ENGINE_NOT_BUILT; OPTIONAL_RUNTIME_NOT_PACKAGED"
+fi
 # Repeatable builds: replace only our own previously packaged directory.
 # Keep the previous runtime as rollback until the new copy is in place.
 backup=""
@@ -159,6 +181,10 @@ done
 if [[ -n "$openvpn_candidate" ]]; then
   test -x "$destination/macos_native/build/openvpn/$arch/bin/openvpn" ||
     { echo "PACKAGED_OPENVPN_MISSING" >&2; exit 3; }
+fi
+if [[ "$wg_packaged" -eq 1 ]]; then
+  test -x "$destination/macos_native/build/wireguard-userspace/$arch/wireguard-go" ||
+    { echo "PACKAGED_WIREGUARD_USERSOURCE_MISSING" >&2; exit 3; }
 fi
 test -r "$destination/macos_native/standalone_connection_manager.py" ||
   { echo "PACKAGED_MANAGER_MISSING" >&2; exit 3; }
