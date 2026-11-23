@@ -24,7 +24,8 @@ approval="$root/local-console-approval"
   echo "EXPECTED_STAGED_STATE_NOT_FOUND" >&2; exit 3;
 }
 files=(unsigned_tun_daemon.py unsigned_tun_policy.py
-       unsigned_tun_watchdog.py openvpn_profile_review.py)
+       unsigned_tun_watchdog.py openvpn_profile_review.py
+       tun_vps_management_guard.py)
 for file in "${files[@]}"; do
   src="macos_native/$file"
   dst="$root/$file"
