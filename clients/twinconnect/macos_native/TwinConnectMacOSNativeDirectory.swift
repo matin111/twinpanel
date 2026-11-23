@@ -130,6 +130,14 @@ struct TwinMacNativeProtocol {
     let configured: Bool
 }
 
+// Windows-parity V2Ray inbound list: these are only server profiles truly
+// delivered to the signed-in account, never synthetic per-node placeholders.
+struct TwinMacNativeXrayInbound {
+    let id: String
+    let host: String
+    let port: Int
+}
+
 struct TwinMacNativeServer {
     let id: String
     let name: String
@@ -866,6 +874,59 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     // Mac proxy mode shares one strictly validated sing-box launcher. Every
     // profile is fetched on demand from the current authenticated tenant and
     // must belong to the selected server. Hysteria2 keeps its existing path.
+    func loadXrayInboundIndex(
+        _ session: TwinMacNativeSession,
+        allowedServerIDs: Set<String>,
+        completion: @escaping (Result<[String: [TwinMacNativeXrayInbound]], Error>) -> Void
+    ) {
+        let endpointURL = endpoint(session.apiOrigin,
+                                   "v1/central-app/session/profiles")
+        request(endpointURL, payload: ["protocol": "v2ray"],
+                bearer: session.accessToken, maxBytes: 1048576) { [weak self] result in
+            guard let self = self else { return }
+            guard case .success(let response) = result,
+                  self.validEnvelope(response, session.namespace),
+                  (response["protocol"] as? String) == "v2ray",
+                  let groups = response["server_groups"] as? [[String: Any]],
+                  groups.count <= 200 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "XRAY_SERVER_PROFILES_UNAVAILABLE")))
+                return
+            }
+            let allowedIDs = ["websocket_tls", "xhttp_reality", "tcp_tls"]
+            var found = [String: [TwinMacNativeXrayInbound]]()
+            var seen = Set<String>()
+            for group in groups {
+                let nodeID: String
+                if let value = group["node_id"] as? String {
+                    nodeID = value
+                } else if let value = group["node_id"] as? Int {
+                    nodeID = String(value)
+                } else { continue }
+                guard allowedServerIDs.contains(nodeID),
+                      seen.insert(nodeID).inserted,
+                      let rows = group["profiles"] as? [[String: Any]],
+                      rows.count <= 8 else { continue }
+                var choices = [TwinMacNativeXrayInbound]()
+                for id in allowedIDs {
+                    let candidates = rows.filter { ($0["id"] as? String) == id }
+                    guard candidates.count == 1,
+                          let uri = candidates[0]["uri"] as? String,
+                          uri.utf8.count <= 8192,
+                          self.reviewedXrayVLESSUri(uri, profileID: id) != nil,
+                          let url = URLComponents(string: uri),
+                          let host = url.host,
+                          let port = url.port,
+                          (1...65535).contains(port) else { continue }
+                    choices.append(TwinMacNativeXrayInbound(
+                        id: id, host: host, port: port))
+                }
+                if !choices.isEmpty { found[nodeID] = choices }
+            }
+            completion(.success(found))
+        }
+    }
+
     func prepareLocalSingBox(_ session: TwinMacNativeSession,
                              serverID: String, protocolCode: String,
                              v2rayInboundID: String? = nil,
