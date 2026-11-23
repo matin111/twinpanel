@@ -50,6 +50,20 @@ if /bin/launchctl print "$label" >/dev/null 2>&1; then
   echo "LAUNCHD_PREVIOUS_CONTROLLER_BUSY" >&2; exit 4;
 fi
 /bin/launchctl bootstrap system "$plist"
-/bin/sleep 1
-/usr/bin/python3 macos_native/unsigned_tun_client.py status
-echo "TUN_ERROR_CODES_INSTALLED; NO_VPN_STARTED; ROUTES_UNCHANGED"
+# Launchd bootstrap succeeds before the daemon has finished setting its
+# privileged socket and session ownership. Do not report a transient
+# TUN_CONSOLE_OWNER_REQUIRED as the final result or claim readiness.
+ready=0
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  /bin/sleep 1
+  if /usr/bin/python3 macos_native/unsigned_tun_client.py status |
+     /usr/bin/grep -q '"state": "stopped"'; then
+    ready=1
+    break
+  fi
+done
+if [[ "$ready" != 1 ]]; then
+  echo "CONTROLLER_NOT_READY; RETAIN_VNC_AND_INSPECT_STATUS" >&2
+  exit 5
+fi
+echo "TUN_ERROR_CODES_INSTALLED; CONTROLLER_READY; NO_VPN_STARTED; ROUTES_UNCHANGED"
