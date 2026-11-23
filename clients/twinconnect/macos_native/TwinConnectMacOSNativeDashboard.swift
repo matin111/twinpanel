@@ -4264,15 +4264,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Converts an entitled Xray profile to a reviewed unsigned sing-box TUN
     // profile. Credentials travel over stdin/stdout, never argv or a log.
     // Conversion does not start a VPN or change system routes.
-    private func reviewedV2RayTunCandidate(_ profile: Data) -> Data? {
-        guard profile.count > 0 && profile.count <= 262144 else { return nil }
+    private func reviewedV2RayTunCandidate(_ profile: Data) -> (Data?, String) {
+        guard profile.count > 0 && profile.count <= 262144 else {
+            return (nil, "VLESS_PROFILE_INVALID")
+        }
         let root = localRuntimeRoot()
         let script = root + "/macos_native/xray_unsigned_tun_candidate.py"
-        guard FileManager.default.isReadableFile(atPath: script) else { return nil }
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (nil, "VLESS_CONVERTER_MISSING")
+        }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         task.arguments = [script, "--stdin"]
-        task.standardError = FileHandle.nullDevice
+        let errors = Pipe()
+        task.standardError = errors
         let input = Pipe()
         let output = Pipe()
         task.standardInput = input
@@ -4283,15 +4288,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             input.fileHandleForWriting.closeFile()
             let converted = output.fileHandleForReading.readDataToEndOfFile()
             task.waitUntilExit()
-            guard task.terminationStatus == 0,
-                  converted.count > 0, converted.count <= 262144,
+            if task.terminationStatus != 0 {
+                let details = errors.fileHandleForReading.readDataToEndOfFile()
+                let reason = String(decoding: details, as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let safe = reason.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                        options: .regularExpression) != nil ?
+                    reason : "VLESS_CONVERSION_FAILED"
+                return (nil, safe)
+            }
+            guard converted.count > 0, converted.count <= 262144,
                   let obj = try? JSONSerialization.jsonObject(with: converted)
                     as? [String: Any],
                   let inbound = obj["inbounds"] as? [[String: Any]],
                   inbound.count == 1,
-                  inbound[0]["type"] as? String == "tun" else { return nil }
-            return converted
-        } catch { return nil }
+                  inbound[0]["type"] as? String == "tun" else {
+                return (nil, "VLESS_CANDIDATE_INVALID")
+            }
+            return (converted, "")
+        } catch { return (nil, "VLESS_CONVERTER_EXEC_FAILED") }
     }
 
     private func tunResponseIs(_ raw: String, state: String) -> Bool {
@@ -4681,8 +4696,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "Starting local-console TUN engine…"
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let reviewed: Data? = protocolCode == "v2ray" ?
-                        self.reviewedV2RayTunCandidate(profile) : profile
+                    let conversion = protocolCode == "v2ray" ?
+                        self.reviewedV2RayTunCandidate(profile) : (profile, "")
+                    let reviewed = conversion.0
+                    let conversionReason = conversion.1
                     let response: (Int32, String) = reviewed.map {
                         self.runFullTunClient("start", profile: $0)
                     } ?? (1, "")
@@ -4702,8 +4719,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         if self.fullTunActive {
                             self.status = "TUN engine running; system VPN NOT verified."
                         } else if reviewed == nil {
-                            self.status = "V2Ray TUN profile conversion failed."
-                            self.recordProxyAttempt(protocolCode, "TUN_PROFILE_CONVERSION_FAILED")
+                            self.status = "V2Ray TUN: " + conversionReason
+                            self.recordProxyAttempt(protocolCode, conversionReason)
                         } else {
                             let reason: String
                             if let data = response.1.data(using: .utf8),
