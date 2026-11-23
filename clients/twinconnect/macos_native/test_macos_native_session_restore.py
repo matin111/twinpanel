@@ -211,7 +211,10 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('safeOutboundTLS(tls, server: host)', directory)
         self.assertIn('"LOCAL_PROFILE_INVALID"', directory)
         self.assertIn('"SERVER_NOT_ALLOWED"', directory)
-        self.assertIn('"PROTOCOL_NOT_ALLOWED"', directory)
+        self.assertIn('"PROTOCOL_NOT_SELECTED"', directory)
+        self.assertIn('"PROTOCOL_CONFIG_MISSING"', directory)
+        self.assertIn('"PROTOCOL_CATALOG_INVALID"', directory)
+        self.assertIn('case .failure(let error):', directory)
         self.assertIn('"PROFILES_NOT_READY"', directory)
 
     def test_naive_tcp_panel_profile_keeps_ca_and_ignores_inert_quic_tuning(self):
