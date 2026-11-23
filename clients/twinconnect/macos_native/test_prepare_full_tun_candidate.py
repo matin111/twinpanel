@@ -31,6 +31,7 @@ class FullTUNCandidateTests(unittest.TestCase):
             with self.subTest(protocol=protocol):
                 result = module.convert(self.profile(protocol))
                 self.assertEqual(result["inbounds"][0]["type"], "tun")
+                self.assertNotIn("interface_name", result["inbounds"][0])
                 self.assertTrue(result["inbounds"][0]["auto_route"])
                 self.assertFalse(result["inbounds"][0]["auto_redirect"])
                 self.assertEqual(result["route"]["final"], "proxy")
