@@ -100,6 +100,19 @@ class MboxFullTunTests(unittest.TestCase):
         self.assertIn('self.reviewedMieruTunCandidate(profile)', UI)
         self.assertIn('startFullTun(session, serverID: serverID, protocolCode: selectedProtocol)', UI)
 
+    def test_mieru_missing_ip_uses_only_authorized_selected_node_probe(self):
+        start = DIRECTORY.index('if protocolCode == "mieru" {')
+        stop = DIRECTORY.index('guard let config = self.reviewedSingBoxProxyConfig(', start)
+        code = DIRECTORY[start:stop]
+        self.assertIn('TwinMacNativePing.validatedPublicIP(rawAddress)', code)
+        self.assertIn('($0["id"] as? String) == serverID', code)
+        self.assertIn('selectedNode["probe_ip"] as? String', code)
+        self.assertIn('TwinMacNativePing.validatedPublicIP(probeAddress)', code)
+        self.assertIn('serverRows[0]["ipAddress"] = probeAddress', code)
+        self.assertIn('"MIERU_SELECTED_NODE_IP_MISSING"', code)
+        self.assertNotIn('getaddrinfo', code)
+        self.assertNotIn('8.8.8.8', code)
+
     def test_mieru_uses_separate_trusted_root_binary(self):
         self.assertIn('MIERU_ENGINE = TRUSTED_ROOT / "mbox"', DAEMON)
         self.assertIn('validate_mbox_tun_config(profile)', DAEMON)
