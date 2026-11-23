@@ -566,6 +566,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var locationCountryIDs = [String]()
     private var locationRowIDs = [String]()
     private var locationSearch = ""
+    private weak var locationsScrollView: NSScrollView?
+    private var locationsScrollOffset: CGFloat = 0
+    private var fastestAutoSelectPending = false
+    private var fastestBusy = false
+    private var fastestStatus = ""
+    private var fastestGeneration = 0
     private var protocolChipCodes = [String?]()
     private var showAllProtocolChips = true
     private var activeProtocol: String?
@@ -927,6 +933,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func build() -> NSView {
+        // Actions and ping redraws recreate the AppKit tree. Keep the visible
+        // country on screen instead of jumping to the top after every click.
+        if tab == 1, let previous = locationsScrollView, previous.window != nil {
+            locationsScrollOffset = max(0, previous.contentView.bounds.origin.y)
+        }
         let root = TwinNativeBackdrop(frame:
             NSRect(x: 0, y: 0, width: 1180, height: 740))
         let configuredBackground = panelBackgroundColor()?
@@ -1098,7 +1109,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                               constant: -18)
         ])
         scroll.documentView = document
-        scroll.contentView.scroll(to: .zero)
+        if tab == 1 { locationsScrollView = scroll }
         root.addSubview(scroll)
         NSLayoutConstraint.activate([
             scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
@@ -1116,6 +1127,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         workspace.setContentHuggingPriority(.required, for: .vertical)
         document.layoutSubtreeIfNeeded()
         scroll.reflectScrolledClipView(scroll.contentView)
+        if tab == 1 {
+            let offset = locationsScrollOffset
+            // The new scroll clip does not have a final size until this view
+            // is attached. Restore only after AppKit completes its layout.
+            DispatchQueue.main.async { [weak scroll] in
+                guard let scroll = scroll, scroll.window != nil else { return }
+                scroll.layoutSubtreeIfNeeded()
+                scroll.documentView?.layoutSubtreeIfNeeded()
+                let clip = scroll.contentView
+                let maxY = max(0, (scroll.documentView?.bounds.height ?? 0) -
+                               clip.bounds.height)
+                let targetY = min(max(0, offset), maxY)
+                clip.scroll(to: NSPoint(x: 0, y: targetY))
+                scroll.reflectScrolledClipView(clip)
+            }
+        }
     }
 
     // Native vector glyphs keep the Windows icon language sharp on Retina
@@ -1936,6 +1963,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if pingAllBusy && nodePingQueue.isEmpty && nodePingBusy.isEmpty {
             pingAllBusy = false
+            if fastestAutoSelectPending { finishFastestICMPSelection() }
         }
     }
 
@@ -1961,28 +1989,160 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
-    @objc private func selectFastestMeasuredServer(_ sender: NSButton) {
-        guard !localProxyBusy && !ciscoTunnelBusy && ciscoTunnelTask == nil else {
-            return
+    private func applyFastestNode(_ server: TwinMacNativeServer) {
+        activeServer = server.id
+        expandedCountries.insert(server.country.uppercased())
+        persistCurrentSelection()
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+        } else {
+            view = build()
         }
+    }
+
+    private func finishFastestICMPSelection() {
+        guard fastestAutoSelectPending else { return }
+        fastestAutoSelectPending = false
+        fastestBusy = false
         let eligible = visibleLocationServers().filter {
             $0.online && nodePingResults[$0.id]?.measuredMs != nil
         }
         guard let best = eligible.min(by: {
             (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
                 (nodePingResults[$1.id]?.measuredMs ?? Int.max)
-        }) else { return }
-        if best.id == activeServer { return }
-        activeServer = best.id
-        expandedCountries.insert(best.country.uppercased())
-        persistCurrentSelection()
-        if localProxyActive {
-            // Selecting a different node must never leave the previous
-            // SOCKS process running behind the new server label.
-            stopVerifiedLocalProxy()
+        }) else {
+            fastestStatus = "No reachable server replied to ICMP."
+            view = build()
             return
         }
+        let ms = nodePingResults[best.id]?.measuredMs ?? 0
+        fastestStatus = "Fastest ICMP: " + countryName(best.country) +
+            " · " + String(ms) + " ms · selected"
+        applyFastestNode(best)
+    }
+
+    private func measuredXrayTCPHandshake(_ inbound: TwinMacNativeXrayInbound) -> Int? {
+        // Reachability latency, NOT a VPN bandwidth test. Only ever runs on
+        // the background worker queue; no process or DNS on AppKit main.
+        let started = ProcessInfo.processInfo.systemUptime
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        task.arguments = ["-G", "2", "-w", "3", "-z", inbound.host,
+                          String(inbound.port)]
+        task.standardInput = FileHandle.nullDevice
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            return max(1, Int((ProcessInfo.processInfo.systemUptime -
+                                started) * 1000))
+        } catch { return nil }
+    }
+
+    private func measureAndSelectFastestV2Ray() {
+        guard let session = accountSession, xrayIndexLoaded else {
+            fastestStatus = "V2Ray profiles are not loaded. Refresh server locations."
+            view = build()
+            return
+        }
+        let validServers = visibleLocationServers().filter { $0.online }
+        let choices: [(server: TwinMacNativeServer, inbound: TwinMacNativeXrayInbound)] =
+            validServers.flatMap { server in
+                (xrayInboundIndex[server.id] ?? [])
+                    .filter { v2rayTunInboundSupported($0.id) }
+                    .map { (server: server, inbound: $0) }
+            }
+        guard !choices.isEmpty else {
+            fastestStatus = "No supported V2Ray inbound is available."
+            view = build()
+            return
+        }
+        fastestBusy = true
+        fastestStatus = "Measuring supported V2Ray inbounds…"
+        fastestGeneration += 1
+        let generation = fastestGeneration
+        let profileGeneration = xrayIndexGeneration
+        let token = session.accessToken
         view = build()
+        let queue = DispatchQueue.global(qos: .utility)
+        let group = DispatchGroup()
+        let limit = DispatchSemaphore(value: 4)
+        let lock = NSLock()
+        var measured = [(index: Int, ms: Int)]()
+        for (index, choice) in choices.enumerated() {
+            group.enter()
+            queue.async { [weak self] in
+                limit.wait()
+                defer { limit.signal(); group.leave() }
+                guard let self = self,
+                      let ms = self.measuredXrayTCPHandshake(choice.inbound)
+                else { return }
+                lock.lock()
+                measured.append((index: index, ms: ms))
+                lock.unlock()
+            }
+        }
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self,
+                  self.fastestGeneration == generation else { return }
+            self.fastestBusy = false
+            guard self.accountSession?.accessToken == token,
+                  self.xrayIndexGeneration == profileGeneration,
+                  self.activeProtocol == "v2ray",
+                  !self.fullTunActive, !self.fullTunBusy else { return }
+            for result in measured {
+                let choice = choices[result.index]
+                self.xrayInboundRtts[
+                    self.xrayPingKey(choice.server.id, choice.inbound.id)
+                ] = result.ms
+            }
+            guard let fastest = measured.min(by: { $0.ms < $1.ms }) else {
+                self.fastestStatus = "No supported V2Ray inbound responded."
+                self.view = self.build()
+                return
+            }
+            let choice = choices[fastest.index]
+            self.activeV2RayInbound = choice.inbound.id
+            self.fastestStatus = "Fastest TCP: " +
+                self.countryName(choice.server.country) + " · " +
+                self.v2rayInboundLabel(choice.inbound.id) + " · " +
+                String(fastest.ms) + " ms · selected"
+            self.applyFastestNode(choice.server)
+        }
+    }
+
+    @objc private func selectFastestMeasuredServer(_ sender: NSButton) {
+        guard !fastestBusy, !localProxyBusy, !fullTunBusy, !fullTunActive,
+              !ciscoTunnelBusy, ciscoTunnelTask == nil else { return }
+        if activeProtocol == "v2ray" {
+            measureAndSelectFastestV2Ray()
+            return
+        }
+        if pingAllBusy {
+            // A previously requested Ping all is still running. Finish it
+            // and choose from its fresh measurements without a second scan.
+            fastestAutoSelectPending = true
+            fastestBusy = true
+            fastestStatus = "Measuring server ICMP latency…"
+            view = build()
+            return
+        }
+        let candidates = visibleLocationServers().filter {
+            $0.online && $0.probeIP != nil
+        }
+        guard !candidates.isEmpty else {
+            fastestStatus = "No server has a usable public ICMP probe address."
+            view = build()
+            return
+        }
+        fastestAutoSelectPending = true
+        fastestBusy = true
+        fastestStatus = "Measuring server ICMP latency…"
+        // Discard stale latency readings; Fastest is based on this click.
+        for server in candidates { nodePingResults.removeValue(forKey: server.id) }
+        pingNodes(candidates)
     }
 
     @objc private func pingAllServers(_ sender: NSButton) {
@@ -2135,7 +2295,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         activeV2RayInbound = inboundID
         activeProtocol = "v2ray"
         persistCurrentSelection()
-        tab = 0
+        // Keep Locations visible; selection is not navigation.
         status = "V2Ray " + (v2rayInboundLabel(inboundID)) + " selected."
         view = build()
     }
@@ -2302,26 +2462,34 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let chips = protocolChips()
         wrapper.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
-        // A fastest-node action must use real local ICMP measurements,
-        // never panel estimates or synthetic timers.
-        let fastest = visibleLocationServers().filter { server in
-            server.online && nodePingResults[server.id]?.measuredMs != nil
-        }.min {
-            (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
-                (nodePingResults[$1.id]?.measuredMs ?? Int.max)
-        }
+        // Click starts its own measured scan. Never require a manual Ping all,
+        // and never rank unmeasured nodes by panel-estimated latency.
+        let availableForFastest = activeProtocol == "v2ray" ?
+            (xrayIndexLoaded &&
+             visibleLocationServers().contains { server in
+                 server.online &&
+                 (xrayInboundIndex[server.id] ?? []).contains {
+                     v2rayTunInboundSupported($0.id)
+                 }
+             }) :
+            visibleLocationServers().contains {
+                $0.online && $0.probeIP != nil
+            }
         let fastestButton = button(
-            fastest.map {
-                "✦  Fastest measured: " + countryName($0.country) +
-                "  ·  " + pingText($0)
-            } ?? "✦  Fastest server  ·  Measure ping first",
+            fastestBusy ? "◷  Finding fastest server…" : "✦  Fastest server",
             action: #selector(selectFastestMeasuredServer(_:)),
             mutedButton: true)
-        fastestButton.isEnabled = fastest != nil && !localProxyBusy &&
+        fastestButton.isEnabled = availableForFastest && !fastestBusy &&
+            !localProxyBusy && !fullTunActive && !fullTunBusy &&
             !ciscoTunnelBusy && ciscoTunnelTask == nil
         fastestButton.heightAnchor.constraint(equalToConstant: 39).isActive = true
-        fastestButton.toolTip = "Choose the lowest real ICMP RTT among online nodes"
+        fastestButton.toolTip = fullTunActive ?
+            "Disconnect before selecting another VPN server" :
+            "Automatically measure reachable inbounds and select the fastest"
         wrapper.addArrangedSubview(fastestButton)
+        if !fastestStatus.isEmpty {
+            wrapper.addArrangedSubview(text(fastestStatus, size: 11, color: muted))
+        }
 
         let visible = visibleLocationServers()
         let grouped = Dictionary(grouping: visible) { $0.country.uppercased() }
@@ -3348,6 +3516,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func showLocations(_ sender: NSButton) {
+        if tab != 1 { locationsScrollOffset = 0 }
         tab = 1
         view = build()
     }
@@ -3358,6 +3527,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func changeTab(_ sender: NSButton) {
+        if tab != 1 && sender.tag == 1 { locationsScrollOffset = 0 }
         tab = sender.tag
         view = build()
     }
@@ -3382,6 +3552,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             persistCurrentSelection()
             stopVerifiedLocalProxy()
             return
+        }
+        if activeProtocol != chosen {
+            fastestGeneration += 1
+            fastestBusy = false
+            fastestAutoSelectPending = false
+            fastestStatus = ""
         }
         activeProtocol = chosen
         persistCurrentSelection()
