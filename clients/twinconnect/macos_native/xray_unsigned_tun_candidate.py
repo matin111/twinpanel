@@ -120,7 +120,7 @@ def convert(data: dict) -> dict:
     candidate = {
         "log": {"level": "error"},
         "inbounds": [{"type": "tun", "tag": "twinconnect-tun",
-                      "interface_name": "twinconnect", "address": ["172.19.0.1/30"],
+                      "address": ["172.19.0.1/30"],
                       "auto_route": True, "auto_redirect": False,
                       "strict_route": False, "stack": "system"}],
         "outbounds": [proxy],
