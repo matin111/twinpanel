@@ -17,6 +17,13 @@ class LimitedTunAdminSetupTests(unittest.TestCase):
         self.assertNotIn('NOPASSWD: ALL', SCRIPT)
         self.assertNotIn('NOPASSWD: /bin/bash', SCRIPT)
 
+    def test_error_codes_installer_queries_as_console_owner(self):
+        script = (SOURCE.parent / "upgrade_macos_tun_error_codes.sh").read_text()
+        self.assertEqual(script.count('/usr/bin/sudo -n -u "$admin" /usr/bin/python3'), 2)
+        self.assertIn('/usr/bin/cmp -s "$source" "$target"', script)
+        self.assertIn("CONTROLLER_ALREADY_CURRENT_AND_READY", script)
+        self.assertNotIn('if /usr/bin/python3 macos_native/unsigned_tun_client.py status |', script)
+
     def test_error_codes_installer_waits_for_controller_readiness(self):
         script = (SOURCE.parent / "upgrade_macos_tun_error_codes.sh").read_text()
         self.assertIn("CONTROLLER_NOT_READY", script)
