@@ -868,6 +868,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     // must belong to the selected server. Hysteria2 keeps its existing path.
     func prepareLocalSingBox(_ session: TwinMacNativeSession,
                              serverID: String, protocolCode: String,
+                             v2rayInboundID: String? = nil,
                              completion: @escaping (Result<Data, Error>) -> Void) {
         if protocolCode == "hysteria2" {
             prepareLocalHysteria2(session, serverID: serverID, completion: completion)
@@ -939,7 +940,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         guard let groups = response["server_groups"] as? [[String: Any]],
                               groups.count <= 200,
                               let config = self.reviewedXrayForServer(
-                                groups, serverID: serverID) else {
+                                groups, serverID: serverID,
+                                inboundID: v2rayInboundID ?? "tcp_tls") else {
                             completion(.failure(TwinMacNativeError.failure(
                                 "XRAY_PROFILE_NOT_READY")))
                             return
@@ -1350,7 +1352,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     // selected entitled node, preferring TCP TLS then WS TLS then XHTTP Reality.
     // Never use unknown transports, gRPC, custom routes or insecure TLS.
     private func reviewedXrayForServer(_ groups: [[String: Any]],
-                                       serverID: String) -> Data? {
+                                       serverID: String,
+                                       inboundID: String) -> Data? {
         let matching = groups.filter { group in
             if let id = group["node_id"] as? String { return id == serverID }
             if let id = group["node_id"] as? Int { return String(id) == serverID }
@@ -1359,17 +1362,14 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         guard matching.count == 1,
               let profiles = matching[0]["profiles"] as? [[String: Any]],
               profiles.count <= 8 else { return nil }
-        let priority = ["tcp_tls", "websocket_tls", "xhttp_reality"]
-        for id in priority {
-            for row in profiles where (row["id"] as? String) == id {
-                guard let uri = row["uri"] as? String,
-                      uri.utf8.count <= 8192 else { continue }
-                if let result = reviewedXrayVLESSUri(uri, profileID: id) {
-                    return result
-                }
-            }
+        // Never silently switch the user's choice to a different inbound.
+        guard ["tcp_tls", "websocket_tls", "xhttp_reality"].contains(inboundID),
+              let row = profiles.first(where: { ($0["id"] as? String) == inboundID }),
+              profiles.filter({ ($0["id"] as? String) == inboundID }).count == 1,
+              let uri = row["uri"] as? String, uri.utf8.count <= 8192 else {
+            return nil
         }
-        return nil
+        return reviewedXrayVLESSUri(uri, profileID: inboundID)
     }
 
     private func reviewedXrayVLESSUri(_ raw: String,
