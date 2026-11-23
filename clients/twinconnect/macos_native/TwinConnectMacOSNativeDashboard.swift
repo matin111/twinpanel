@@ -1427,10 +1427,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               (openVPNSystemRouteVerified ? "◉  Connected · OpenVPN" :
                "◉  OpenVPN · Tunnel only") :
              (wireGuardSystemRouteVerified ? "◉  Connected · WireGuard" :
+              ((wireGuardProbeBusy || wireGuardProbeTask != nil) ?
+               "◌  Connecting…" :
               (ciscoSystemRouteVerified ? "◉  Connected · Cisco" :
               (ciscoTunnelTask != nil ?
                "◌  Connecting…" :
-              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline"))))),
+              (fullTunActive ? "◉  TUN running · unverified" : "◌  Offline")))))),
             color: (localProxyActive || openVPNAppSessionActive ||
                     ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
@@ -1648,11 +1650,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (openVPNAppSessionActive ?
               (openVPNSystemRouteVerified ? "Connected · OpenVPN" : "Tunnel only") :
              (wireGuardSystemRouteVerified ? "Connected · WireGuard" :
+              ((wireGuardProbeBusy || wireGuardProbeTask != nil) ? "Connecting…" :
               (ciscoSystemRouteVerified ? "Connected · Cisco" :
               (ciscoTunnelTask != nil ? "Connecting…" :
-               (fullTunActive ? "TUN running · unverified" : "Disconnected"))))),
+               (fullTunActive ? "TUN running · unverified" : "Disconnected")))))),
             color: (localProxyActive || openVPNSystemRouteVerified ||
-                    ciscoSystemRouteVerified) ? sea : muted))
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
