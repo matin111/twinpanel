@@ -403,6 +403,59 @@ def cisco_verified_probe(baseline_interfaces: dict[str, str]) -> str:
         return "CISCO_EGRESS_TEST_UNAVAILABLE"
 
 
+def cisco_independent_egress_probe(baseline_interfaces: dict[str, str]) -> str:
+    """Verify a SECOND external network without changing default route or DNS.
+
+    Cloudflare-only success is insufficient evidence for a usable full VPN.
+    DNS over HTTPS is addressed by fixed IPv4 with TLS hostname pinning via
+    curl --resolve; the host route exists only for the bounded guard lease.
+    """
+    available = cisco_tun_interfaces()
+    created = [name for name in available
+               if baseline_interfaces.get(name) != available[name]]
+    if len(created) != 1:
+        return "CISCO_SECOND_EGRESS_TUN_NOT_IDENTIFIED"
+    interface = created[0]
+    guard = ["/usr/bin/python3", CISCO_HOST_GUARD]
+    target = "8.8.8.8"
+    trial = subprocess.run([*guard, "probe-host", interface, target],
+                           capture_output=True, text=True, timeout=12,
+                           check=False)
+    if trial.returncode or trial.stdout.strip() != "CISCO_HOST_EGRESS_TRIAL_ACTIVE":
+        return "CISCO_SECOND_EGRESS_GUARD_REFUSED"
+    try:
+        before = cisco_tun_counters(interface)
+        response = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--resolve", "dns.google:443:8.8.8.8",
+             "--connect-timeout", "4", "--max-time", "10",
+             "https://dns.google/resolve?name=example.com&type=A"],
+            capture_output=True, text=True, timeout=12, check=False)
+        after = cisco_tun_counters(interface)
+        if response.returncode:
+            if before and after:
+                if after[1] <= before[1]:
+                    return "CISCO_SECOND_EGRESS_NO_OUTBOUND"
+                if after[0] <= before[0]:
+                    return "CISCO_SECOND_EGRESS_NO_RETURN"
+            return "CISCO_SECOND_EGRESS_HTTPS_FAILED"
+        try:
+            parsed = json.loads(response.stdout)
+        except (ValueError, TypeError):
+            return "CISCO_SECOND_EGRESS_INVALID_RESPONSE"
+        if parsed.get("Status") != 0 or not parsed.get("Answer"):
+            return "CISCO_SECOND_EGRESS_INVALID_RESPONSE"
+        return "CISCO_MULTINET_EGRESS_VERIFIED"
+    except (OSError, subprocess.TimeoutExpired):
+        return "CISCO_SECOND_EGRESS_UNAVAILABLE"
+    finally:
+        recovered = subprocess.run(
+            [*guard, "rollback"], capture_output=True,
+            text=True, timeout=12, check=False)
+        if recovered.returncode or "ROLLBACK_VERIFIED" not in recovered.stdout:
+            raise ValueError("CISCO_SECOND_EGRESS_ROLLBACK_INCOMPLETE")
+
+
 def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
     """Connect through isolated Cisco TUN, then verify data before full IPv4.
 
@@ -481,6 +534,15 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
         if egress_reason is None:
             raise ValueError("CISCO_UNROUTED_TUNNEL_TIMEOUT")
         if egress_reason != "CISCO_EGRESS_VERIFIED":
+            return 1
+        # Confirm the Cisco server actually forwards traffic beyond the
+        # Cloudflare IP used by the original probe. A single successful
+        # domain is not a reliable system-VPN readiness test.
+        second = cisco_independent_egress_probe(initial_interfaces)
+        record_cisco_result(second)
+        print(json.dumps({"state": "cisco_second_egress_probe",
+                          "reason": second, "vpn_connected": False}), flush=True)
+        if second != "CISCO_MULTINET_EGRESS_VERIFIED":
             return 1
         if not system_vpn:
             return 0
