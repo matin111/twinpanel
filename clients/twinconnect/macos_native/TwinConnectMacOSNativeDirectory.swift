@@ -1040,7 +1040,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                               groups.count <= 200,
                               let config = self.reviewedXrayForServer(
                                 groups, serverID: serverID,
-                                inboundID: v2rayInboundID ?? "tcp_tls") else {
+                                inboundID: v2rayInboundID ?? "websocket_tls") else {
                             completion(.failure(TwinMacNativeError.failure(
                                 "XRAY_PROFILE_NOT_READY")))
                             return
