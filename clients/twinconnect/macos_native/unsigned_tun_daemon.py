@@ -282,9 +282,15 @@ class Session:
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
                         validate_full_tun_config(path)
-                    subprocess.run([str(engine), "check", "-c", str(path)],
-                                   check=True, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, timeout=20)
+                    try:
+                        subprocess.run([str(engine), "check", "-c", str(path)],
+                                       check=True, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL, timeout=20)
+                    except subprocess.CalledProcessError:
+                        # Never echo sing-box output: it may contain secrets.
+                        raise ValueError("SINGBOX_CONFIG_REJECTED") from None
+                    except subprocess.TimeoutExpired:
+                        raise ValueError("SINGBOX_CONFIG_CHECK_TIMEOUT") from None
                     command = [str(engine), "run", "-c", str(path)]
                 child = subprocess.Popen(command,
                                          stdin=subprocess.DEVNULL,
@@ -316,9 +322,11 @@ class Session:
                 # macOS installed a utun route, with a short bounded startup
                 # window; never treat this as proof of remote HTTPS egress.
                 route_observed = False
-                for _ in range(12):
-                    if child.poll() is not None or watcher.poll() is not None:
-                        break
+                for _ in range(32):
+                    if child.poll() is not None:
+                        raise ValueError("TUN_ENGINE_EXITED_BEFORE_ROUTE")
+                    if watcher.poll() is not None:
+                        raise ValueError("TUN_WATCHDOG_EXITED_BEFORE_ROUTE")
                     if observe_route()["route_state"] == "utun_route_observed_unverified":
                         route_observed = True
                         break
