@@ -23,7 +23,7 @@ if [[ -e "$destination" &&
       ! -f "$destination/macos_native/standalone_connection_manager.py" ]]; then
   echo "UNRECOGNIZED_EXISTING_RUNTIME_REFUSED" >&2; exit 2
 fi
-for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
+for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/l2tp_native_preflight.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
   if [[ ! -f "$source" || -L "$source" ]]; then
     echo "MISSING_OR_UNSAFE_RUNTIME_SOURCE: $source" >&2; exit 2
   fi
@@ -42,6 +42,8 @@ install -m 0755 macos_native/cisco_openconnect_auth.py \
   "$stage/macos_native/cisco_openconnect_auth.py"
 install -m 0755 macos_native/unsigned_tun_client.py \
   "$stage/macos_native/unsigned_tun_client.py"
+install -m 0755 macos_native/l2tp_native_preflight.py \
+  "$stage/macos_native/l2tp_native_preflight.py"
 install -m 0644 macos_native/openvpn_profile_review.py \
   "$stage/macos_native/openvpn_profile_review.py"
 install -m 0644 macos_native/openvpn_traffic_telemetry.py \
