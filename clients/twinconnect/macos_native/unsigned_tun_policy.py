@@ -79,6 +79,12 @@ def validate_full_tun_config(file: Path) -> dict:
     outbounds = obj.get("outbounds")
     if not isinstance(route, dict) or not isinstance(outbounds, list):
         raise ValueError("PROXY_ROUTE_REQUIRED")
+    # When auto_route is enabled the sing-box dialer must bind its outbound
+    # sockets to the original NIC; otherwise it can tunnel its own transport.
+    if route.get("auto_detect_interface") is not True:
+        raise ValueError("TUN_OUTBOUND_INTERFACE_BIND_REQUIRED")
+    if route.get("default_interface") is not None:
+        raise ValueError("TUN_AMBIGUOUS_INTERFACE_BINDING")
     tag = route.get("final")
     matches = [o for o in outbounds if isinstance(o, dict) and o.get("tag") == tag]
     if len(matches) != 1 or matches[0].get("type") in ("direct", "block", "dns"):
