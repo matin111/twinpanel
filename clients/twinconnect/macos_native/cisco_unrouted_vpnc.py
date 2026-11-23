@@ -9,13 +9,59 @@ interface is configured. This is NOT a system-wide VPN.
 from __future__ import annotations
 
 import ipaddress
+import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 
 IFCONFIG = "/sbin/ifconfig"
 TUN_NAME = re.compile(r"utun[0-9]{1,3}\Z")
+DNS_STATE = Path("/private/var/run/twinconnect-cisco-route-guard/tunnel-dns.json")
+
+
+def tunnel_dns(env: dict[str, str]) -> list[str]:
+    """Take only legitimate IPv4 DNS values OpenConnect supplies, no secrets."""
+    raw = [env.get("INTERNAL_IP4_DNS", "")]
+    raw.extend(env.get("INTERNAL_IP4_DNS" + str(i), "") for i in range(1, 5))
+    addresses: list[str] = []
+    for field in raw:
+        for token in re.split(r"[\s,;]+", field.strip()):
+            if not token:
+                continue
+            try:
+                parsed = ipaddress.IPv4Address(token)
+                if parsed.is_unspecified or parsed.is_loopback or parsed.is_multicast:
+                    continue
+                address = str(parsed)
+                if address not in addresses:
+                    addresses.append(address)
+            except ipaddress.AddressValueError:
+                continue
+    return addresses[:4]
+
+
+def store_tunnel_dns(interface: str, address: str, servers: list[str]) -> None:
+    """Root-only metadata used when the guarded connection changes macOS DNS."""
+    try:
+        root = DNS_STATE.parent
+        info = root.stat()
+        if root.is_symlink() or info.st_uid != 0 or info.st_mode & 0o077:
+            return
+        temp = root / "tunnel-dns.next"
+        fd = os.open(temp, os.O_CREAT | os.O_EXCL | os.O_WRONLY |
+                     os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"interface": interface, "address": address,
+                       "servers": servers, "timestamp": int(time.time())}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, DNS_STATE)
+    except OSError:
+        pass
+
 
 
 def validated_env(env: dict[str, str]) -> tuple[str, str, str, int]:
@@ -52,6 +98,7 @@ def execute(env: dict[str, str]) -> str:
         capture_output=True, timeout=8, check=False)
     if result.returncode:
         raise ValueError("CISCO_UTUN_CONFIG_FAILED")
+    store_tunnel_dns(name, address, tunnel_dns(env))
     return "CISCO_UTUN_CONFIGURED_UNROUTED"
 
 
