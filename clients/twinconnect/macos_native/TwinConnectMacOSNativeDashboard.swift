@@ -3734,6 +3734,49 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    private func refreshWireGuardRouteStatus() {
+        guard (wireGuardProbeTask != nil || wireGuardSystemRouteVerified),
+              !wireGuardRoutePollBusy,
+              Date().timeIntervalSince(wireGuardRouteLastPoll) >= 3 else { return }
+        wireGuardRoutePollBusy = true
+        wireGuardRouteLastPoll = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/python3",
+                "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py",
+                "status-uptime"]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let output = Pipe()
+            task.standardOutput = output
+            var result = Data()
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                result = output.fileHandleForReading.readDataToEndOfFile()
+            }
+            let status = (try? JSONSerialization.jsonObject(
+                with: Data(result.prefix(512)))) as? [String: Any]
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.wireGuardRoutePollBusy = false
+                let verified = self.wireGuardProbeTask != nil &&
+                    status?["state"] as? String == "connected"
+                let start = verified ? (status?["connected_at"] as? NSNumber).map {
+                    Date(timeIntervalSince1970: $0.doubleValue)
+                } : nil
+                let changed = verified != self.wireGuardSystemRouteVerified
+                let startChanged = start != self.wireGuardConnectedAt
+                if !changed && !startChanged { return }
+                self.wireGuardSystemRouteVerified = verified
+                self.wireGuardConnectedAt = start
+                self.wireGuardProbeStatus = verified ? "" : "WireGuard disconnected"
+                if changed { self.resetTrafficMetrics() }
+                self.view = self.build()
+            }
+        }
+    }
+
     // Real network metrics: read utun interface counters, actual IPv4 exit,
     // and a real ICMP latency probe. Never synthesize readings.
     private func refreshOpenVPNTelemetry() {
@@ -4391,6 +4434,35 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
     // Do not label a SOCKS listener as a connected system VPN.
     private func requestWireGuardProbe() {
+        if wireGuardProbeTask != nil || wireGuardSystemRouteVerified {
+            wireGuardProbeGeneration += 1
+            wireGuardProbeBusy = true
+            wireGuardProbeStatus = "Disconnecting WireGuard…"
+            view = build()
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                if (try? stop.run()) != nil { stop.waitUntilExit() }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.wireGuardProbeTask?.terminate()
+                    self.wireGuardProbeTask = nil
+                    self.wireGuardProbeBusy = false
+                    self.wireGuardSystemRouteVerified = false
+                    self.wireGuardConnectedAt = nil
+                    self.wireGuardProbeStatus = "WireGuard disconnected"
+                    self.resetTrafficMetrics()
+                    self.view = self.build()
+                }
+            }
+            return
+        }
         guard !wireGuardProbeBusy,
               ciscoTunnelTask == nil, !ciscoSystemRouteVerified,
               !openVPNAppSessionActive, !localProxyActive,
@@ -4432,7 +4504,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 DispatchQueue.global(qos: .userInitiated).async {
                     let task = Process()
                     task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-                    task.arguments = ["-n", "/usr/bin/python3", helper, "probe"]
+                    task.arguments = ["-n", "/usr/bin/python3", helper, "system"]
                     let input = Pipe()
                     let output = Pipe()
                     task.standardInput = input
@@ -4443,25 +4515,37 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         DispatchQueue.main.async {
                             if self.wireGuardProbeGeneration == generation {
                                 self.wireGuardProbeTask = task
+                                self.wireGuardProbeBusy = false
+                                self.wireGuardProbeStatus = "Connecting WireGuard…"
+                                self.view = self.build()
+                            } else {
+                                task.terminate()
                             }
                         }
                         input.fileHandleForWriting.write(payload)
                         input.fileHandleForWriting.closeFile()
                         let data = output.fileHandleForReading.readDataToEndOfFile()
                         task.waitUntilExit()
-                        let json = (try? JSONSerialization.jsonObject(
-                            with: Data(data.prefix(2048)))) as? [String: Any]
-                        let code = json?["reason"] as? String ?? "WG_PROBE_FAILED"
+                        let resultLines = (String(data: Data(data.prefix(16384)),
+                                                  encoding: .utf8) ?? "")
+                            .split(separator: "\n")
+                        let codes = resultLines.compactMap { line -> String? in
+                            guard let json = try? JSONSerialization.jsonObject(
+                                with: Data(line.utf8)) as? [String: Any] else { return nil }
+                            return json["reason"] as? String
+                        }
+                        let code = codes.last ?? "WG_ENGINE_EXITED"
                         DispatchQueue.main.async {
                             guard self.wireGuardProbeGeneration == generation else { return }
                             self.wireGuardProbeBusy = false
                             self.wireGuardProbeTask = nil
+                            self.wireGuardSystemRouteVerified = false
+                            self.wireGuardConnectedAt = nil
                             self.wireGuardProbeStatus =
-                                code == "WG_PEER_HANDSHAKE_VERIFIED_UNROUTED" ?
-                                "WireGuard handshake verified · system routing not enabled" :
-                                (code.range(of: "^WG_[A-Z0-9_]{3,80}$",
+                                code == "WG_SYSTEM_DISCONNECTED" ? "WireGuard disconnected" :
+                                (code.range(of: "^WG_[A-Z0-9_]{3,120}$",
                                             options: .regularExpression) != nil ?
-                                 code : "WG_PROBE_FAILED")
+                                 code : "WG_ENGINE_EXITED")
                             self.view = self.build()
                         }
                     } catch {
