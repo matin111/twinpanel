@@ -24,6 +24,7 @@ class XrayVlessTunCandidateTests(unittest.TestCase):
     def test_tls_vless_yields_tun_without_direct_fallback(self):
         result = convert(self.data)
         self.assertEqual(result["inbounds"][0]["type"], "tun")
+        self.assertNotIn("interface_name", result["inbounds"][0])
         self.assertEqual(result["route"]["final"], "proxy")
         self.assertIs(result["route"]["auto_detect_interface"], True)
         self.assertEqual(len(result["outbounds"]), 1)
