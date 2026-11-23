@@ -1,5 +1,7 @@
 import copy
 import json
+import subprocess
+import tempfile
 from pathlib import Path
 import sys
 import unittest
@@ -32,6 +34,24 @@ class XrayVlessTunCandidateTests(unittest.TestCase):
             "realitySettings": {"serverName": "example.org", "publicKey": "abc",
                                 "shortId": "42", "fingerprint": "chrome"}}
         self.assertTrue(convert(self.data)["outbounds"][0]["tls"]["reality"]["enabled"])
+
+    def test_cli_stdin_emits_tun_json_without_writing_secrets(self):
+        source = Path(__file__).with_name("xray_unsigned_tun_candidate.py")
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, str(source), "--stdin"],
+                input=json.dumps(self.data).encode(), capture_output=True,
+                cwd=directory, check=False, timeout=10)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(json.loads(result.stdout)["inbounds"][0]["type"], "tun")
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_cli_rejects_malformed_profile_without_output(self):
+        source = Path(__file__).with_name("xray_unsigned_tun_candidate.py")
+        result = subprocess.run([sys.executable, str(source), "--stdin"],
+                                input=b'{}', capture_output=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b'')
 
     def test_invalid_variants_fail_closed(self):
         variants = []
