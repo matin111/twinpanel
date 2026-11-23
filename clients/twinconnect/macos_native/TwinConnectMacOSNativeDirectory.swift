@@ -1950,7 +1950,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                 // privileged routing is added with a recoverable console.
                 config["inbounds"] = [[
                     "type": "tun", "tag": "twin-tun",
-                    "interface_name": "twinconnect-test",
+                    // macOS will assign a valid utunN even in offline preflight.
                     "address": ["172.19.254.1/30"],
                     "auto_route": false,
                     "auto_redirect": false,
@@ -2020,7 +2020,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     "inbounds": [[
                         "type": "tun",
                         "tag": "twinconnect-tun",
-                        "interface_name": "twinconnect",
+                        // Darwin allocates utunN; a fixed non-utun name
+                        // crashes sing-box before its system route exists.
                         "address": ["172.19.0.1/30"],
                         "auto_route": true,
                         "auto_redirect": false,
