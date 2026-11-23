@@ -1429,7 +1429,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func updateConnectionDuration() {
         if fullTunActive, let startedAt = fullTunStartedAt {
-            proxyUptimeText?.stringValue = "◷  TUN trial  " +
+            proxyUptimeText?.stringValue = "◷  TUN session  " +
                 elapsedConnectionTime(startedAt)
             return
         }
@@ -1731,11 +1731,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if localProxyActive || openVPNSystemRouteVerified ||
            ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
            l2tpSystemRouteVerified || fullTunActive {
-            // TUN is an unverified 45-second trial, not a Connected VPN.
+            // TUN route existence is not proof of a verified VPN egress.
             let timing = stack(.horizontal, spacing: 8)
             let uptime = text(fullTunActive ?
-                (fullTunStartedAt.map { "◷  TUN trial  " +
-                    elapsedConnectionTime($0) } ?? "◷  TUN trial") :
+                (fullTunStartedAt.map { "◷  TUN session  " +
+                    elapsedConnectionTime($0) } ?? "◷  TUN session") :
                 verifiedConnectionStart.map { start in
                 "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
                          (wireGuardSystemRouteVerified ? "WireGuard" :
@@ -4916,7 +4916,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         self.fullTunActive = false
                         self.fullTunObservedExitIP = nil
                         self.fullTunStartedAt = nil
-                        self.status = "TUN trial stopped (45-second limit or engine exit)."
+                        self.status = "TUN session stopped or engine exited."
                         self.view = self.build()
                     }
                 } else if self.fullTunActive {
