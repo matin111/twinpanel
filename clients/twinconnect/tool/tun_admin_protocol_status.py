@@ -53,7 +53,24 @@ def current_protocol(root=ROOT, ps_output=None):
                   if isinstance(row, dict) and row.get("tag") == "proxy"]
         if len(tagged) != 1:
             return None
-        return ALLOWED.get(tagged[0].get("type"))
+        primary = tagged[0]
+        if primary.get("type") == "shadowsocks":
+            # A legitimate ShadowTLS profile is a chain. The primary route
+            # is tagged "proxy" (Shadowsocks), while the transport is a
+            # distinct ShadowTLS v3 outbound referenced by the detour tag.
+            # Don't mislabel an unrelated Shadowsocks configuration.
+            if len(outbounds) != 2:
+                return None
+            detour = primary.get("detour")
+            if not isinstance(detour, str) or not detour:
+                return None
+            transport = [row for row in outbounds
+                         if isinstance(row, dict) and
+                         row.get("tag") == detour and
+                         row.get("type") == "shadowtls" and
+                         row.get("version") == 3]
+            return "shadowtls" if len(transport) == 1 else None
+        return ALLOWED.get(primary.get("type"))
     except (OSError, ValueError, TypeError, subprocess.SubprocessError):
         return None
 
