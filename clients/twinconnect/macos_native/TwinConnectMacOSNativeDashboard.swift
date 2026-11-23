@@ -625,6 +625,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Experimental, separately installed root-owned local-console TUN service.
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
+    private var fullTunObservedExitIP: String?
+    private var fullTunStartedAt: Date?
     private var openVPNAppSessionActive = false
     private var openVPNSystemRouteVerified = false
     private var openVPNExitIP: String?
@@ -1422,6 +1424,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func updateConnectionDuration() {
+        if fullTunActive, let startedAt = fullTunStartedAt {
+            proxyUptimeText?.stringValue = "◷  TUN trial  " +
+                elapsedConnectionTime(startedAt)
+            return
+        }
         if let startedAt = verifiedConnectionStart {
             let protocolName = l2tpSystemRouteVerified ? "L2TP" :
                 (wireGuardSystemRouteVerified ? "WireGuard" :
@@ -1707,17 +1714,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         header.addArrangedSubview(pill(
             verifiedNetworkConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
-                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+                    fullTunBusy) ? sea : muted))
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
         if localProxyActive || openVPNSystemRouteVerified ||
            ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-           l2tpSystemRouteVerified {
-            // Proxy and VPN telemetry use separate verified sources.
+           l2tpSystemRouteVerified || fullTunActive {
+            // TUN is an unverified 45-second trial, not a Connected VPN.
             let timing = stack(.horizontal, spacing: 8)
-            let uptime = text(verifiedConnectionStart.map { start in
+            let uptime = text(fullTunActive ?
+                (fullTunStartedAt.map { "◷  TUN trial  " +
+                    elapsedConnectionTime($0) } ?? "◷  TUN trial") :
+                verifiedConnectionStart.map { start in
                 "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
                          (wireGuardSystemRouteVerified ? "WireGuard" :
                          (ciscoSystemRouteVerified ? "Cisco" :
@@ -1734,18 +1745,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
-                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                value: fullTunActive ? "—" :
+                    ((openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
                         wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
-                    openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—" :
-                    pingText(selected),
+                    (openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—") :
+                    pingText(selected)),
                 valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
                              wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     sea : pingColor(selected)))
             network.addArrangedSubview(networkMetric("IP Address",
-                value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                value: fullTunActive ? (fullTunObservedExitIP ?? "—") :
+                    ((openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
                         wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     (openVPNExitIP ?? "—") :
-                    (localProxyExitIP ?? "—")))
+                    (localProxyExitIP ?? "—"))))
             content.addArrangedSubview(network)
             network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             let traffic = stack(.horizontal, spacing: 10)
@@ -4320,6 +4333,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         } catch { return (nil, "VLESS_CONVERTER_EXEC_FAILED") }
     }
 
+    private func tunRouteIsRunning(_ raw: String) -> Bool {
+        guard tunResponseIs(raw, state: "engine_running_unverified"),
+              let data = raw.data(using: .utf8),
+              let payload = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+        return payload["owner_present"] as? Bool == true &&
+               payload["route_state"] as? String == "utun_route_observed_unverified"
+    }
+
     private func tunResponseIs(_ raw: String, state: String) -> Bool {
         guard let data = raw.data(using: .utf8),
               let response = (try? JSONSerialization.jsonObject(with: data))
@@ -4684,6 +4706,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func startFullTun(_ session: TwinMacNativeSession,
                               serverID: String, protocolCode: String) {
+        fullTunObservedExitIP = nil
+        fullTunStartedAt = nil
         fullTunBusy = true
         localProxyGeneration += 1
         let generation = localProxyGeneration
@@ -4714,6 +4738,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     let response: (Int32, String) = reviewed.map {
                         self.runFullTunClient("start", profile: $0)
                     } ?? (1, "")
+                    // If the controller accepted the first request but the
+                    // next start reports ALREADY_RUNNING, reconcile against
+                    // the actual kernel route rather than showing Offline.
+                    // This status query never changes routes or starts VPNs.
+                    let observed: (Int32, String) =
+                        reviewed != nil && !self.tunRouteIsRunning(response.1) ?
+                            self.runFullTunClient("status") : response
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.fullTunBusy = false
@@ -4724,11 +4755,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             }
                             return
                         }
-                        self.fullTunActive = response.0 == 0 &&
-                            self.tunResponseIs(response.1,
-                                               state: "engine_running_unverified")
+                        self.fullTunActive = reviewed != nil &&
+                            self.tunRouteIsRunning(observed.1)
                         if self.fullTunActive {
-                            self.status = "TUN engine running; system VPN NOT verified."
+                            self.fullTunStartedAt = Date()
+                            self.status = "TUN route running; HTTPS egress not yet verified."
                         } else if reviewed == nil {
                             self.status = "V2Ray TUN: " + conversionReason
                             self.recordProxyAttempt(protocolCode, conversionReason)
@@ -4762,6 +4793,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                            "system_https_reachable",
                                        let address = state["observed_exit_ip"] as? String,
                                        address.count <= 64 {
+                                        self.fullTunObservedExitIP = address
                                         self.status = "System HTTPS reachable via TUN route; exit IP: " +
                                             address + ". Full VPN not yet verified."
                                     } else {
@@ -4804,6 +4836,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if result.0 != 0 ||
                    !self.tunResponseIs(result.1, state: "engine_running_unverified") {
                     self.fullTunActive = false
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunStartedAt = nil
                     self.status = "TUN service stopped or unavailable."
                     self.view = self.build()
                 }
