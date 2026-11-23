@@ -79,7 +79,8 @@ class TUNDaemonControlTests(unittest.TestCase):
             self.assertFalse(server.vps_mode())
         source = (DIR / "unsigned_tun_daemon.py").read_text()
         self.assertIn("if vps_mode():", source)
-        self.assertIn("profile = guard_candidate(profile)", source)
+        self.assertIn("profile = guard_candidate(", source)
+        self.assertIn("dns_servers=system_dns_resolvers()", source)
         self.assertNotIn("if session_limit() == VPS_SESSION:", source)
 
     def test_unix_peer_uid_uses_kernel_credentials(self):
