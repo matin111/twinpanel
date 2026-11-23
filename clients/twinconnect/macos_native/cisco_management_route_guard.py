@@ -140,6 +140,32 @@ def status() -> str:
              "CISCO_MANAGEMENT_PIN_IDLE"))
 
 
+def status_uptime() -> str:
+    """Read-only genuine connection start; never confuse TTL with uptime."""
+    current = load()
+    if current.get("mode") != "leased" or time.time() >= current.get("deadline", 0):
+        return json.dumps({"state": "disconnected"})
+    started = current.get("connected_at")
+    if not isinstance(started, (int, float)) or not 0 < started <= time.time():
+        # Existing active sessions predate the stored connected_at field.
+        # Read only a root-owned, private, verified connection result.
+        try:
+            source = ROOT / "last-result.json"
+            info = os.lstat(source)
+            if info.st_uid == 0 and info.st_mode & 0o077 == 0 and info.st_nlink == 1:
+                last = json.loads(source.read_text())
+                recorded = last.get("timestamp")
+                if (last.get("reason") == "CISCO_SYSTEM_IPV4_CONNECTED" and
+                        isinstance(recorded, (int, float)) and
+                        0 < recorded <= time.time()):
+                    started = recorded
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    if not isinstance(started, (int, float)) or not 0 < started <= time.time():
+        return json.dumps({"state": "connected", "connected_at": None})
+    return json.dumps({"state": "connected", "connected_at": int(started)})
+
+
 def rollback() -> str:
     data = load()
     if not data:
@@ -561,6 +587,7 @@ def activate_full(interface: str, pid: int) -> str:
     if health != "CISCO_NAMED_HTTPS_VERIFIED":
         return health + "_" + rollback()
     state["mode"] = "leased"
+    state["connected_at"] = time.time()
     state["deadline"] = time.time() + LEASE_SECONDS
     store(state)
     return "CISCO_SYSTEM_IPV4_CONNECTED"
@@ -626,6 +653,9 @@ def main() -> int:
         return 0
     with LOCK.open("a+") as stream:
         fcntl.flock(stream, fcntl.LOCK_EX)
+        if sys.argv[1:] == ["status-uptime"]:
+            print(status_uptime(), flush=True)
+            return 0
         if sys.argv[1:] == ["status"]:
             result = status()
         elif sys.argv[1:] == ["preflight"]:
