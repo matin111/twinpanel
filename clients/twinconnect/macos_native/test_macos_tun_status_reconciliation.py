@@ -30,10 +30,24 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertNotIn('self.runFullTunClient("start"', poll)
         self.assertIn('(fullTunActive || activeProtocol == "v2ray")', poll)
 
+    def test_transient_status_error_does_not_fake_offline_or_connected(self):
+        start = UI.index('private func refreshFullTunStatus()')
+        end = UI.index('private func stopFullTun()', start)
+        poll = UI[start:end]
+        self.assertIn('let confirmedStopped = result.0 == 0 &&', poll)
+        self.assertIn('self.tunResponseIs(result.1, state: "stopped")', poll)
+        self.assertIn('self.fullTunStatusMisses += 1', poll)
+        self.assertIn('self.fullTunStatusUncertain = true', poll)
+        self.assertIn('self.fullTunStatusMisses >= 3', poll)
+        self.assertIn('TUN trial stopped (45-second limit or engine exit).', poll)
+        self.assertIn('if fullTunStatusUncertain { return "◌  Checking TUN…" }', UI)
+        self.assertIn('if fullTunStatusUncertain { return "Checking TUN…" }', UI)
+        self.assertIn('!fullTunStatusUncertain && !ciscoTunnelBusy', UI)
+
     def test_stopped_trial_clears_stale_ip_and_timer(self):
         self.assertIn('self.fullTunObservedExitIP = nil', UI)
         self.assertIn('self.fullTunStartedAt = nil', UI)
-        self.assertIn('TUN service stopped or unavailable.', UI)
+        self.assertIn('TUN trial stopped (45-second limit or engine exit).', UI)
 
 if __name__ == "__main__":
     unittest.main()
