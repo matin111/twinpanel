@@ -401,6 +401,42 @@ def openconnect_endpoint(pid: int) -> str | None:
     return next(iter(peers)) if len(peers) == 1 else None
 
 
+def verify_named_https_and_dns() -> str:
+    """Confirm ordinary applications can resolve names and fetch HTTPS.
+
+    Single-IP curl probes only prove tunnel forwarding, not macOS DNS.
+    Run this after installing guarded IPv4 routes and DNS; callers must
+    rollback immediately on any failure.
+    """
+    dns = run("/usr/bin/dig", "+time=2", "+tries=1",
+              "@1.1.1.1", "example.com", "A", "+short")
+    if dns.returncode:
+        return "CISCO_TUNNEL_DNS_UNREACHABLE"
+    addresses = []
+    for line in dns.stdout.splitlines():
+        try:
+            address = ipaddress.IPv4Address(line.strip())
+            if address.is_global:
+                addresses.append(str(address))
+        except ipaddress.AddressValueError:
+            continue
+    if not addresses:
+        return "CISCO_TUNNEL_DNS_INVALID"
+    try:
+        # Do NOT use --resolve: it would bypass the very DNS path being
+        # verified and could falsely report success during a DNS outage.
+        result = subprocess.run(
+            ["/usr/bin/curl", "--noproxy", "*", "-4", "-fsS",
+             "--connect-timeout", "3", "--max-time", "8",
+             "-o", "/dev/null", "https://example.com"],
+            capture_output=True, text=True, timeout=10, check=False)
+        if result.returncode:
+            return "CISCO_NAMED_HTTPS_FAILED"
+    except (OSError, subprocess.TimeoutExpired):
+        return "CISCO_NAMED_HTTPS_FAILED"
+    return "CISCO_NAMED_HTTPS_VERIFIED"
+
+
 def activate_full(interface: str, pid: int) -> str:
     """Lease full IPv4 only after the separately checked TUN egress succeeds."""
     if not re.fullmatch(r"utun[0-9]{1,4}", interface):
@@ -477,6 +513,9 @@ def activate_full(interface: str, pid: int) -> str:
     store(state)
     if run(NETWORKSETUP, "-setdnsservers", service, *DNS_SERVERS).returncode:
         return "CISCO_DNS_ACTIVATION_FAILED_" + rollback()
+    health = verify_named_https_and_dns()
+    if health != "CISCO_NAMED_HTTPS_VERIFIED":
+        return health + "_" + rollback()
     state["mode"] = "leased"
     state["deadline"] = time.time() + LEASE_SECONDS
     store(state)
