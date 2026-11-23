@@ -157,6 +157,21 @@ if [[ -f "$wg_source" && ! -L "$wg_source" && -x "$wg_source" ]]; then
 else
   echo "WIREGUARD_UNSIGNED_ENGINE_NOT_BUILT; OPTIONAL_RUNTIME_NOT_PACKAGED"
 fi
+# Optional unsigned native macOS L2TP SystemConfiguration helper.
+# This is a capability/provisioning tool, NOT an installed VPN or full route.
+l2tp_source="macos_native/build/l2tp/$arch/twinconnect-l2tp-native"
+if [[ -x "$l2tp_source" && ! -L "$l2tp_source" ]]; then
+  /usr/bin/lipo -archs "$l2tp_source" | tr ' ' '\n' |
+    grep -Fxq "$host_arch" || {
+      echo "L2TP_NATIVE_ARCH_MISMATCH" >&2; exit 3
+    }
+  mkdir -p "$stage/macos_native/build/l2tp/$arch"
+  install -m 0755 "$l2tp_source" \
+    "$stage/macos_native/build/l2tp/$arch/twinconnect-l2tp-native"
+  echo "L2TP_NATIVE_SERVICE_TOOL_PACKAGED: $arch"
+else
+  echo "L2TP_NATIVE_SERVICE_TOOL_NOT_BUILT"
+fi
 # Repeatable builds: replace only our own previously packaged directory.
 # Keep the previous runtime as rollback until the new copy is in place.
 backup=""
