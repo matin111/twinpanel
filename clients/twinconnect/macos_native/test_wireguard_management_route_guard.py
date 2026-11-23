@@ -70,10 +70,10 @@ class WatchdogTests(unittest.TestCase):
              patch.object(guard, "exact_routes", side_effect=lambda: set(routes)), \
              patch.object(guard, "route", return_value={"interface": "utun15"}), \
              patch.object(guard, "run", side_effect=fake_run), \
-             patch.object(guard.STATE, "unlink") as unlink:
+             patch.object(guard, "STATE") as state_path:
             self.assertEqual(guard.rollback(),
                              "WG_MANAGEMENT_PIN_ROLLBACK_VERIFIED")
-            unlink.assert_called_once()
+            state_path.unlink.assert_called_once()
 
     def test_refuses_parallel_legacy_vpn_after_handshake(self):
         with patch.object(guard, "wireguard_endpoint",
