@@ -118,7 +118,18 @@ static int selftest(void) {
         SCPreferencesUnlock(prefs);
         CFRelease(prefs); return 2;
     }
-    SCNetworkServiceRef service=SCNetworkServiceCreate(prefs,iface);
+    // A native L2TP service is PPP layered over L2TP layered over IPv4.
+    // SCNetworkServiceCreate rejects the L2TP bottom interface (SCError 1002).
+    SCNetworkInterfaceRef pppInterface=SCNetworkInterfaceCreateWithInterface(
+        iface,kSCNetworkInterfaceTypePPP);
+    if (!pppInterface) {
+        result(@"error",@"L2TP_NATIVE_PPP_INTERFACE_UNAVAILABLE");
+        CFRelease(iface);
+        SCPreferencesUnlock(prefs);
+        CFRelease(prefs);
+        return 2;
+    }
+    SCNetworkServiceRef service=SCNetworkServiceCreate(prefs,pppInterface);
     BOOL good=service != NULL;
     if (!good) {
         result(@"error",[NSString stringWithFormat:@"L2TP_NATIVE_SERVICE_ERROR_%d",SCError()]);
@@ -136,7 +147,7 @@ static int selftest(void) {
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
-        BOOL pppAccepted=SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp);
+        BOOL pppAccepted=SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp);
         BOOL ipsecAccepted=SCNetworkInterfaceSetExtendedConfiguration(
             iface,kSCEntNetIPSec,(__bridge CFDictionaryRef)ipsec);
         if (!pppAccepted) {
@@ -150,6 +161,7 @@ static int selftest(void) {
         }
     }
     if (service) {SCNetworkServiceRemove(service);CFRelease(service);}
+    CFRelease(pppInterface);
     CFRelease(iface);
     SCPreferencesUnlock(prefs);
     CFRelease(prefs);
@@ -176,6 +188,7 @@ static int prepareService(NSDictionary *profile) {
     SCNetworkServiceRef svc=NULL;
     SCNetworkSetRef set=SCNetworkSetCopyCurrent(prefs);
     SCNetworkInterfaceRef iface=NULL;
+    SCNetworkInterfaceRef pppInterface=NULL;
     do {
         if (!set) { result(@"error",@"L2TP_NETWORK_SET_UNAVAILABLE"); break; }
         SCNetworkServiceRef existing=findService(prefs);
@@ -187,7 +200,12 @@ static int prepareService(NSDictionary *profile) {
         iface=SCNetworkInterfaceCreateWithInterface(kSCNetworkInterfaceIPv4,
                                                    kSCNetworkInterfaceTypeL2TP);
         if (!iface) { result(@"error",@"L2TP_NATIVE_INTERFACE_UNAVAILABLE"); break; }
-        svc=SCNetworkServiceCreate(prefs,iface);
+        pppInterface=SCNetworkInterfaceCreateWithInterface(
+            iface,kSCNetworkInterfaceTypePPP);
+        if (!pppInterface) {
+            result(@"error",@"L2TP_NATIVE_PPP_INTERFACE_UNAVAILABLE"); break;
+        }
+        svc=SCNetworkServiceCreate(prefs,pppInterface);
         if (!svc) { result(@"error",@"L2TP_SERVICE_CREATE_FAILED"); break; }
         if (!SCNetworkServiceSetName(svc,(__bridge CFStringRef)ServiceName) ||
             !SCNetworkServiceEstablishDefaultConfiguration(svc)) {
@@ -204,7 +222,7 @@ static int prepareService(NSDictionary *profile) {
             (__bridge NSString*)kSCPropNetIPSecAuthenticationMethod:
                 (__bridge NSString*)kSCValNetIPSecAuthenticationMethodSharedSecret
         };
-        if (!SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp) ||
+        if (!SCNetworkInterfaceSetConfiguration(pppInterface,(__bridge CFDictionaryRef)ppp) ||
             !SCNetworkInterfaceSetExtendedConfiguration(iface,kSCEntNetIPSec,
                                                          (__bridge CFDictionaryRef)ipsec) ||
             !SCNetworkSetAddService(set,svc)) {
@@ -218,6 +236,7 @@ static int prepareService(NSDictionary *profile) {
     } while (0);
     if (code && svc) SCNetworkServiceRemove(svc);
     if (svc) CFRelease(svc);
+    if (pppInterface) CFRelease(pppInterface);
     if (iface) CFRelease(iface);
     if (set) CFRelease(set);
     SCPreferencesUnlock(prefs);
