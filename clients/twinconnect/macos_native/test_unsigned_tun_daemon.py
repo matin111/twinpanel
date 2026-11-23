@@ -26,6 +26,14 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def test_vps_trial_session_is_bounded(self):
+        with mock.patch.object(server, "APPROVAL",
+                               mock.Mock(read_text=lambda **_: "VPS_OOB_CONSOLE_45_SECONDS")):
+            self.assertEqual(server.session_limit(), 45)
+        with mock.patch.object(server, "APPROVAL",
+                               mock.Mock(read_text=lambda **_: "LOCAL_MAC_WITH_RECOVERY")):
+            self.assertEqual(server.session_limit(), 600)
+
     def test_console_owner_required(self):
         self.assertTrue(server.allowed_uid(501, 501))
         self.assertFalse(server.allowed_uid(502, 501))
