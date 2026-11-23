@@ -36,6 +36,24 @@ class XrayVlessTunCandidateTests(unittest.TestCase):
                                 "shortId": "42", "fingerprint": "chrome"}}
         self.assertTrue(convert(self.data)["outbounds"][0]["tls"]["reality"]["enabled"])
 
+    def test_websocket_tls_supports_path_and_host(self):
+        self.data["outbounds"][0]["streamSettings"] = {
+            "network": "ws", "security": "tls",
+            "tlsSettings": {"serverName": "vpn.example.org"},
+            "wsSettings": {"path": "/tunnel", "headers": {"Host": "edge.example.org"}}}
+        result = convert(self.data)
+        self.assertEqual(result["outbounds"][0]["transport"],
+                         {"type": "ws", "path": "/tunnel",
+                          "headers": {"Host": "edge.example.org"}})
+
+    def test_websocket_rejects_malformed_host(self):
+        self.data["outbounds"][0]["streamSettings"] = {
+            "network": "ws", "security": "tls",
+            "tlsSettings": {"serverName": "vpn.example.org"},
+            "wsSettings": {"path": "/tunnel", "headers": {"Host": "bad\rhost"}}}
+        with self.assertRaisesRegex(ValueError, "WS_HOST_INVALID"):
+            convert(self.data)
+
     def test_cli_stdin_emits_tun_json_without_writing_secrets(self):
         source = Path(__file__).with_name("xray_unsigned_tun_candidate.py")
         with tempfile.TemporaryDirectory() as directory:
