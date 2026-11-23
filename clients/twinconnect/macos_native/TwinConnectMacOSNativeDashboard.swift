@@ -1469,7 +1469,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         offlineRow.addArrangedSubview(pill(
             verifiedHeroConnectionLabel,
             color: (localProxyActive || openVPNSystemRouteVerified ||
-                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified) ? sea : muted))
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+                    l2tpSystemRouteVerified) ? sea : muted))
         offlineRow.addArrangedSubview(trailingSpace)
         leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
             .isActive = true
@@ -1537,7 +1538,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
-        if localProxyActive || ciscoSystemRouteVerified || wireGuardSystemRouteVerified {
+        if localProxyActive || ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+           l2tpSystemRouteVerified {
             // More vivid green state like the shared Windows design, while
             // still representing ONLY a verified SOCKS proxy.
             let mint = NSColor(calibratedRed: 0.07, green: 0.82,
@@ -1685,9 +1687,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             // Proxy and VPN telemetry use separate verified sources.
             let timing = stack(.horizontal, spacing: 8)
             let uptime = text(verifiedConnectionStart.map { start in
-                "◷  " + (wireGuardSystemRouteVerified ? "WireGuard" :
+                "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
+                         (wireGuardSystemRouteVerified ? "WireGuard" :
                          (ciscoSystemRouteVerified ? "Cisco" :
-                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle))) +
+                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)))) +
                 "  " + elapsedConnectionTime(start)
             } ?? "◷  Connected", size: 12, color: muted)
             proxyUptimeText = uptime
@@ -1701,15 +1704,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             network.distribution = .fillEqually
             network.addArrangedSubview(networkMetric("Ping",
                 value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
-                        wireGuardSystemRouteVerified) ?
+                        wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—" :
                     pingText(selected),
                 valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
-                             wireGuardSystemRouteVerified) ?
+                             wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     sea : pingColor(selected)))
             network.addArrangedSubview(networkMetric("IP Address",
                 value: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
-                        wireGuardSystemRouteVerified) ?
+                        wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
                     (openVPNExitIP ?? "—") :
                     (localProxyExitIP ?? "—")))
             content.addArrangedSubview(network)
