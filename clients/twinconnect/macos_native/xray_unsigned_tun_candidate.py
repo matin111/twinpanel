@@ -2,7 +2,7 @@
 """Prepare an OFFLINE sing-box TUN candidate from one Xray VLESS outbound.
 
 Does not start an engine, touch routes, persist secrets, or claim VPN connectivity.
-Only explicitly reviewed TCP/TLS or TCP/REALITY streams are supported.
+Only explicitly reviewed TCP/TLS, TCP/REALITY or WS/TLS streams are supported.
 """
 from __future__ import annotations
 
@@ -51,13 +51,19 @@ def convert(data: dict) -> dict:
     if set(user) - {"id", "encryption", "flow", "level", "email"}:
         raise ValueError("VLESS_USER_FIELDS_UNSUPPORTED")
     stream = outbound.get("streamSettings")
-    if not isinstance(stream, dict) or stream.get("network", "tcp") != "tcp":
+    if not isinstance(stream, dict):
+        raise ValueError("VLESS_TRANSPORT_UNSUPPORTED")
+    transport = stream.get("network", "tcp")
+    if transport not in ("tcp", "ws"):
         raise ValueError("VLESS_TRANSPORT_UNSUPPORTED")
     sec = stream.get("security")
-    if sec not in ("tls", "reality"):
+    if sec not in ("tls", "reality") or (transport == "ws" and sec != "tls"):
         raise ValueError("VLESS_SECURE_TRANSPORT_REQUIRED")
     sec_key = "tlsSettings" if sec == "tls" else "realitySettings"
-    if set(stream) - {"network", "security", sec_key}:
+    allowed = {"network", "security", sec_key}
+    if transport == "ws":
+        allowed.add("wsSettings")
+    if set(stream) - allowed:
         raise ValueError("VLESS_STREAM_FIELDS_UNSUPPORTED")
     opts = stream.get(sec_key)
     if not isinstance(opts, dict):
@@ -84,6 +90,29 @@ def convert(data: dict) -> dict:
         tls["utls"] = {"enabled": True, "fingerprint": opts["fingerprint"]}
     proxy = {"type": "vless", "tag": "proxy", "server": node["address"],
              "server_port": node["port"], "uuid": user["id"], "tls": tls}
+    if transport == "ws":
+        if user.get("flow"):
+            raise ValueError("VLESS_WS_FLOW_UNSUPPORTED")
+        ws = stream.get("wsSettings")
+        if not isinstance(ws, dict) or set(ws) - {"path", "headers"}:
+            raise ValueError("VLESS_WS_SETTINGS_UNSUPPORTED")
+        path = ws.get("path")
+        if (not isinstance(path, str) or not path.startswith("/")
+                or len(path.encode("utf-8")) > 1024
+                or "\r" in path or "\n" in path):
+            raise ValueError("VLESS_WS_PATH_INVALID")
+        transport_out = {"type": "ws", "path": path}
+        headers = ws.get("headers", {})
+        if not isinstance(headers, dict) or set(headers) - {"Host"}:
+            raise ValueError("VLESS_WS_HEADERS_UNSUPPORTED")
+        if "Host" in headers:
+            host = headers["Host"]
+            if (not isinstance(host, str) or not host
+                    or len(host.encode("utf-8")) > 255
+                    or any(c in host for c in ("\r", "\n", "/", " "))):
+                raise ValueError("VLESS_WS_HOST_INVALID")
+            transport_out["headers"] = {"Host": host}
+        proxy["transport"] = transport_out
     if user.get("flow"):
         if user["flow"] != "xtls-rprx-vision":
             raise ValueError("VLESS_FLOW_UNSUPPORTED")
