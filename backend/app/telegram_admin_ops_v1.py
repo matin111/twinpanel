@@ -35,7 +35,7 @@ def _home():
         [InlineKeyboardButton(text="🧾 رسیدهای تأییدنشده", callback_data="adm:review")],
         [InlineKeyboardButton(text="🔎 کاربران و اشتراک‌ها", callback_data="adm:lookup")],
         [InlineKeyboardButton(text="📢 ارسال پیام همگانی", callback_data="adm:broadcast")],
-        [InlineKeyboardButton(text="💻 کانکشن هوشمند مک (Intel)", url="https://t.me/twin_connect1/8")],
+        [InlineKeyboardButton(text="📚 آموزش و دانلود", callback_data="mlearn:g:root")],
         [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home")],
     ])
 
