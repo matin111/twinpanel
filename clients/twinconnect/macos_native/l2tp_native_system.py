@@ -139,6 +139,41 @@ def check_probe(interface: str, destination: str) -> None:
             raise ValueError("L2TP_PROBE_ROLLBACK_UNVERIFIED")
 
 
+def verify_ipsec_peer(endpoint: str) -> bool:
+    """Check the two mature ESP transport SAs for the selected server.
+    The SAD output can include key material; it never leaves this function.
+    """
+    try:
+        result = subprocess.run(["/usr/sbin/setkey", "-D"], capture_output=True,
+                                text=True, timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        return False
+    if result.returncode or len(result.stdout)>262144:
+        return False
+    pairs=set()
+    for record in re.split(r"(?m)\n(?=\S)",result.stdout.strip()):
+        lines=record.splitlines()
+        if not lines:
+            continue
+        match=re.fullmatch(r"\s*([0-9.]+)(?:\[[0-9]+\])?\s+([0-9.]+)(?:\[[0-9]+\])?\s*",lines[0])
+        if not match:
+            continue
+        source,dest=match.groups()
+        try:
+            source=str(ipaddress.IPv4Address(source))
+            dest=str(ipaddress.IPv4Address(dest))
+        except ValueError:
+            continue
+        body="\n".join(lines[1:])
+        if (not re.search(r"(?m)^\s+esp\s",body) or
+                not re.search(r"\bmode=transport\b",body) or
+                not re.search(r"\bstate=mature\b",body)):
+            continue
+        pairs.add((source,dest))
+    return any(dest==endpoint and source!=endpoint and (dest,source) in pairs
+               for source,dest in pairs)
+
+
 def full_connection(payload: dict) -> None:
     if guard("preflight") != "L2TP_MANAGEMENT_PRECHECK_READY":
         raise ValueError("L2TP_PREFLIGHT_FAILED")
@@ -168,6 +203,8 @@ def full_connection(payload: dict) -> None:
                 break
     if interface is None:
         raise ValueError("L2TP_PPP_HANDSHAKE_TIMEOUT")
+    if not verify_ipsec_peer(address):
+        raise ValueError("L2TP_IPSEC_ENDPOINT_MISMATCH")
     for destination in ("1.1.1.1", "8.8.8.8"):
         check_probe(interface, destination)
     if guard("activate", interface, timeout=30) != "L2TP_SYSTEM_IPV4_CONNECTED":

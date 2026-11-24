@@ -307,7 +307,7 @@ static int stopService(void) {
     return ok?0:2;
 }
 
-static BOOL routeWatchdogArmed(void) {
+static BOOL routeWatchdogArmed(NSString *endpoint) {
     NSString *path=@"/private/var/run/twinconnect-l2tp-route-guard/state.json";
     struct stat info;
     if (lstat(path.UTF8String,&info)!=0 || !S_ISREG(info.st_mode) ||
@@ -316,14 +316,45 @@ static BOOL routeWatchdogArmed(void) {
     NSData *data=[NSData dataWithContentsOfFile:path];
     NSDictionary *obj=[NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     if (![obj isKindOfClass:NSDictionary.class]) return NO;
-    if (![obj[@"mode"] isEqual:@"armed"]) return NO;
+    if (![obj[@"mode"] isEqual:@"armed"] || ![obj[@"endpoint"] isEqual:endpoint]) return NO;
     NSNumber *deadline=obj[@"deadline"];
     return [deadline isKindOfClass:NSNumber.class] &&
         deadline.doubleValue > [[NSDate date] timeIntervalSince1970];
 }
 
+// Refresh only our disconnected L2TP service. Preserve unrelated settings;
+// never put the supplied password or PSK into SystemConfiguration preferences.
+static BOOL synchronizeSelectedEndpoint(NSDictionary *profile) {
+    SCPreferencesRef prefs=SCPreferencesCreate(NULL, CFSTR("TwinConnectL2TP"), NULL);
+    if (!prefs) return NO;
+    if (!SCPreferencesLock(prefs,TRUE)) { CFRelease(prefs); return NO; }
+    SCNetworkServiceRef svc=findService(prefs);
+    BOOL ok=NO;
+    if (svc) {
+        SCNetworkInterfaceRef iface=SCNetworkServiceGetInterface(svc);
+        CFStringRef type=iface ? SCNetworkInterfaceGetInterfaceType(iface) : NULL;
+        SCNetworkInterfaceRef lower=iface ? SCNetworkInterfaceGetInterface(iface) : NULL;
+        CFStringRef lowerType=lower ? SCNetworkInterfaceGetInterfaceType(lower) : NULL;
+        if (type && lowerType && CFEqual(type,kSCNetworkInterfaceTypePPP) &&
+            CFEqual(lowerType,kSCNetworkInterfaceTypeL2TP)) {
+            CFDictionaryRef old=SCNetworkInterfaceGetConfiguration(iface);
+            NSMutableDictionary *ppp=old ? [(__bridge NSDictionary*)old mutableCopy] :
+                                            [NSMutableDictionary dictionary];
+            ppp[(__bridge NSString*)kSCPropNetPPPCommRemoteAddress]=profile[@"server"];
+            ppp[(__bridge NSString*)kSCPropNetPPPAuthName]=profile[@"username"];
+            [ppp removeObjectForKey:(__bridge NSString*)kSCPropNetPPPAuthPassword];
+            ok=SCNetworkInterfaceSetConfiguration(iface,(__bridge CFDictionaryRef)ppp) &&
+               SCPreferencesCommitChanges(prefs) && SCPreferencesApplyChanges(prefs);
+        }
+        CFRelease(svc);
+    }
+    SCPreferencesUnlock(prefs);
+    CFRelease(prefs);
+    return ok;
+}
+
 static int connectService(NSDictionary *profile) {
-    if (geteuid()!=0 || !noParallelVPN() || !routeWatchdogArmed()) {
+    if (geteuid()!=0 || !noParallelVPN() || !routeWatchdogArmed(profile[@"server"])) {
         result(@"error",@"L2TP_INDEPENDENT_ROUTE_GUARD_REQUIRED");
         return 2;
     }
@@ -334,10 +365,23 @@ static int connectService(NSDictionary *profile) {
         CFRelease(conn);
         return 2;
     }
-    // Credentials are in-memory only. The host/IP and username were
-    // stored by prepare; no password or PSK is saved in preferences.
+    // The existing service may have been prepared for a different server.
+    // Refresh while disconnected, then reopen its connection object.
+    CFRelease(conn);
+    if (!synchronizeSelectedEndpoint(profile) || !routeWatchdogArmed(profile[@"server"])) {
+        result(@"error",@"L2TP_SELECTED_ENDPOINT_SYNC_FAILED");
+        return 2;
+    }
+    conn=l2tpConnection();
+    if (!conn || SCNetworkConnectionGetStatus(conn)!=kSCNetworkConnectionDisconnected) {
+        if (conn) CFRelease(conn);
+        result(@"error",@"L2TP_NATIVE_SERVICE_BUSY");
+        return 2;
+    }
+    // Only transient connection options contain authentication secrets.
     NSDictionary *options=@{
         (__bridge NSString*)kSCEntNetPPP:@{
+            (__bridge NSString*)kSCPropNetPPPCommRemoteAddress:profile[@"server"],
             (__bridge NSString*)kSCPropNetPPPAuthName:profile[@"username"],
             (__bridge NSString*)kSCPropNetPPPAuthPassword:profile[@"password"]
         },

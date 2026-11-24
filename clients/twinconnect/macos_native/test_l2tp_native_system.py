@@ -42,6 +42,24 @@ class NativeSystemTests(unittest.TestCase):
                 module.check_probe("ppp0", "1.1.1.1")
             self.assertEqual(guard.call_args_list[-1].args[0], "rollback-probe")
 
+    def test_selected_endpoint_requires_bidirectional_mature_esp(self):
+        import subprocess
+        sad = ("2.3.4.5 1.2.3.4 \n\tesp mode=transport\n\tstate=mature\n"
+               "1.2.3.4 2.3.4.5 \n\tesp mode=transport\n\tstate=mature\n")
+        with patch.object(module.subprocess,"run",return_value=subprocess.CompletedProcess([],0,sad,"")):
+            self.assertTrue(module.verify_ipsec_peer("1.2.3.4"))
+            self.assertFalse(module.verify_ipsec_peer("8.8.8.8"))
+        with patch.object(module.subprocess,"run",return_value=subprocess.CompletedProcess([],0,sad.replace("state=mature","state=dead"),"")):
+            self.assertFalse(module.verify_ipsec_peer("1.2.3.4"))
+
+    def test_native_reconnect_refreshes_selected_host_before_start(self):
+        source=Path(__file__).with_name("TwinConnectL2TPNativeService.m").read_text()
+        start=source[source.index("static int connectService"):source.index("int main(")]
+        self.assertLess(start.index("synchronizeSelectedEndpoint(profile)"),
+                        start.index("SCNetworkConnectionStart("))
+        self.assertIn("routeWatchdogArmed(profile",start)
+        self.assertIn("kSCPropNetPPPCommRemoteAddress",start)
+
     def test_no_full_connect_without_preflight(self):
         with patch.object(module, "guard", return_value="L2TP_OTHER_SYSTEM_VPN_ACTIVE"), \
              patch.object(module, "native") as native:
