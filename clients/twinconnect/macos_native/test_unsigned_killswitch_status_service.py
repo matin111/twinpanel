@@ -39,7 +39,8 @@ class StatusTests(unittest.TestCase):
         self.assertIn('ownerAccountID',block)
         self.assertIn('activation_available',block)
         self.assertIn('leak_verified',block)
-        self.assertIn('"Kill Switch: " + nativeKillSwitchReport()',source)
+        self.assertIn('let protectionReport = nativeKillSwitchReport()',source)
+        self.assertIn('protectionReport.hasPrefix("Kill Switch: ")',source)
         self.assertNotIn('UserDefaults',block)
 
     def test_publish_atomic(self):

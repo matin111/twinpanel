@@ -25,12 +25,15 @@ class StandaloneManagerTests(unittest.TestCase):
         path.write_text(json.dumps(obj))
         return path
 
-    def test_all_fifteen_codes_registered(self):
-        self.assertEqual(len(manager.PROTOCOLS), 15)
-        self.assertEqual(len(set(manager.PROTOCOLS)), 15)
+    def test_all_sixteen_codes_registered(self):
+        expected = {"openvpn","openconnect","l2tp","wireguard","amneziawg","v2ray",
+                    "hysteria2","tuic","anytls","naive","shadowtls","snell","socks5",
+                    "mieru","trusttunnel","sudoku"}
+        self.assertEqual(set(manager.PROTOCOLS), expected)
+        self.assertEqual(len(manager.PROTOCOLS), len(expected))
         listed = manager.list_protocols()
         self.assertFalse(listed["default_route_modified"])
-        self.assertEqual(len(listed["protocols"]), 15)
+        self.assertEqual({p["code"] for p in listed["protocols"]}, expected)
         self.assertEqual(listed["mode"], "local_proxy_only")
 
     def test_xray_local_socks_only(self):

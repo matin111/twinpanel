@@ -29,7 +29,7 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('self.runFullTunClient("status")', poll)
         self.assertNotIn('self.runFullTunClient("start"', poll)
         self.assertIn('(fullTunActive || fullTunServicePresent())', poll)
-        self.assertIn('self.readActiveFullTunProtocol()', poll)
+        self.assertIn('self.attestedFullTunProtocol(result.1)', poll)
 
     def test_transient_status_error_does_not_fake_offline_or_connected(self):
         start = UI.index('private func refreshFullTunStatus()')
@@ -43,7 +43,9 @@ class UnsignedTunStatusTests(unittest.TestCase):
         self.assertIn('TUN session stopped or engine exited.', poll)
         self.assertIn('if fullTunStatusUncertain { return "◌  Checking TUN…" }', UI)
         self.assertIn('if fullTunStatusUncertain { return "Checking TUN…" }', UI)
-        self.assertIn('!fullTunStatusUncertain && !ciscoTunnelBusy', UI)
+        action=UI.split('@objc private func requestVPNConnection(',1)[1]
+        self.assertIn('if fullTunBusy || fullTunStatusUncertain {',action)
+        self.assertIn('if localProxyBusy || ciscoTunnelBusy ||',action)
 
     def test_verified_https_enables_connected_only_with_kernel_route(self):
         self.assertIn('private var fullTunHTTPSConnected: Bool', UI)

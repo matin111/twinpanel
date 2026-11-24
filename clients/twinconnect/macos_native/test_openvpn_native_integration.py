@@ -33,7 +33,8 @@ class NativeOpenVPNIntegrationTests(unittest.TestCase):
 
     def test_rejects_missing_openvpn_privileged_helper(self):
         profile = {"mode": "openvpn", "profile": "client\n"}
-        with mock.patch.object(daemon, "trusted_root_file", return_value=False), \
+        with mock.patch.object(daemon, "kill_switch_control", return_value=None), \
+             mock.patch.object(daemon, "trusted_root_file", return_value=False), \
              mock.patch.object(daemon.os, "open") as file_write, \
              mock.patch.object(daemon.subprocess, "Popen") as spawn:
             with self.assertRaisesRegex(ValueError, "TRUSTED_OPENVPN_NOT_INSTALLED"):
@@ -44,7 +45,8 @@ class NativeOpenVPNIntegrationTests(unittest.TestCase):
     def test_rejects_openvpn_injected_commands_before_file_write(self):
         malicious = ("client\ndev tun\nremote vpn.example.com 1194\n"
                      "remote-cert-tls server\nup /bin/sh\n<ca>\nCERT\n</ca>\n")
-        with mock.patch.object(daemon, "trusted_root_file", return_value=True), \
+        with mock.patch.object(daemon, "kill_switch_control", return_value=None), \
+             mock.patch.object(daemon, "trusted_root_file", return_value=True), \
              mock.patch.object(daemon.os, "access", return_value=True), \
              mock.patch.object(daemon.os, "open") as file_write:
             with self.assertRaisesRegex(ValueError, "OVPN_UNSAFE_DIRECTIVE"):
@@ -63,8 +65,10 @@ class NativeOpenVPNIntegrationTests(unittest.TestCase):
         self.assertIn('OPENVPN_CERTIFICATE_ROLE_REQUIRED',
                       (DIR / "unsigned_tun_daemon.py").read_text())
         self.assertIn('OPENVPN_LOCAL_HELPER_STAGED', INSTALLER)
-        self.assertIn('OPENVPN_PRIVILEGED_INSTALL_CANDIDATE_PREPARED',
-                      (DIR.parent / "tool/package_macos_local_proxy_runtime.sh").read_text())
+        package = (DIR.parent / "tool/package_macos_local_proxy_runtime.sh").read_text()
+        self.assertIn("OPENVPN_BUNDLED_EXECUTION_VERIFIED", package)
+        self.assertIn("OPENVPN_HELPER_BUILD_CURRENT", package)
+        self.assertIn("OPENVPN_HELPER_BUILD_REFRESHED", package)
 
 
 if __name__ == "__main__":

@@ -80,15 +80,17 @@ class ProfilePrepareTests(unittest.TestCase):
             module.prepare("shadowtls", path)
 
     def test_shadowtls_selects_shadowsocks_proxy(self):
-        path = self.input({
-            "outbounds": [{"type": "shadowtls", "tag": "transport",
-                           "server": "original.example", "server_port": 443},
-                          {"type": "shadowsocks", "tag": "proxy",
-                           "detour": "transport", "password": "keep"}]
-        })
+        chain = [{"type": "shadowsocks", "tag": "proxy",
+                  "detour": "shadowtls-transport", "password": "test-placeholder"},
+                 {"type": "shadowtls", "tag": "shadowtls-transport", "version": 3,
+                  "server": "original.example", "server_port": 443}]
+        path = self.input({"outbounds": chain})
         result = module.prepare("shadowtls", path)
         converted = json.loads(Path(result["path"]).read_text())
         self.assertEqual(converted["route"]["final"], "proxy")
+        self.assertEqual(converted["outbounds"], chain)
+        with self.assertRaisesRegex(ValueError, "SHADOWTLS_CHAIN_INVALID"):
+            module.prepare("shadowtls", self.input({"outbounds": list(reversed(chain))}))
 
     def test_rejects_symlink_input(self):
         original = self.input({"outbounds": [{"type": "tuic", "tag": "proxy"}]})

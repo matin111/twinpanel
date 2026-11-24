@@ -27,12 +27,12 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn("self.fullTunActive = false", section)
         self.assertIn("System VPN not connected.", section)
 
-    def test_openvpn_progress_and_errors_are_visible_beside_button(self):
+    def test_openvpn_progress_and_errors_are_available_in_connect_tooltip(self):
         section = DASHBOARD.split("private func connectPage()", 1)[1]
         section = section.split("private func ", 1)[0]
-        self.assertIn('if activeProtocol == "openvpn" {', section)
-        self.assertIn('status.hasPrefix("OpenVPN")', section)
-        self.assertIn('main.addArrangedSubview(connectionFeedback)', section)
+        self.assertIn('let openVPNHasDiagnostic = activeProtocol == "openvpn"', section)
+        self.assertIn('connect.toolTip =', section)
+        self.assertIn('activeProtocol == "openvpn" && openVPNHasDiagnostic ? status', section)
 
     def test_result_parser_ignores_stop_marker_and_prioritizes_handshake(self):
         section = DASHBOARD.split("private func startOpenVPNAppProbe(", 1)[1]
@@ -49,11 +49,13 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn("if openVPNAppSessionInstalled() {", section)
         self.assertIn("startPersistentOpenVPN(session, serverID: serverID)", section)
         self.assertIn("refreshOpenVPNAppSession()", DASHBOARD)
-        self.assertIn("OpenVPN: tunnel active; system internet is NOT routed.", DASHBOARD)
+        self.assertIn("OpenVPN tunnel only · not system VPN", DASHBOARD)
 
     def test_persistent_script_has_route_guard_and_auto_expiry(self):
         script = (ROOT / "macos_native/openvpn_app_session.py").read_text()
-        self.assertIn("MAX_SESSION_SECONDS = 900", script)
+        self.assertIn("MAX_SESSION_SECONDS = 86400", script)
+        self.assertIn("deadline = time.time() + MAX_SESSION_SECONDS", script)
+        self.assertIn("while time.time() < deadline and not STOP.exists()", script)
         self.assertIn('"--route-nopull"', script)
         self.assertIn("default_route() != before", script)
         self.assertIn("stop_openvpn(child)", script)
@@ -70,7 +72,7 @@ class OpenVPNAppButtonTests(unittest.TestCase):
         self.assertIn('default_route() != before', script)
         self.assertIn('"--route-nopull"', script)
         self.assertIn("system_vpn_verified", script)
-        self.assertIn("tunnel HTTPS verified; system internet is NOT routed.", DASHBOARD)
+        self.assertIn("OpenVPN tunnel only; system routing not active.", DASHBOARD)
         ast.parse(script)
 
     def test_sudoers_rule_uses_separate_fixed_action_commands(self):

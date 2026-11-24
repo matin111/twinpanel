@@ -9,7 +9,7 @@ SCRIPT = (Path(__file__).resolve().parents[1] /
 
 class LocalInstallerContractTests(unittest.TestCase):
     def test_requires_explicit_action(self):
-        self.assertIn('case "$action" in check|stage|activate|stop|remove)', SCRIPT)
+        self.assertIn('case "$action" in check|stage|stage-vps|activate|stop|remove)', SCRIPT)
 
     def test_refuses_ssh_and_remote_vps_marker(self):
         self.assertIn("SSH_CONNECTION", SCRIPT)
@@ -23,7 +23,9 @@ class LocalInstallerContractTests(unittest.TestCase):
 
     def test_requires_staging_before_activation(self):
         self.assertIn("STAGE_BEFORE_ACTIVATE", SCRIPT)
-        self.assertIn('if [[ "$action" == "stage" ]]; then', SCRIPT)
+        self.assertIn('if [[ "$action" == "stage" || "$action" == "stage-vps" ]]; then', SCRIPT)
+        self.assertIn("STAGE-VPS-FILES-ONLY", SCRIPT)
+        self.assertLess(SCRIPT.index("LOCAL_TUN_FILES_STAGED; SERVICE_NOT_STARTED"), SCRIPT.index("launchctl bootstrap system"))
         self.assertIn("LOCAL_TUN_FILES_STAGED; SERVICE_NOT_STARTED", SCRIPT)
 
     def test_no_route_dns_commands(self):

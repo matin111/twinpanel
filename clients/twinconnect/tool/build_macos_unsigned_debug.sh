@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Build an unsigned macOS debug candidate, including the PacketTunnel target.
+# Build an unsigned macOS Debug or Release candidate, including PacketTunnel.
 # This validates Swift/Flutter compilation only. An unsigned PacketTunnel
 # cannot establish a functioning Network Extension VPN connection.
 # Does NOT change project signing settings, certificates or system routes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 workspace="macos/Runner.xcworkspace"
+configuration="${TWINCONNECT_BUILD_CONFIGURATION:-Debug}"
+case "$configuration" in Debug|Release) ;; *) echo "INVALID_BUILD_CONFIGURATION" >&2; exit 2;; esac
 test -d "$workspace" || { echo "Missing macOS workspace" >&2; exit 1; }
 log="${TWINCONNECT_BUILD_LOG:-$HOME/twinconnect-unsigned-macos-build.log}"
 if [ "${TWINCONNECT_SKIP_APPKIT_RELINK:-0}" != "1" ]; then
@@ -14,7 +16,7 @@ fi
 if xcodebuild \
   -workspace "$workspace" \
   -scheme Runner \
-  -configuration Debug \
+  -configuration "$configuration" \
   -destination 'platform=macOS' \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
@@ -23,13 +25,13 @@ if xcodebuild \
   # DerivedData path (especially not Index.noindex/Build/Products).
   # Package both real engines into Runner.app; fail the build if either is
   # missing so we never claim to have a portable standalone client.
-  built_app="$(python3 - "$workspace" <<'PY'
+  built_app="$(python3 - "$workspace" "$configuration" <<'PY'
 import json
 import subprocess
 import sys
 command = [
     "xcodebuild", "-workspace", sys.argv[1], "-scheme", "Runner",
-    "-configuration", "Debug", "-destination", "platform=macOS",
+    "-configuration", sys.argv[2], "-destination", "platform=macOS",
     "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO",
     "-showBuildSettings", "-json",
 ]
