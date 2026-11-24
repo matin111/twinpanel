@@ -113,12 +113,8 @@ def _main_menu_keyboard():
             ],
             [
                 InlineKeyboardButton(
-                    text="📚 آموزش",
+                    text="📚 آموزش و دانلود",
                     callback_data="mlearn:g:root",
-                ),
-                InlineKeyboardButton(
-                    text="⬇️ دانلود برنامه",
-                    callback_data="mlearn:d:root",
                 ),
             ],
             [
@@ -346,8 +342,7 @@ def install_account_link_feature(
             "🔗 اطلاعات اتصال را دریافت کنید\n"
             "🔄 اشتراک خود را تمدید کنید\n"
             "💰 کیف پول خود را مدیریت کنید\n"
-            "📚 آموزش اتصال را مشاهده کنید\n"
-            "⬇️ برنامه مناسب دستگاه خود را دانلود کنید\n"
+            "📚 آموزش اتصال و دریافت برنامه مناسب دستگاه را از همین بخش مشاهده کنید\n"
             "🎫 با پشتیبانی در ارتباط باشید\n\n"
             "از منوی زیر بخش موردنظر را انتخاب کنید.",
             reply_markup=main_runtime.main_keyboard(),
