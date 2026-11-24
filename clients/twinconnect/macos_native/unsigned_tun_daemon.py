@@ -370,6 +370,13 @@ class Session:
             }
             if self.process is not None:
                 status.update(observe_route())
+                # Only the root daemon knows whether this sing-box SOCKS
+                # outbound belongs to the separately supervised official
+                # TrustTunnel client. Never mislabel it as generic SOCKS5.
+                if (self.transport_process is not None and
+                        self.transport_process.poll() is None and
+                        self.owner is not None):
+                    status["protocol_code"] = "trusttunnel"
             return status
 
     def start(self, uid: int, profile: object) -> dict:

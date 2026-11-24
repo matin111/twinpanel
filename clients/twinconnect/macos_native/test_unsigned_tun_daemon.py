@@ -26,6 +26,29 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def test_root_attests_trusttunnel_only_when_both_engines_alive(self):
+        session = server.Session()
+        session.process = mock.Mock(poll=mock.Mock(return_value=None))
+        session.owner = 501
+        session.transport_process = mock.Mock(
+            poll=mock.Mock(return_value=None))
+        with (mock.patch.object(session, "console_owner_present", return_value=True),
+              mock.patch.object(server, "observe_route",
+                                return_value={"route_state":
+                                              "utun_route_observed_unverified"})):
+            running = session.status()
+        self.assertEqual(running["protocol_code"], "trusttunnel")
+        self.assertFalse(running["system_vpn_verified"])
+        self.assertEqual(running["state"], "engine_running_unverified")
+        session.transport_process = None
+        with (mock.patch.object(session, "console_owner_present", return_value=True),
+              mock.patch.object(server, "observe_route",
+                                return_value={"route_state":
+                                              "utun_route_observed_unverified"})):
+            generic = session.status()
+        self.assertNotIn("protocol_code", generic)
+        # Mocked processes represent offline contract tests, never a VPN.
+
     def test_trusttunnel_retry_after_socks5_failure_then_https_succeeds(self):
         checks = [
             mock.Mock(returncode=0),

@@ -20,6 +20,19 @@ class FullTunPendingIndicatorTests(unittest.TestCase):
         block = UI[start:end]
         self.assertIn('return fullTunActive ? "Disconnecting…" : "Connecting…"', block)
 
+    def test_connect_failure_is_visible_in_network_card(self):
+        self.assertIn('private var connectionAttemptNotice: String?', UI)
+        self.assertIn('if let notice = connectionAttemptNotice {', UI)
+        self.assertIn('feedback.toolTip = notice', UI)
+        self.assertIn('tab = 1', UI)
+        self.assertIn('TUN connection failed: ', UI)
+
+    def test_attested_trusttunnel_shows_correct_protocol_not_socks5(self):
+        self.assertIn('private func attestedFullTunProtocol(', UI)
+        self.assertIn('object["protocol_code"] as? String == "trusttunnel"', UI)
+        self.assertIn('self.attestedFullTunProtocol(observed.1)', UI)
+        self.assertIn('self.attestedFullTunProtocol(result.1)', UI)
+
     def test_button_shows_progress_without_faking_connected(self):
         self.assertIn('let connect = button(fullTunStatusUncertain ? "Checking…" :', UI)
         self.assertIn('fullTunBusy && activeProtocol != "openvpn" ?', UI)

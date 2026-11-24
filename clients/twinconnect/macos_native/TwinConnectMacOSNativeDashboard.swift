@@ -1550,6 +1550,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return "◌  Offline"
     }
 
+    // A failed Connect action must not silently return to "Disconnected".
+    // Surface only redacted application error codes in the Network card,
+    // never raw configuration, URLs, credentials, or protocol payloads.
+    private var connectionAttemptNotice: String? {
+        if status.hasPrefix("TUN connection failed: ") ||
+           status.hasPrefix("VPN profile request failed: ") ||
+           status.hasPrefix("Connection unavailable: ") ||
+           status.hasPrefix("TrustTunnel TUN helper not installed; ") ||
+           status.hasPrefix("TUN status could not be verified.") ||
+           status.hasPrefix("TUN stop unverified; ") {
+            return status
+        }
+        return nil
+    }
+
     private var verifiedNetworkConnectionLabel: String {
         if fullTunBusy && activeProtocol != "openvpn" {
             return fullTunActive ? "Disconnecting…" : "Connecting…"
@@ -1908,6 +1923,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // The previous equal-height dashboard stretched this single
         // location row into a huge empty rectangle.
         locationCard.heightAnchor.constraint(equalToConstant: 55).isActive = true
+        if let notice = connectionAttemptNotice {
+            let feedback = text(notice, size: 11, weight: .medium, color: amber)
+            feedback.lineBreakMode = .byWordWrapping
+            feedback.maximumNumberOfLines = 2
+            feedback.toolTip = notice
+            content.addArrangedSubview(feedback)
+            feedback.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
         let flexibleBottom = NSView()
         flexibleBottom.setContentHuggingPriority(.defaultLow, for: .vertical)
         content.addArrangedSubview(flexibleBottom)
@@ -4498,7 +4521,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func recordProxyAttempt(_ protocolCode: String, _ reason: String) {
         let allowed: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
-            "snell", "naive", "shadowtls", "v2ray", "mieru"
+            "snell", "naive", "shadowtls", "v2ray", "mieru",
+            "trusttunnel"
         ]
         guard allowed.contains(protocolCode) else { return }
         let safeCode = reason.range(
@@ -4705,6 +4729,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         } catch {
             return nil
         }
+    }
+
+    private func attestedFullTunProtocol(_ raw: String) -> String? {
+        // A trusted root daemon identifies its two-process transport.
+        // Never infer TrustTunnel from a generic SOCKS outbound or picker.
+        guard tunRouteIsRunning(raw),
+              let data = raw.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any] else { return nil }
+        if object["protocol_code"] as? String == "trusttunnel" {
+            return "trusttunnel"
+        }
+        return readActiveFullTunProtocol()
     }
 
     private func tunRouteIsRunning(_ raw: String) -> Bool {
@@ -5096,6 +5133,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // helper runs. For Mieru this also makes clock/auth failures
         // diagnosable, without retaining user credentials.
         recordProxyAttempt(protocolCode, "CONNECT_REQUESTED")
+        if protocolCode == "trusttunnel" {
+            NSLog("TwinConnect AppKit: TrustTunnel Connect received; profile lookup started")
+        }
         fullTunStatusUncertain = false
         fullTunStatusMisses = 0
         fullTunBusy = true
@@ -5142,7 +5182,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                         reviewed != nil && !self.tunRouteIsRunning(response.1) ?
                             self.runFullTunClient("status") : response
                     let realProtocol = self.tunRouteIsRunning(observed.1) ?
-                        self.readActiveFullTunProtocol() : nil
+                        self.attestedFullTunProtocol(observed.1) : nil
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.fullTunBusy = false
@@ -5179,6 +5219,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             }
                             self.status = "TUN connection failed: " + reason
                             self.recordProxyAttempt(protocolCode, reason)
+                            NSLog("TwinConnect AppKit: TUN start rejected with code %@", reason)
                         }
                         self.view = self.build()
                         if self.fullTunActive {
@@ -5393,7 +5434,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let observedRoute = result.0 == 0 &&
                 self.tunRouteIsRunning(result.1)
             let realProtocol = observedRoute ?
-                self.readActiveFullTunProtocol() : nil
+                self.attestedFullTunProtocol(result.1) : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.fullTunStatusPollBusy = false
@@ -5840,6 +5881,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             if let code = activeProtocol {
                 recordProxyAttempt(code, "SELECTION_NOT_READY")
             }
+            if activeProtocol == nil || activeServer == nil { tab = 1 }
             view = build()
             return
         }
