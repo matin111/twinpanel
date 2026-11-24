@@ -42,6 +42,15 @@ class L2TPGuardTests(unittest.TestCase):
                              "L2TP_TWO_EGRESS_PROBES_REQUIRED")
             cmd.assert_not_called()
 
+    def test_two_probes_must_use_independent_networks(self):
+        state={"mode":"armed","interface":"en0","verified_probes":["1.1.1.1","1.0.0.1"]}
+        with patch.object(guard,"verified_state",return_value=state), \
+             patch.object(guard,"native_status",return_value="L2TP_NATIVE_LINK_CONNECTED_UNROUTED"), \
+             patch.object(guard,"ppp_interface",return_value="ppp0"), \
+             patch.object(guard,"run") as calls:
+            self.assertEqual(guard.activate("ppp0"),"L2TP_TWO_EGRESS_PROBES_REQUIRED")
+            calls.assert_not_called()
+
     def test_never_probe_arbitrary_destination(self):
         with patch.object(guard, "verified_state") as state:
             self.assertEqual(guard.probe_host("ppp0", "9.9.9.9"),

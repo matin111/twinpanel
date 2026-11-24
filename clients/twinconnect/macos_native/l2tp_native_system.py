@@ -229,8 +229,14 @@ def full_connection(payload: dict) -> None:
         time.sleep(0.5)
     if not verified:
         raise ValueError("L2TP_IPSEC_ENDPOINT_MISMATCH")
-    for destination in ("1.1.1.1", "8.8.8.8"):
-        check_probe(interface, destination)
+    for group in (("1.1.1.1","1.0.0.1"),("8.8.8.8","8.8.4.4")):
+        for destination in group:
+            try:
+                check_probe(interface,destination)
+                break
+            except ValueError as exc:
+                if str(exc)!="L2TP_PROBE_ROUTE_PREEXISTS" or destination==group[-1]:
+                    raise
     if guard("activate", interface, timeout=30) != "L2TP_SYSTEM_IPV4_CONNECTED":
         raise ValueError("L2TP_FULL_ROUTE_UNVERIFIED")
     safe_reply("L2TP_SYSTEM_IPV4_CONNECTED", state="connected", vpn=True)

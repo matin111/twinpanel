@@ -28,8 +28,9 @@ LABEL = "system/com.twinconnect.l2tp-management-route-guard"
 ROUTE = "/sbin/route"
 NETSTAT = "/usr/sbin/netstat"
 NETWORKSETUP = "/usr/sbin/networksetup"
-PROBES = frozenset(("1.1.1.1", "8.8.8.8"))
-HALVES = (("0.0.0.0/1", "1.0.0.1"), ("128.0.0.0/1", "129.0.0.1"))
+PROBE_GROUPS = (frozenset(("1.1.1.1","1.0.0.1")), frozenset(("8.8.8.8","8.8.4.4")))
+PROBES = frozenset().union(*PROBE_GROUPS)
+HALVES = (("0.0.0.0/1", "9.9.9.9"), ("128.0.0.0/1", "129.0.0.1"))
 INITIAL_TTL = 60
 PROBE_TTL = 18
 LEASE_TTL = 45
@@ -353,18 +354,18 @@ def verify_probe() -> str:
         return "L2TP_PROBE_STATE_UNTRUSTED"
     if route(dest).get("interface") != interface:
         return "L2TP_PROBE_ROUTE_MISSING"
-    if dest == "1.1.1.1":
+    if dest in PROBE_GROUPS[0]:
         response = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
                        "--connect-timeout", "3", "--max-time", "8",
-                       "https://1.1.1.1/cdn-cgi/trace", timeout=10)
+                       "https://"+dest+"/cdn-cgi/trace", timeout=10)
         match = re.search(r"(?m)^ip=([0-9.]+)$", response.stdout)
         if (response.returncode or not match or
                 not public_ip(match.group(1)) or
                 match.group(1) == state.get("baseline_exit")):
             return "L2TP_VPN_EXIT_NOT_VERIFIED"
-    elif dest == "8.8.8.8":
+    elif dest in PROBE_GROUPS[1]:
         response = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
-                       "--resolve", "dns.google:443:8.8.8.8",
+                       "--resolve", "dns.google:443:"+dest,
                        "--connect-timeout", "3", "--max-time", "8",
                        "https://dns.google/resolve?name=example.com&type=A", timeout=10)
         try:
@@ -374,10 +375,12 @@ def verify_probe() -> str:
         if response.returncode or answer.get("Status") != 0 or not answer.get("Answer"):
             return "L2TP_SECOND_EXIT_NOT_VERIFIED"
     marked = state.get("verified_probes", [])
-    if not isinstance(marked, list) or len(marked) > 2:
+    if (not isinstance(marked,list) or len(marked)>2 or
+            any(not isinstance(item,str) or item not in PROBES for item in marked)):
         return "L2TP_PROBE_PROOF_INVALID"
-    if dest not in marked:
-        marked.append(dest)
+    group=next(group for group in PROBE_GROUPS if dest in group)
+    marked=[item for item in marked if item not in group]
+    marked.append(dest)
     state["verified_probes"] = marked
     store(state)
     return "L2TP_PROBE_EGRESS_VERIFIED"
@@ -419,9 +422,10 @@ def activate(interface: str) -> str:
     if native_status() != "L2TP_NATIVE_LINK_CONNECTED_UNROUTED" or (
             ppp_interface() != interface):
         return "L2TP_PPP_NOT_ESTABLISHED"
-    if set(state.get("verified_probes", [])) != PROBES:
+    proofs=set(state.get("verified_probes",[]))
+    if len(proofs)!=2 or any(len(proofs & group)!=1 for group in PROBE_GROUPS):
         return "L2TP_TWO_EGRESS_PROBES_REQUIRED"
-    for dest, _ in ((x, y) for x, y in (("1.0.0.1", "0"), ("129.0.0.1", "0"))):
+    for _,dest in HALVES:
         if route(dest).get("interface") != state["interface"]:
             return "L2TP_BEFORE_FULL_ROUTE_NOT_ORIGINAL"
     state["full_interface"] = interface
