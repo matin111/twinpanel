@@ -31,3 +31,23 @@ for the unsigned path, not an enabled firewall or leak-tested Kill Switch.
 
 Phase 1 runs Apple's PF syntax checker with -n only. No root firewall
 configuration is changed by this code or its tests.
+
+## Phase 3: lifecycle, durable state and PF adapter
+
+Implemented components:
+- Controller: explicit enable, close-before-disconnect, loss/drift handling,
+  stale-generation rejection, restart recovery, explicit Reset.
+- Root-private journal: exclusive service lock, bounded validated JSON,
+  atomic writes, fsync, separate durable ownership of the PF reference.
+- PF adapter: closed initial rules, stock PF preflight, syntax normalization,
+  dedicated anchor replacement/readback, owned-reference-only removal.
+- The native command runner refuses firewall mutation on remote/enrolled
+  Termalin hosts. Tests use injected kernels; no actual PF activation.
+
+Remaining acceptance blockers: wire the serialized privileged service and
+its independent recovery readiness check; implement pre-connect endpoint
+attestation, including OpenVPN, L2TP/ESP, Cisco DTLS and the secondary
+TrustTunnel/Sudoku transports; validate PF reference readback format and
+effective rule/state/interface behavior under live local-console tests;
+then expose the actual verified control in Settings. Do not interpret
+rules_readback as proof of leak protection. No release readiness claim.
