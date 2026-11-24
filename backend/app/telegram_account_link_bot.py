@@ -68,14 +68,9 @@ def _main_menu_keyboard():
             ],
             [
                 inline_button(
-                    "📚 آموزش",
+                    "📚 آموزش و دانلود",
                     callback_data="mlearn:g:root",
                     style=styles.learning,
-                ),
-                inline_button(
-                    "⬇️ دانلود برنامه",
-                    callback_data="mlearn:d:root",
-                    style=styles.download,
                 ),
             ],
             [
