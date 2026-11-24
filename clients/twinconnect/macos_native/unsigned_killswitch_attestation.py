@@ -220,8 +220,7 @@ def openvpn_evidence(state):
     return evidence
 
 
-def cisco_evidence(state):
-    iface,uplink,pid,endpoint=checked_lease(state,"cisco")
+def cisco_tcp_transport(pid,endpoint):
     if not process_command(pid).startswith(CISCO_BIN+" "):
         raise ValueError("KS_ENGINE_IDENTITY_UNVERIFIED")
     result=run("/usr/sbin/lsof","-nP","-a","-p",str(pid),"-iTCP","-sTCP:ESTABLISHED")
@@ -237,9 +236,14 @@ def cisco_evidence(state):
     # OpenConnect may also use DTLS. Until that UDP association is
     # independently attested, do not claim a complete live policy.
     udp=run("/usr/sbin/lsof","-nP","-a","-p",str(pid),"-iUDP")
-    if udp.returncode==0 and len(udp.stdout.splitlines())>1:
+    if udp.returncode not in (0,1) or (udp.returncode==0 and len(udp.stdout.splitlines())>1):
         raise ValueError("KS_CISCO_DTLS_NOT_ATTESTED")
-    return Evidence("cisco",iface,uplink,tuple(peers),pid)
+    return next(iter(peers))
+
+
+def cisco_evidence(state):
+    iface,uplink,pid,endpoint=checked_lease(state,"cisco")
+    return Evidence("cisco",iface,uplink,(cisco_tcp_transport(pid,endpoint),),pid)
 
 
 def observed_tun_processes():

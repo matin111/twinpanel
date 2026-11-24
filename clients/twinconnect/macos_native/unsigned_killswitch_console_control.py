@@ -29,7 +29,7 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence, TUN_PROTOCOLS, tun_session_identity
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence, TUN_PROTOCOLS, tun_session_identity, cisco_tcp_transport
 from unsigned_killswitch_policy import Transport, render_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
@@ -47,7 +47,7 @@ RECONNECT_SECONDS=60
 ARMING_TIMEOUT=30
 SESSION_MODE='until_reset'
 WG_PROTOCOLS={'wireguard':WG_BIN,'amneziawg':AWG_BIN}
-SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn'}|TUN_PROTOCOLS
+SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn','cisco'}|TUN_PROTOCOLS
 
 
 def run(*args, input=None, timeout=4):
@@ -224,6 +224,18 @@ def reconnect_identity(evidence):
         if evidence.protocol in TUN_PROTOCOLS:
             actual,identity=tun_session_identity(False)
             return identity if actual==evidence else None
+        if evidence.protocol=="cisco":
+            state=root_private_json(Path("/private/var/run/twinconnect-cisco-route-guard/state.json"))
+            digest=state.get("profile_digest")
+            baseline=state.get("baseline_ip")
+            peer=evidence.transports[0]
+            if (state.get("worker_pid")!=evidence.pid or
+                    not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest) or
+                    not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
+                return None
+            return {"protocol":"cisco","digest":digest,"ip":peer.ip,"port":peer.port,
+                    "transport":"tcp","uplink":evidence.uplink,"gateway":state["gateway"],
+                    "baseline_ip":baseline}
         if evidence.protocol=="openvpn":
             current,worker,digest=openvpn_session_evidence()
             state=root_private_json(Path("/private/var/run/twinconnect-full-route-guard/state.json"))
@@ -412,6 +424,50 @@ def tun_matches_lease(lease,require_live=False):
                 ("protocol","digest","ip","port","transport","uplink")))
 
 
+def attach_cisco_reconnect(pid,iface,digest):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="handshake":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        identity=lease["reconnect_identity"]
+        session_deadline(lease)
+        if (identity.get("protocol")!="cisco" or identity.get("digest")!=digest or
+                not re.fullmatch(r"utun[0-9]{1,4}",iface) or
+                time.time()>=lease.get("reconnect_until",0) or
+                route_interface(identity["ip"])!=identity["uplink"] or
+                cisco_tcp_transport(pid,identity["ip"])!=Transport(identity["ip"],identity["port"],"tcp")):
+            raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
+        replace_owned_policy(lease,bootstrap_rules(identity,iface),
+                             pid=pid,interface=iface,reconnect_stage="route")
+
+
+def before_cisco_disconnect(pid,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease:
+            return
+        if lease.get("reconnect_identity",{}).get("protocol")!="cisco":
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if lease.get("locked") and not lease.get("reconnect_stage"):
+            if anchor_rules()!=lines(RULES) or not pf_enabled():
+                raise RuntimeError("KS_CLOSED_POLICY_UNVERIFIED")
+            return
+        if lease.get("pid")!=pid or lease.get("interface")!=iface:
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        close_lease(lease)
+
+
+def cisco_active_recovery(pid,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if (not lease or lease.get("locked") or lease.get("pid")!=pid or
+                lease.get("interface")!=iface or
+                lease.get("reconnect_identity",{}).get("protocol")!="cisco"):
+            return False
+        session_deadline(lease)
+        return monitor_lease(lease)=="active"
+
+
 def attach_openvpn_reconnect(worker,iface):
     with lock():
         lease=read_json("lease.json")
@@ -541,6 +597,10 @@ def monitor_lease(lease):
                 iface=lease["interface"]
                 if identity.get("protocol") in TUN_PROTOCOLS:
                     expired=not tun_matches_lease(lease)
+                elif identity.get("protocol")=="cisco":
+                    expired=(cisco_tcp_transport(lease["pid"],identity["ip"])!=
+                             Transport(identity["ip"],identity["port"],"tcp") or
+                             route_interface(identity["ip"])!=identity["uplink"])
                 elif identity.get("protocol")=="openvpn":
                     evidence,worker,digest=openvpn_session_evidence()
                     expired=(evidence.pid!=lease["pid"] or worker!=lease.get("route_worker") or
@@ -568,9 +628,9 @@ def monitor_lease(lease):
         protocol=identity.get("protocol") if isinstance(identity,dict) else None
         if protocol in TUN_PROTOCOLS:
             valid=tun_matches_lease(lease)
-        elif protocol=="openvpn":
+        elif protocol in ("openvpn","cisco"):
             evidence=collect()
-            valid=(evidence is not None and evidence.protocol=="openvpn" and
+            valid=(evidence is not None and evidence.protocol==protocol and
                    evidence.pid==pid and evidence.interface==iface and
                    evidence.uplink==identity["uplink"] and
                    evidence.transports==(Transport(identity["ip"],identity["port"],identity["transport"]),))
@@ -728,6 +788,21 @@ def enable():
             ready=read_json("ready.json")
             if session_deadline(lease)!=0:
                 raise RuntimeError("KS_SESSION_NOT_AUTHORIZED")
+            if evidence.protocol=="cisco":
+                try:
+                    probe=run("/usr/bin/curl","--interface","if!"+evidence.interface,
+                              "--noproxy","*","-4","-fsS","--connect-timeout","3",
+                              "--max-time","7","-o","/dev/null","https://example.com",timeout=9)
+                    verified=probe.returncode==0 and collect()==evidence
+                except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                    verified=False
+                if not verified:
+                    close_lease(lease)
+                    lease["lock_reason"]="KS_DNS_RECONNECT_REQUIRED"
+                    write_json("lease.json",lease)
+                    publish("locked","KS_DNS_RECONNECT_REQUIRED")
+                    print("KS_ENABLED_LOCKED_RECONNECT_REQUIRED",flush=True)
+                    return
             if evidence.protocol in TUN_PROTOCOLS and not tun_network_verified(lease):
                 # A previous VPS DNS bypass is not permitted through PF.
                 # Keep the lock; a protected reconnect may restore DNS.

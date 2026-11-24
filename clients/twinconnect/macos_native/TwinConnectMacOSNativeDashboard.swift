@@ -677,6 +677,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var wireGuardRoutePollBusy = false
     private var wireGuardRouteLastPoll = Date.distantPast
     private var ciscoTunnelTask: Process?
+    private var ciscoReconnectProfile: Data?
+    private var ciscoReconnectAccount: String?
+    private var ciscoReconnectOrigin: URL?
+    private var ciscoReconnectServer: String?
     private var ciscoTunnelGeneration = 0
     private let proxyAttemptQueue = DispatchQueue(
         label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
@@ -3079,7 +3083,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let on = state == "active" || state == "locked"
         toggle.state = on ? .on : .off
         let protectedConnectionReady = (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
-            openVPNSystemRouteVerified ||
+            ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
             (wireGuardSystemRouteVerified &&
              ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol))
         toggle.isEnabled = !nativeKillSwitchActionBusy &&
@@ -3110,7 +3114,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let enable = sender.state == .on
         if enable {
             guard (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
-                  openVPNSystemRouteVerified ||
+                  ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
                   (wireGuardSystemRouteVerified &&
                    ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)) else {
                 updateNativeKillSwitchControls()
@@ -3695,6 +3699,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpBusy = false
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
+        ciscoReconnectProfile = nil
+        ciscoReconnectAccount = nil
+        ciscoReconnectOrigin = nil
+        ciscoReconnectServer = nil
         fullTunReconnectProfile = nil
         fullTunReconnectProtocol = nil
         fullTunReconnectAccount = nil
@@ -3981,7 +3989,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func requestCiscoTunnel(_ sender: NSButton) {
         if let existing = ciscoTunnelTask {
             ciscoTunnelStatus = "Stopping Cisco tunnel…"
-            existing.terminate()
+            ciscoTunnelBusy = true
             // Terminating sudo is not sufficient proof that its privileged
             // child exited. Use a fixed root-owned stop command to restore
             // DNS/routes and signal only our verified Cisco worker.
@@ -3992,9 +4000,24 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
                     "stop"]
                 stop.standardInput = FileHandle.nullDevice
-                stop.standardOutput = FileHandle.nullDevice
+                let output = Pipe()
+                stop.standardOutput = output
                 stop.standardError = FileHandle.nullDevice
-                if (try? stop.run()) != nil { stop.waitUntilExit() }
+                let started = (try? stop.run()) != nil
+                let data = started ? output.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: data, encoding: .utf8) ?? "").contains("CISCO_SYSTEM_DISCONNECTED")
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if stopped {
+                        if existing.isRunning { existing.terminate() }
+                    } else {
+                        self.ciscoTunnelBusy = false
+                        self.ciscoTunnelStatus = "CISCO_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                    }
+                }
             }
             view = build()
             return
@@ -4035,8 +4058,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ciscoTunnelGeneration += 1
         let generation = ciscoTunnelGeneration
         view = build()
-        directory.prepareCiscoAuthentication(session, serverID: serverID) {
-            [weak self] result in
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self else { return }
             guard self.ciscoTunnelGeneration == generation,
                   self.accountSession?.accessToken == session.accessToken else {
@@ -4052,12 +4074,37 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                      error.localizedDescription : "PROFILE_ERROR")
                 self.view = self.build()
             case .success(let profile):
+                self.ciscoReconnectProfile = profile
+                self.ciscoReconnectAccount = session.namespace
+                self.ciscoReconnectOrigin = session.apiOrigin
+                self.ciscoReconnectServer = serverID
                 DispatchQueue.global(qos: .userInitiated).async {
                     self.launchCiscoTunnel(profile, helper: helper,
                                            managementIP: mgmt,
                                            generation: generation)
                 }
             }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard mgmt == "unrouted-probe",
+                  ciscoReconnectAccount == session.namespace,
+                  ciscoReconnectOrigin == session.apiOrigin,
+                  ciscoReconnectServer == serverID,
+                  let cached = ciscoReconnectProfile else {
+                ciscoTunnelBusy = false
+                ciscoTunnelStatus = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            ciscoTunnelBusy = false
+            ciscoTunnelStatus = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareCiscoAuthentication(session, serverID: serverID,
+                                                 completion: complete)
         }
     }
 
@@ -6184,7 +6231,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let ks = nativeKillSwitchControlStatus(),
            let state = ks["state"] as? String, state != "off" {
-            if fullTunActive {
+            if ciscoTunnelTask != nil || (state == "locked" && activeProtocol == "cisco") {
+                requestCiscoTunnel(sender)
+            } else if fullTunActive {
                 stopFullTun()
             } else if openVPNAppSessionActive || openVPNSystemRouteVerified {
                 stopPersistentOpenVPN()

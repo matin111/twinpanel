@@ -34,8 +34,8 @@ ROUTE = "/sbin/route"
 NETSTAT = "/usr/sbin/netstat"
 
 
-def run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, capture_output=True, text=True, timeout=6,
+def run(*args: str, timeout=6) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout,
                           check=False)
 
 
@@ -166,6 +166,36 @@ def status_uptime() -> str:
     return json.dumps({"state": "connected", "connected_at": int(started)})
 
 
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def rollback() -> str:
     data = load()
     if not data:
@@ -200,6 +230,13 @@ def rollback() -> str:
     # management and server bypasses; otherwise Termalin could be lost.
     if data.get("mode") in ("trial-full", "leased"):
         tun = data.get("full_interface", "")
+        if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+            try:
+                control=kill_switch_control()
+                if control:
+                    control.before_cisco_disconnect(data.get("worker_pid"),tun)
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                return "CISCO_KS_CLOSE_BEFORE_ROLLBACK_FAILED"
         if not re.fullmatch(r"utun[0-9]{1,4}", tun):
             return "CISCO_FULL_ROUTE_STATE_INVALID"
         for network, probe in (("0.0.0.0/1", "1.0.0.1"),
@@ -252,8 +289,15 @@ def rollback() -> str:
 
 
 def preflight() -> tuple[str, list[str], str, str]:
+    protected=None
     if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
-        return "CISCO_KS_RECONNECT_NOT_AUTHORIZED", [], "", ""
+        try:
+            control=kill_switch_control()
+            protected=control.reconnect_context("handshake") if control else None
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            pass
+        if not protected or protected.get("protocol")!="cisco":
+            return "CISCO_KS_RECONNECT_NOT_AUTHORIZED", [], "", ""
     default = route("default")
     gateway, interface = default.get("gateway"), default.get("interface")
     if not gateway or not interface or not re.fullmatch(r"en[0-9]{1,3}", interface):
@@ -262,11 +306,16 @@ def preflight() -> tuple[str, list[str], str, str]:
         return "CISCO_BASELINE_GATEWAY_INVALID", [], "", ""
     if STATE.exists():
         return "CISCO_MANAGEMENT_TRIAL_ALREADY_ACTIVE", [], "", ""
-    peers = sorted(set(management_peers() + connector_peers()))
-    if not connector_peers():
-        return "CISCO_TERMALIN_CONTROL_MISSING", [], "", ""
-    if not peers:
-        return "CISCO_MANAGEMENT_CONNECTION_MISSING", [], "", ""
+    if protected:
+        if protected.get("gateway")!=gateway or protected.get("uplink")!=interface:
+            return "CISCO_KS_BASELINE_CHANGED", [], "", ""
+        peers=[]
+    else:
+        peers = sorted(set(management_peers() + connector_peers()))
+        if not connector_peers():
+            return "CISCO_TERMALIN_CONTROL_MISSING", [], "", ""
+        if not peers:
+            return "CISCO_MANAGEMENT_CONNECTION_MISSING", [], "", ""
     exact = exact_routes()
     if exact is None:
         return "CISCO_MANAGEMENT_ROUTE_OBSERVATION_FAILED", [], "", ""
@@ -498,7 +547,7 @@ def verify_named_https_and_dns(resolver: str = "1.1.1.1") -> str:
     return "CISCO_NAMED_HTTPS_VERIFIED"
 
 
-def activate_full(interface: str, pid: int) -> str:
+def activate_full(interface: str, pid: int, digest=None) -> str:
     """Lease full IPv4 only after the separately checked TUN egress succeeds."""
     if not re.fullmatch(r"utun[0-9]{1,4}", interface):
         return "CISCO_FULL_INTERFACE_INVALID"
@@ -531,18 +580,35 @@ def activate_full(interface: str, pid: int) -> str:
     ipv6 = run(ROUTE, "-n", "get", "-inet6", "default")
     if ipv6.returncode == 0 and "interface:" in ipv6.stdout:
         return "CISCO_IPV6_DEFAULT_PRESENT"
-    baseline_ip = exit_ip()
+    control=None
+    protected=None
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        try:
+            control=kill_switch_control()
+            protected=control.reconnect_context("handshake") if control else None
+            if (not protected or protected.get("protocol")!="cisco" or
+                    protected.get("ip")!=endpoint or protected.get("digest")!=digest):
+                return "CISCO_KS_RECONNECT_NOT_AUTHORIZED"
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "CISCO_KS_RECONNECT_NOT_AUTHORIZED"
+    baseline_ip = verified_public(protected["baseline_ip"]) if protected else exit_ip()
     if baseline_ip is None:
         return "CISCO_BASELINE_IP_UNVERIFIED"
     service = network_service(baseline_interface)
     dns_prior = saved_dns(service) if service else None
     if dns_prior is None:
         return "CISCO_DNS_BACKUP_UNAVAILABLE"
+    if protected:
+        try:
+            control.attach_cisco_reconnect(pid,interface,digest)
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "CISCO_KS_PEER_UNVERIFIED"
     # The root-owned launchd daemon owns the rollback state before edits.
     state = {"mode": "trial-full", "peers": [], "gateway": gateway,
              "interface": baseline_interface, "full_interface": interface,
              "endpoint": endpoint, "endpoint_pinned": False,
              "worker_pid": pid, "dns_started": False,
+             "baseline_ip":baseline_ip,"profile_digest":digest,
              "dns_service": service, "dns_prior": dns_prior,
              "deadline": time.time() + LEASE_SECONDS}
     store(state)
@@ -588,10 +654,25 @@ def activate_full(interface: str, pid: int) -> str:
             break
     if health != "CISCO_NAMED_HTTPS_VERIFIED":
         return health + "_" + rollback()
+    if protected:
+        second=run("/usr/bin/curl","--noproxy","*","-4","-fsS",
+                   "--resolve","dns.google:443:8.8.8.8","--connect-timeout","3",
+                   "--max-time","7","https://dns.google/resolve?name=example.com&type=A",timeout=10)
+        try:
+            result=json.loads(second.stdout)
+            if second.returncode or result.get("Status")!=0 or not result.get("Answer"):
+                return "CISCO_KS_SECOND_EGRESS_FAILED_"+rollback()
+        except (ValueError,TypeError):
+            return "CISCO_KS_SECOND_EGRESS_FAILED_"+rollback()
     state["mode"] = "leased"
     state["connected_at"] = time.time()
     state["deadline"] = time.time() + LEASE_SECONDS
     store(state)
+    if protected:
+        try:
+            control.complete_reconnect(pid,interface)
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "CISCO_KS_RECONNECT_FAILED_"+rollback()
     return "CISCO_SYSTEM_IPV4_CONNECTED"
 
 
@@ -615,7 +696,12 @@ def heartbeat(pid: int) -> str:
         return "CISCO_MANAGEMENT_BYPASS_LOST"
     connector = connector_peers()
     if not connector or not set(connector).issubset(set(current.get("peers", []))):
-        return "CISCO_MANAGEMENT_PEER_CHANGED"
+        try:
+            control=kill_switch_control() if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json") else None
+            if not control or not control.cisco_active_recovery(pid,current["full_interface"]):
+                return "CISCO_MANAGEMENT_PEER_CHANGED"
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "CISCO_MANAGEMENT_PEER_CHANGED"
     current["deadline"] = time.time() + LEASE_SECONDS
     store(current)
     return "CISCO_SYSTEM_IPV4_CONNECTED"
@@ -664,8 +750,12 @@ def main() -> int:
             result = preflight()[0]
         elif sys.argv[1:] == ["trial"]:
             result = trial()
-        elif len(sys.argv) == 4 and sys.argv[1] == "activate-full":
-            result = activate_full(sys.argv[2], int(sys.argv[3]))
+        elif len(sys.argv) in (4,5) and sys.argv[1] == "activate-full":
+            digest=sys.argv[4] if len(sys.argv)==5 else None
+            if digest is not None and not re.fullmatch(r"[0-9a-f]{64}",digest):
+                result="CISCO_PROFILE_DIGEST_INVALID"
+            else:
+                result = activate_full(sys.argv[2], int(sys.argv[3]), digest)
         elif len(sys.argv) == 3 and sys.argv[1] == "heartbeat":
             result = heartbeat(int(sys.argv[2]))
             if result != "CISCO_SYSTEM_IPV4_CONNECTED":

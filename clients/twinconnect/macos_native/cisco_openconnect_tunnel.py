@@ -10,6 +10,8 @@ Do NOT run remotely unless a known management IPv4 is provided.
 from __future__ import annotations
 
 import ipaddress
+import hashlib
+from pathlib import Path
 import json
 import os
 import re
@@ -456,7 +458,37 @@ def cisco_independent_egress_probe(baseline_interfaces: dict[str, str]) -> str:
             raise ValueError("CISCO_SECOND_EGRESS_ROLLBACK_INCOMPLETE")
 
 
-def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def probe_unrouted(profile: dict, system_vpn: bool = False, raw=None) -> int:
     """Connect through isolated Cisco TUN, then verify data before full IPv4.
 
     The only privileged child network edit is the root-owned utun-only
@@ -492,10 +524,35 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
         "--servercert=" + profile["servercert"], "--script=" + script,
         "https://" + profile["host"] + ":" + str(profile["port"])
     ]
+    control=None
+    protected=None
+    digest=hashlib.sha256(raw).hexdigest() if raw is not None else None
+    if system_vpn:
+        # TCP-only while DTLS is not independently attested.
+        cmd.insert(1,"--no-dtls")
+        if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+            control=kill_switch_control()
+            if not control or raw is None:
+                raise ValueError("CISCO_KS_RECONNECT_NOT_AUTHORIZED")
+            try:
+                protected=control.begin_reconnect(raw.decode("utf-8"),"cisco")
+                if (not protected or protected.get("port")!=profile["port"] or
+                        protected.get("gateway")!=original["gateway"] or
+                        protected.get("uplink")!=original["interface"]):
+                    raise ValueError("CISCO_KS_RECONNECT_NOT_AUTHORIZED")
+                cmd.insert(1,"--resolve="+profile["host"]+":"+protected["ip"])
+            except (ValueError,RuntimeError,OSError,subprocess.SubprocessError):
+                control.abort_reconnect("cisco")
+                raise ValueError("CISCO_KS_RECONNECT_NOT_AUTHORIZED") from None
     initial_interfaces = cisco_tun_interfaces()
-    child = subprocess.Popen(
+    try:
+        child = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        if protected:
+            control.abort_reconnect("cisco")
+        raise
     # The UI's Stop Test sends SIGTERM to this privileged command.
     # Handle it in Python so the child process group is terminated first.
     def requested_stop(_signum, _frame):
@@ -523,27 +580,28 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
             if egress_reason is None and any(
                     initial_interfaces.get(k) != v
                     for k, v in cisco_tun_interfaces().items()):
-                egress_reason = cisco_verified_probe(initial_interfaces)
-                record_cisco_result(egress_reason)
-                print(json.dumps({"state": "cisco_egress_probe",
-                                  "reason": egress_reason,
-                                  "vpn_connected": False}), flush=True)
+                if protected:
+                    egress_reason="CISCO_PROTECTED_CANDIDATE_READY"
+                else:
+                    egress_reason = cisco_verified_probe(initial_interfaces)
+                    record_cisco_result(egress_reason)
+                    print(json.dumps({"state": "cisco_egress_probe",
+                                      "reason": egress_reason,
+                                      "vpn_connected": False}), flush=True)
             if egress_reason is not None:
                 break
             time.sleep(1)
         if egress_reason is None:
             raise ValueError("CISCO_UNROUTED_TUNNEL_TIMEOUT")
-        if egress_reason != "CISCO_EGRESS_VERIFIED":
-            return 1
-        # Confirm the Cisco server actually forwards traffic beyond the
-        # Cloudflare IP used by the original probe. A single successful
-        # domain is not a reliable system-VPN readiness test.
-        second = cisco_independent_egress_probe(initial_interfaces)
-        record_cisco_result(second)
-        print(json.dumps({"state": "cisco_second_egress_probe",
-                          "reason": second, "vpn_connected": False}), flush=True)
-        if second != "CISCO_MULTINET_EGRESS_VERIFIED":
-            return 1
+        if not protected:
+            if egress_reason != "CISCO_EGRESS_VERIFIED":
+                return 1
+            second = cisco_independent_egress_probe(initial_interfaces)
+            record_cisco_result(second)
+            print(json.dumps({"state": "cisco_second_egress_probe",
+                              "reason": second, "vpn_connected": False}), flush=True)
+            if second != "CISCO_MULTINET_EGRESS_VERIFIED":
+                return 1
         if not system_vpn:
             return 0
         # Only after actual HTTPS egress is proven do we attempt guarded
@@ -553,9 +611,11 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
         if len(created) != 1:
             raise ValueError("CISCO_EGRESS_TUN_NOT_IDENTIFIED")
         guard = ["/usr/bin/python3", CISCO_HOST_GUARD]
-        activated = subprocess.run([*guard, "activate-full", created[0],
-                                    str(child.pid)], capture_output=True,
-                                   text=True, timeout=29, check=False)
+        args=[*guard,"activate-full",created[0],str(child.pid)]
+        if digest:
+            args.append(digest)
+        activated = subprocess.run(args, capture_output=True,
+                                   text=True, timeout=45 if protected else 29, check=False)
         if activated.returncode or activated.stdout.strip() != "CISCO_SYSTEM_IPV4_CONNECTED":
             raise ValueError("CISCO_SYSTEM_ROUTE_ACTIVATION_FAILED")
         record_cisco_result("CISCO_SYSTEM_IPV4_CONNECTED")
@@ -587,6 +647,11 @@ def probe_unrouted(profile: dict, system_vpn: bool = False) -> int:
                                text=True, timeout=12, check=False)
             except (OSError, subprocess.TimeoutExpired):
                 pass  # independent watchdog still owns recovery
+        if protected:
+            try:
+                control.abort_reconnect("cisco")
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                pass
         signal.signal(signal.SIGTERM, previous_term)
         signal.signal(signal.SIGINT, previous_int)
         if child.poll() is None:
@@ -609,10 +674,11 @@ def main() -> int:
         if sys.argv[1:] not in (["probe"], ["system"]) and (
                 len(sys.argv) != 3 or sys.argv[1] != "connect"):
             raise ValueError("CISCO_INVALID_ACTION")
-        if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        if sys.argv[1:] != ["system"] and os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
             raise ValueError("CISCO_KS_RECONNECT_NOT_AUTHORIZED")
         # Validation before any privileged network operation.
-        profile = validate(sys.stdin.buffer.read(16385))
+        raw=sys.stdin.buffer.read(16385)
+        profile = validate(raw)
         if not profile.get("servercert"):
             raise ValueError("CISCO_PIN_REQUIRED_FOR_TUNNEL")
         if sys.argv[1:] == ["probe"]:
@@ -620,7 +686,7 @@ def main() -> int:
         if sys.argv[1:] == ["system"]:
             if not CISCO_SYSTEM_ROUTE_ENABLED:
                 raise ValueError("CISCO_SYSTEM_ROUTE_DISABLED")
-            return probe_unrouted(profile, system_vpn=True)
+            return probe_unrouted(profile, system_vpn=True, raw=raw)
         return run(profile, sys.argv[2])
     except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
         code = str(exc)
