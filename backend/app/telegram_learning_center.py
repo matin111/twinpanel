@@ -845,7 +845,7 @@ def register_learning_handlers(
     )
 
     @router.message(
-        F.text == "📚 آموزش"
+        (F.text == "📚 آموزش و دانلود") | (F.text == "📚 آموزش")
     )
     async def learning_home(
         message: Message,
