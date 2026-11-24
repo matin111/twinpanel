@@ -1,0 +1,273 @@
+name: TwinConnect macOS Mieru Official Core Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/lib/macos_mieru_profile.dart'
+      - 'clients/twinconnect/lib/macos_mieru_tun_relay.dart'
+      - 'clients/twinconnect/test/macos_mieru_tun_relay_test.dart'
+      - 'clients/twinconnect/tool/macos_mieru_tun_fixture.dart'
+      - 'clients/twinconnect/lib/macos_mieru_controller.dart'
+      - 'clients/twinconnect/lib/live_dashboard.dart'
+      - 'clients/twinconnect/macos_native/TwinConnectMacOSVPNBridge.swift'
+      - 'clients/twinconnect/macos_native/TwinConnectMacOSMieruControl.swift'
+      - 'clients/twinconnect/macos_native/install_macos_bridge.py'
+      - 'clients/twinconnect/test/macos_mieru_keychain_handoff_contract_test.dart'
+      - 'clients/twinconnect/macos_native/mieru/**'
+      - 'clients/twinconnect/macos_native/install_packet_tunnel_target.rb'
+      - 'clients/twinconnect/test/macos_mieru_cabi_adapter_contract_test.dart'
+      - 'clients/twinconnect/test/macos_mieru_packet_tunnel_owner_contract_test.dart'
+      - 'clients/twinconnect/test/macos_mieru_core_bundling_contract_test.dart'
+      - 'clients/twinconnect/test/macos_mieru_profile_test.dart'
+      - '.github/workflows/twinconnect-macos-mieru-core.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-macos-mieru-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-official-core:
+    runs-on: macos-15
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Validate Mieru profile adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter test test/macos_mieru_profile_test.dart
+          flutter test test/macos_mieru_tun_relay_test.dart
+          flutter test test/macos_mieru_cabi_adapter_contract_test.dart
+          flutter test test/macos_mieru_packet_tunnel_owner_contract_test.dart
+          flutter test test/macos_mieru_keychain_handoff_contract_test.dart
+          flutter test test/macos_mieru_inprocess_profile_test.dart
+          flutter test test/macos_mieru_core_bundling_contract_test.dart
+          flutter test test/mieru_client_profile_test.dart
+      - name: Fetch and validate official macOS Mieru archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=3.39.0
+          base="https://github.com/enfein/mieru/releases/download/v${version}"
+          mkdir -p build/macos_mieru_core
+          for arch in amd64 arm64; do
+            package="mieru_${version}_macos_${arch}.tar.gz"
+            archive="build/macos_mieru_core/${package}"
+            hashfile="${archive}.sha256.txt"
+            target="build/macos_mieru_core/${arch}"
+            mkdir -p "${target}"
+            curl --fail --location --retry 4 --retry-all-errors \
+              --connect-timeout 20 --max-time 180 --silent --show-error \
+              "${base}/${package}" --output "${archive}"
+            curl --fail --location --retry 4 --retry-all-errors \
+              --connect-timeout 20 --max-time 60 --silent --show-error \
+              "${base}/${package}.sha256.txt" --output "${hashfile}"
+            # Upstream checksum text may use a different filename layout.
+            # Check the digest against the exact downloaded archive.
+            python3 - "${archive}" "${hashfile}" <<'PY'
+          import hashlib, pathlib, re, sys
+          archive = pathlib.Path(sys.argv[1])
+          supplied = pathlib.Path(sys.argv[2]).read_text().strip()
+          match = re.search(r"(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F])", supplied)
+          if match is None:
+              raise SystemExit("Official SHA256 file did not contain a digest")
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if digest.lower() != match.group(0).lower():
+              raise SystemExit("Mieru official SHA256 mismatch")
+          print(f"Verified official SHA256 for {archive.name}")
+          PY
+            tar -tzf "${archive}" > "${target}/archive-manifest.txt"
+            # Do not assume a flat layout inside upstream tarball.
+            tar -xzf "${archive}" -C "${target}"
+            binary="$(find "${target}" -type f -name mieru -print -quit)"
+            test -n "${binary}" && test -s "${binary}" || {
+              echo "::error::Mieru executable absent in ${package}"
+              cat "${target}/archive-manifest.txt"
+              exit 1
+            }
+            if test "${binary}" != "${target}/mieru"; then
+              cp "${binary}" "${target}/mieru"
+            fi
+            chmod 755 "${target}/mieru"
+            file "${target}/mieru" | grep -q Mach-O
+            actual="$(lipo -archs "${target}/mieru")"
+            if test "${arch}" = arm64; then
+              echo "${actual}" | grep -qw arm64
+            else
+              echo "${actual}" | grep -qw x86_64
+            fi
+            "${target}/mieru" version
+          done
+      - name: Verify native Mieru IPv4 endpoint and route exclusion planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc \
+            macos_native/mieru/TwinConnectMacMieruEndpointRoute.swift \
+            macos_native/mieru/tests/main.swift \
+            -o "$RUNNER_TEMP/twinconnect-mieru-route-test"
+          "$RUNNER_TEMP/twinconnect-mieru-route-test"
+      - name: Compile native in-process Mieru library for both Mac architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(pwd)"
+          temp="$(mktemp -d)"
+          trap 'rm -rf "$temp"' EXIT
+          git clone --depth 1 --branch v3.39.0 \
+            https://github.com/enfein/mieru.git "$temp/mieru"
+          cd "$temp/mieru"
+          test "$(go list -m)" = "github.com/enfein/mieru/v3"
+          mkdir -p cmd/twinconnect_mieru
+          cp "$workspace/macos_native/mieru/twin_mieru_cbridge.go" \
+            cmd/twinconnect_mieru/main.go
+          sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          test -f "$sdk/usr/include/stdlib.h" || {
+            echo "::error::macOS SDK headers missing from $sdk"
+            exit 1
+          }
+          clang="$(xcrun --sdk macosx --find clang)"
+          for arch in arm64 amd64; do
+            case "$arch" in
+              arm64) apple_arch=arm64 ;;
+              amd64) apple_arch=x86_64 ;;
+            esac
+            output="$workspace/build/macos_mieru_core/$arch/libtwinmieru.dylib"
+            mkdir -p "$(dirname "$output")"
+            printf '#include <stdlib.h>\\nint main(void) { return 0; }\\n' | \
+              "$clang" -arch "$apple_arch" -isysroot "$sdk" \
+                -x c -fsyntax-only -
+            GOOS=darwin GOARCH="$arch" CGO_ENABLED=1 \
+              SDKROOT="$sdk" CC="$clang" \
+              CGO_CFLAGS="-arch $apple_arch -isysroot $sdk" \
+              CGO_CPPFLAGS="-isysroot $sdk" \
+              CGO_LDFLAGS="-arch $apple_arch -isysroot $sdk" \
+              go build -trimpath -buildmode=c-shared \
+                -o "$output" ./cmd/twinconnect_mieru
+            test -s "$output"
+            lipo -archs "$output" | grep -qw "$apple_arch"
+            nm -gU "$output" | grep -q TwinMieruStart
+            nm -gU "$output" | grep -q TwinMieruStop
+            nm -gU "$output" | grep -q TwinMieruLocalReady
+          done
+          lipo -create \
+            "$workspace/build/macos_mieru_core/amd64/libtwinmieru.dylib" \
+            "$workspace/build/macos_mieru_core/arm64/libtwinmieru.dylib" \
+            -output "$workspace/build/macos_mieru_core/libtwinmieru.dylib"
+          lipo -archs "$workspace/build/macos_mieru_core/libtwinmieru.dylib" \
+            | grep -qw arm64
+          lipo -archs "$workspace/build/macos_mieru_core/libtwinmieru.dylib" \
+            | grep -qw x86_64
+      - name: Compile unsigned macOS app and packet tunnel scaffold
+        shell: bash
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          flutter build macos --release --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          test -x "$app/Contents/MacOS/twinconnect"
+          test -x "$app/Contents/PlugIns/PacketTunnel.appex/Contents/MacOS/PacketTunnel"
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' \
+            "$app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist" | grep -qx false
+      - name: Bundle official Mieru core in unsigned macOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          destination="$app/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$destination"
+          # macOS distributes architecture-specific binaries. The Flutter
+          # binary in this unsigned artifact remains a CI-only preview.
+          lipo -create \
+            build/macos_mieru_core/amd64/mieru \
+            build/macos_mieru_core/arm64/mieru \
+            -output "$destination/mieru"
+          chmod 755 "$destination/mieru"
+          arches="$(lipo -archs "$destination/mieru")"
+          echo "$arches" | grep -qw x86_64
+          echo "$arches" | grep -qw arm64
+          file "$destination/mieru" | grep -q Mach-O
+          test -x "$destination/mieru"
+          # Stage the same upstream-verified binary inside the extension.
+          # Native PacketTunnel must own the engine for future signed tests;
+          # executable presence alone is never permission to activate VPN.
+          extension="$app/Contents/PlugIns/PacketTunnel.appex"
+          extension_engines="$extension/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$extension_engines"
+          ditto "$destination/mieru" "$extension_engines/mieru"
+          chmod 755 "$extension_engines/mieru"
+          cmp "$destination/mieru" "$extension_engines/mieru"
+          file "$extension_engines/mieru" | grep -q Mach-O
+          test -x "$extension_engines/mieru"
+          # In-process C ABI must live in the extension, never in the host.
+          # This unsigned app is intentionally NOT provisioned for activation.
+          extension_frameworks="$extension/Contents/Frameworks"
+          mkdir -p "$extension_frameworks"
+          cp build/macos_mieru_core/libtwinmieru.dylib \
+            "$extension_frameworks/libtwinmieru.dylib"
+          chmod 755 "$extension_frameworks/libtwinmieru.dylib"
+          lipo -archs "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -qw arm64
+          lipo -archs "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -qw x86_64
+          nm -gU "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -q TwinMieruStart
+          test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"
+          # Bundled executable does NOT grant the PacketTunnel subprocess
+          # access or a working Mieru full-tunnel packet-flow bridge.
+          echo "Mieru official dual-arch core bundled, VPN NOT READY"
+      - name: Record unsigned non-VPN status
+        shell: bash
+        run: |
+          cat > build/macos_mieru_core/README.txt <<'EOF'
+          TwinConnect official Mieru macOS engine candidate, 3.39.0
+          Official upstream sha256 checks verified in workflow.
+          Both arm64 and Intel macOS binaries provided.
+          Bundled in unsigned TwinConnect.app and PacketTunnel.appex Resources/TwinConnectEngines/mieru.
+          NOT code signed with Apple Developer identity.
+          The signed-only Mieru C ABI is staged inside PacketTunnel.appex/Contents/Frameworks.\n          NO authenticated PacketTunnel + Libbox traffic orchestration yet.
+          NO VPN connection, handshakes, egress, or DNS validation.
+          This is a standalone core artifact for future signed integration.
+          EOF
+      - name: Package unsigned Mac app with official Mieru core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent twinconnect.app TwinConnect-macOS-Mieru-UNSIGNED.zip
+          shasum -a 256 TwinConnect-macOS-Mieru-UNSIGNED.zip > MIERU-APP-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Mieru-Official-Cores-UNSIGNED
+          path: |
+            clients/twinconnect/build/macos_mieru_core/amd64/mieru
+            clients/twinconnect/build/macos_mieru_core/arm64/mieru
+            clients/twinconnect/build/macos_mieru_core/README.txt
+            clients/twinconnect/build/macos_mieru_core/libtwinmieru.dylib
+            clients/twinconnect/build/macos/Build/Products/Release/TwinConnect-macOS-Mieru-UNSIGNED.zip
+            clients/twinconnect/build/macos/Build/Products/Release/MIERU-APP-SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error

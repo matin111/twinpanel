@@ -1,0 +1,22 @@
+{
+  "log": {"level": "error"},
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "local-test",
+      "listen": "127.0.0.1",
+      "listen_port": 20888
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "hysteria2",
+      "tag": "proxy",
+      "server": "example.com",
+      "server_port": 443,
+      "password": "TEST_ONLY_NOT_A_REAL_CREDENTIAL",
+      "tls": {"enabled": true, "server_name": "example.com"}
+    }
+  ],
+  "route": {"final": "proxy"}
+}

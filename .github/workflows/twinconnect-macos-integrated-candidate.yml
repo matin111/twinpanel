@@ -1,0 +1,193 @@
+name: TwinConnect macOS Integrated Libbox Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/**'
+      - 'clients/twinconnect/lib/macos_hysteria2_controller.dart'
+      - 'clients/twinconnect/lib/macos_shadowtls_controller.dart'
+      - 'clients/twinconnect/lib/macos_shadowtls_config.dart'
+      - 'clients/twinconnect/lib/macos_snell_controller.dart'
+      - 'clients/twinconnect/lib/macos_socks5_controller.dart'
+      - 'clients/twinconnect/test/macos_socks5_native_test.dart'
+      - 'clients/twinconnect/tool/macos_socks5_config_fixture.dart'
+      - 'clients/twinconnect/test/macos_snell_native_contract_test.dart'
+      - 'clients/twinconnect/test/singbox_macos_snell_config_test.dart'
+      - 'clients/twinconnect/lib/shadowtls_chain.dart'
+      - 'clients/twinconnect/test/macos_shadowtls_*.dart'
+      - 'clients/twinconnect/tool/macos_shadowtls_config_fixture.dart'
+      - 'clients/twinconnect/lib/singbox_macos_config.dart'
+      - 'clients/twinconnect/lib/live_dashboard.dart'
+      - 'clients/twinconnect/test/macos_hysteria2_dashboard_lifecycle_contract_test.dart'
+      - '.github/workflows/twinconnect-macos-integrated-candidate.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: twinconnect-mac-integrated-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-integrated-unsigned:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Validate ShadowTLS v3 chain and signed-only native contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter test test/macos_shadowtls_config_test.dart test/macos_shadowtls_native_contract_test.dart test/macos_snell_native_contract_test.dart test/singbox_macos_snell_config_test.dart test/macos_socks5_native_test.dart
+          dart run tool/macos_shadowtls_config_fixture.dart > "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
+          test -s "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
+          echo "ShadowTLS two-hop profile and native contract passed (offline only)"
+      - name: Verify signed-candidate opt-in and effective entitlement staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v macos_native/test_signed_macos_tooling.py
+          python3 -m unittest -v macos_native/test_metal_fallback_install.py
+          python3 -m unittest -v macos_native/test_hysteria2_network_evidence.py
+          echo "Apple signing and egress-evidence tests are offline; no real VPN used"
+      - name: Restore pinned, previously verified Libbox for macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: TwinConnect-macOS-Libbox-Unsigned-Framework
+          repository: matin111/twinpanel
+          run-id: 43802530369
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/mac-libbox
+      - name: Restore macOS framework symlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/mac-libbox"
+          target=macos_native/build/libbox/Libbox.xcframework
+          mkdir -p "$(dirname "$target")"
+          if test -f "$source/Libbox.xcframework/Info.plist"; then
+            ditto "$source/Libbox.xcframework" "$target"
+          elif test -f "$source/Info.plist"; then
+            ditto "$source" "$target"
+          else
+            echo "::error::Verified Libbox artifact missing"
+            exit 1
+          fi
+          plutil -lint "$target/Info.plist"
+          count=0
+          for framework in "$target"/*/Libbox.framework; do
+            test -s "$framework/Versions/A/Libbox" || continue
+            rm -rf "$framework/Versions/Current"
+            ln -s A "$framework/Versions/Current"
+            for part in Libbox Headers Modules Resources; do
+              if test -e "$framework/Versions/A/$part"; then
+                rm -rf "$framework/$part"
+                ln -s "Versions/Current/$part" "$framework/$part"
+              fi
+            done
+            test -s "$framework/Libbox"
+            count=$((count + 1))
+          done
+          test "$count" -ge 1
+          echo "Verified macOS Libbox slices: $count"
+      - name: Generate Flutter Runner and link in-process Libbox PacketTunnel
+        shell: bash
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby macos_native/libbox/link_libbox_packet_tunnel.rb
+          grep -q 'TwinConnectMacLibboxEngine.swift' macos/Runner.xcodeproj/project.pbxproj
+          grep -q 'TwinConnectMacLibboxPlatform.swift' macos/Runner.xcodeproj/project.pbxproj
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' macos_native/PacketTunnel-Info.plist | grep -qx false
+          echo 'Unsigned preview: Hysteria2 connection intentionally disabled'
+      - name: Build integrated macOS Flutter app and its embedded extension
+        shell: bash
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          set -euo pipefail
+          flutter build macos --release \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+      - name: Compile signed-only Swift feature path without signing or enabling VPN
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/twinconnect-macos-signed-path-compile.log"
+          # Flutter plugins are linked via Runner.xcworkspace; building the
+          # bare Xcode project leaves FlutterMacOS unavailable to SwiftPM deps.
+          if ! xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
+            -configuration Release -sdk macosx -arch arm64 \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS=TWINCONNECT_SIGNED_LIBBOX \
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            grep -nE -C 3 'error:|fatal error:|Undefined symbols|BUILD FAILED' "$log" | tail -110 || true
+            tail -45 "$log"
+            exit 1
+          fi
+          grep -q '\\*\\* BUILD SUCCEEDED \\*\\*' "$log"
+          # The signed-only code compiled, but marker and entitlements remain
+          # deliberately disabled for this unsigned CI artifact.
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' \
+            build/macos/Build/Products/Release/twinconnect.app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist | grep -qx false
+          echo "Signed-only Swift code path: COMPILED WITHOUT Apple signing"
+          echo "VPN functionality: NOT VERIFIED"
+      - name: Verify statically linked Libbox symbols and unsigned extension guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          appex="$app/Contents/PlugIns/PacketTunnel.appex"
+          test -x "$app/Contents/MacOS/twinconnect"
+          test -x "$appex/Contents/MacOS/PacketTunnel"
+          # Go/gomobile's macOS Libbox.framework contains a static ar archive.
+          # Static linkage belongs in the PacketTunnel executable; do not
+          # mistake the absence of otool -L entries for an unlinked library.
+          test ! -e "$appex/Contents/Frameworks/Libbox.framework"
+          nm -g "$appex/Contents/MacOS/PacketTunnel" > "$RUNNER_TEMP/packet-tunnel-static-symbols.txt"
+          grep -E '(_LibboxSetup|_LibboxNewCommandServer|OBJC_CLASS_.*Libbox)' "$RUNNER_TEMP/packet-tunnel-static-symbols.txt"
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' "$appex/Contents/Info.plist" | grep -qx false
+          plutil -lint "$appex/Contents/Info.plist"
+          # An unsigned candidate cannot be mistaken for a functional VPN.
+          if /usr/libexec/PlistBuddy -c 'Print TwinConnectKeychainAccessGroup' "$app/Contents/Info.plist"; then
+            echo '::error::Unexpected signed-test Keychain group in unsigned candidate'
+            exit 1
+          fi
+          {
+            echo 'TWINCONNECT MACOS LIBBOX INTEGRATED CANDIDATE'
+            echo "Source commit: $GITHUB_SHA"
+            echo 'App+PacketTunnel+statically linked Libbox: packaged and validated'
+            echo 'Apple developer signing: NOT CONFIGURED'
+            echo 'Network Extension provider usable: NO'
+            echo 'Hysteria2 / ShadowTLS / Snell / SOCKS5 VPN connection / egress / DNS: NOT VERIFIED'
+            echo 'For signing, rebuild on your provisioned Mac using macos_native/SIGNED_LIBBOX_TEST.md'
+          } > build/macos/Build/Products/Release/MACOS-INTEGRATED-TEST-NOTES.txt
+      - name: Package integrated app with symbolic links intact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent twinconnect.app TwinConnect-macOS-Libbox-Integrated-UNSIGNED.zip
+          shasum -a 256 TwinConnect-macOS-Libbox-Integrated-UNSIGNED.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Libbox-Integrated-UNSIGNED
+          path: |
+            clients/twinconnect/build/macos/Build/Products/Release/TwinConnect-macOS-Libbox-Integrated-UNSIGNED.zip
+            clients/twinconnect/build/macos/Build/Products/Release/SHA256SUMS.txt
+            clients/twinconnect/build/macos/Build/Products/Release/MACOS-INTEGRATED-TEST-NOTES.txt
+          retention-days: 14
+          if-no-files-found: error

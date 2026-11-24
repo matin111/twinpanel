@@ -1,0 +1,104 @@
+#!/usr/bin/env ruby
+# Link the locally prepared WireGuardKit Swift package and the built Go archive
+# into PacketTunnel. Idempotent; does NOT set signing or declare a working VPN.
+require 'xcodeproj'
+root = File.expand_path('..', __dir__)
+project_path = File.join(root, 'macos/Runner.xcodeproj')
+source = File.join(root, '.dart_tool/twinconnect-wireguard-apple')
+archive = File.join(root, '.dart_tool/twinconnect-wireguard-build/lib/libwg-go.a')
+abort 'ERROR: build libwg-go.a first' unless File.size?(archive)
+abort 'ERROR: prepare upstream WireGuardKit source first' unless File.file?(File.join(source, 'Package.swift'))
+manifest = File.join(source, 'Package.swift')
+manifest_text = File.read(manifest)
+# The upstream manifest declares swift-tools-version 5.3 but uses
+# .macOS(.v12) and .iOS(.v15), which are unavailable in that manifest API.
+# Patch ONLY the downloaded, ignored local checkout; never rewrite upstream.
+if manifest_text.start_with?("// swift-tools-version:5.3\n")
+  File.write(manifest, manifest_text.sub(
+    "// swift-tools-version:5.3\n", "// swift-tools-version:5.7\n"
+  ))
+  puts 'Prepared local WireGuardKit Package.swift for macOS 12/iOS 15 (Swift tools 5.7)'
+elsif manifest_text.match?(/\A\/\/ swift-tools-version:5\.(?:7|8|9|10)\b/)
+  puts 'WireGuardKit Swift tools manifest already supports deployment platform versions'
+else
+  abort "ERROR: unexpected upstream Swift tools manifest. Inspect #{manifest}"
+end
+project = Xcodeproj::Project.open(project_path)
+extension = project.targets.find { |t| t.name == 'PacketTunnel' }
+abort 'ERROR: PacketTunnel target missing; run install_packet_tunnel_target.rb first' unless extension
+abort 'ERROR: installed xcodeproj gem does not support local Swift packages' unless defined?(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
+relative = '../.dart_tool/twinconnect-wireguard-apple'
+packages = project.root_object.package_references.select do |p|
+  p.isa == 'XCLocalSwiftPackageReference'
+end
+own = packages.find { |p| p.relative_path == relative }
+# This project may already contain a WireGuardKit checkout in
+# macos_native/build/wireguard-apple. Reuse it rather than introducing a
+# second package with the same exported product name.
+existing = packages.find do |p|
+  next false if p == own
+  path = File.expand_path(p.relative_path.to_s, File.dirname(project_path))
+  File.file?(File.join(path, 'Package.swift')) &&
+    File.read(File.join(path, 'Package.swift')).include?('name: "WireGuardKit"')
+end
+package = existing || own
+unless package
+  package = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
+  package.relative_path = relative
+  project.root_object.package_references << package
+end
+if existing
+  existing_manifest = File.expand_path(
+    File.join(existing.relative_path, 'Package.swift'), File.dirname(project_path)
+  )
+  text = File.read(existing_manifest)
+  if text.start_with?("// swift-tools-version:5.3\n")
+    File.write(existing_manifest, text.sub(
+      "// swift-tools-version:5.3\n", "// swift-tools-version:5.7\n"
+    ))
+    puts "Prepared existing WireGuardKit manifest: #{existing_manifest}"
+  end
+  if own && own != existing
+    project.root_object.package_references.delete(own)
+    puts "Removed duplicate WireGuardKit package reference: #{relative}"
+  end
+end
+products = extension.package_product_dependencies.select { |p| p.product_name == 'WireGuardKit' }
+product = products.first
+unless product
+  product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+  product.product_name = 'WireGuardKit'
+  extension.package_product_dependencies << product
+end
+product.package = package
+products.drop(1).each do |duplicate|
+  extension.frameworks_build_phase.files.select { |f| f.product_ref == duplicate }.each do |f|
+    extension.frameworks_build_phase.files.delete(f)
+    f.remove_from_project
+  end
+  extension.package_product_dependencies.delete(duplicate)
+  duplicate.remove_from_project
+end
+unless extension.frameworks_build_phase.files.any? { |f| f.product_ref == product }
+  build_file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
+  build_file.product_ref = product
+  extension.frameworks_build_phase.files << build_file
+end
+puts "Using WireGuardKit package reference: #{package.relative_path}"
+# Keep archive linker flags explicitly scoped to the extension, not Runner.
+extension.build_configurations.each do |configuration|
+  settings = configuration.build_settings
+  settings['MACOSX_DEPLOYMENT_TARGET'] = '12.0' # upstream WireGuardKit minimum macOS
+  paths = Array(settings['LIBRARY_SEARCH_PATHS'])
+  paths = ['$(inherited)'] if paths.empty?
+  lib_path = '$(PROJECT_DIR)/../.dart_tool/twinconnect-wireguard-build/lib'
+  paths << lib_path unless paths.include?(lib_path)
+  settings['LIBRARY_SEARCH_PATHS'] = paths
+  flags = Array(settings['OTHER_LDFLAGS'])
+  flags = ['$(inherited)'] if flags.empty?
+  flags << '-lwg-go' unless flags.include?('-lwg-go')
+  settings['OTHER_LDFLAGS'] = flags
+end
+project.save
+puts 'SUCCESS: WireGuardKit package and libwg-go.a linker settings added to PacketTunnel'
+puts 'NOTE: This is an unsigned compile integration, not a working signed VPN.'

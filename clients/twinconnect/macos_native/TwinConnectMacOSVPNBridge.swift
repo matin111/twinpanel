@@ -1,7 +1,149 @@
-// Native macOS capability boundary for the shared TwinConnect Flutter UI.
-// The real NEPacketTunnelProvider target and engine linkage are not installed
-// in this unsigned development preview. Never claim connectivity/protection.
+// macOS native capabilities are derived from the installed extension and
+// its real protocol backend marker. Installing an .appex alone is never proof
+// of a working VPN. Native controls are fail-closed until backend integration.
+import Foundation
+import Security
+
 final class TwinConnectMacOSVPNBridge {
+    private static func extensionBundle() -> Bundle? {
+        guard let plugins = Bundle.main.builtInPlugInsPath else { return nil }
+        let url = URL(fileURLWithPath: plugins)
+            .appendingPathComponent("PacketTunnel.appex", isDirectory: true)
+        guard let bundle = Bundle(url: url),
+              bundle.bundleIdentifier == "com.twinpanel.twinconnect.PacketTunnel" else {
+            return nil
+        }
+        return bundle
+    }
+
+    private static func mieruCoreBundled() -> Bool {
+        let core = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/mieru")
+        return FileManager.default.isExecutableFile(atPath: core.path)
+    }
+
+    private static func mieruCoreInExtension() -> Bool {
+        guard let bundle = extensionBundle() else { return false }
+        let core = bundle.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/mieru")
+        return FileManager.default.isExecutableFile(atPath: core.path)
+    }
+
+    private static func mieruInProcessLibraryBundled() -> Bool {
+        guard let bundle = extensionBundle() else { return false }
+        let path = bundle.bundleURL.appendingPathComponent(
+            "Contents/Frameworks/libtwinmieru.dylib")
+        return FileManager.default.fileExists(atPath: path.path)
+    }
+
+    private static func xrayEngineInstalled() -> Bool {
+        let executable = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/xray")
+        return FileManager.default.isExecutableFile(atPath: executable.path)
+    }
+
+    private static func libboxInExtension() -> Bool {
+        // Upstream gomobile ships Libbox as a static Go archive. Its code is
+        // linked into PacketTunnel's executable, not copied to Frameworks.
+        // The marker is opt-in for a provisioned signed candidate only; the
+        // offline bundle verifier separately checks real Libbox symbols.
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectProtocolBackendLinked") as? Bool == true,
+              let executable = bundle.executableURL else {
+            return false
+        }
+        return FileManager.default.isExecutableFile(atPath: executable.path)
+    }
+
+    private static func hysteriaEngineInstalled() -> Bool {
+        let root = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/sing-box")
+        guard FileManager.default.isExecutableFile(atPath: root.path) else {
+            return false
+        }
+        // A bundled binary is useful for profile preflight only. Native
+        // PacketTunnel packetFlow forwarding is a separate requirement.
+        return true
+    }
+
+    private static func wireGuardBackendReady() -> Bool {
+        // Only a deliberately provisioned signed build can request a VPN.
+        // The unsigned CI preview must remain fail-closed even when the Go
+        // symbols are compiled into PacketTunnel.
+        #if TWINCONNECT_SIGNED_WIREGUARD
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectWireGuardBackendLinked") as? Bool == true,
+              let executable = bundle.executableURL,
+              FileManager.default.isExecutableFile(atPath: executable.path),
+              let task = SecTaskCreateFromSelf(kCFAllocatorDefault),
+              let appEntitlements = SecTaskCopyValueForEntitlement(task,
+                  "com.apple.developer.networking.networkextension" as CFString,
+                  nil) as? [String],
+              appEntitlements.contains("packet-tunnel-provider") else {
+            return false
+        }
+        // Verify the embedded extension was signed with packet-tunnel-provider.
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(bundle.bundleURL as CFURL,
+                                          SecCSFlags(), &code) == errSecSuccess,
+              let code else { return false }
+        var signing: CFDictionary?
+        guard SecStaticCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess,
+              SecCodeCopySigningInformation(code,
+                                            SecCSFlags(rawValue: kSecCSSigningInformation),
+                                            &signing) == errSecSuccess,
+              let info = signing as? [String: Any],
+              let entitlements = info[kSecCodeInfoEntitlementsDict as String]
+                  as? [String: Any],
+              let modes = entitlements[
+                  "com.apple.developer.networking.networkextension"] as? [String],
+              modes.contains("packet-tunnel-provider") else {
+            return false
+        }
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private static func libboxBackendReady() -> Bool {
+        // CI builds are unsigned and must never report VPN readiness.
+        // Production may enable this only after a signed/manual egress test,
+        // with both the app and extension provisioned for NetworkExtension.
+        #if TWINCONNECT_SIGNED_LIBBOX
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectProtocolBackendLinked") as? Bool == true,
+              libboxInExtension(),
+              let task = SecTaskCreateFromSelf(kCFAllocatorDefault),
+              let values = SecTaskCopyValueForEntitlement(task,
+                  "com.apple.developer.networking.networkextension" as CFString,
+                  nil) as? [String],
+              values.contains("packet-tunnel-provider") else {
+            return false
+        }
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private static func supportedTunnelCodes() -> [String] {
+        var codes: [String] = []
+        // A ready signed WireGuard PacketTunnel is independent of Libbox.
+        // Unsigned previews retain empty capabilities and cannot start VPN.
+        if wireGuardBackendReady() { codes.append("wireguard") }
+        if libboxBackendReady() {
+            codes.append(contentsOf: [
+                "hysteria2", "tuic", "anytls", "naive",
+                "shadowtls", "snell", "socks5"
+            ])
+        }
+        return codes
+    }
+
     static func register(binaryMessenger messenger: FlutterBinaryMessenger) {
         let channel = FlutterMethodChannel(
             name: "com.twinpanel.twinconnect/vpn",
@@ -12,8 +154,8 @@ final class TwinConnectMacOSVPNBridge {
             case "getCapabilities":
                 result([
                     "contractVersion": 1,
-                    "engineReady": false,
-                    "fullTunnel": false,
+                    "engineReady": wireGuardBackendReady() || libboxBackendReady(),
+                    "fullTunnel": wireGuardBackendReady() || libboxBackendReady(),
                     "includeApps": false,
                     "excludeApps": false,
                     "killSwitchEnforced": false,
@@ -24,21 +166,214 @@ final class TwinConnectMacOSVPNBridge {
                     "autoReconnect": false,
                     "managedDevice": false,
                 ] as [String: Any])
+            case "getMacKillSwitchStatus":
+                TwinConnectMacOSKillSwitch.status(result)
+            case "setMacKillSwitch":
+                TwinConnectMacOSKillSwitch.set(call.arguments, result: result)
             case "getProtocolCapabilities":
-                // An Apple-signed, entitled Packet Tunnel extension with
-                // real protocol engines must be embedded before this changes.
                 result([
                     "contractVersion": 1,
-                    "supportedCodes": [String]()
+                    "supportedCodes": supportedTunnelCodes()
+                ] as [String: Any])
+            case "prepareMieru":
+                TwinConnectMacOSMieruControl.prepare(
+                    call.arguments, result: result)
+            case "macOSMieruEngineStatus":
+                // The standalone Mieru executable is not a PacketTunnel
+                // traffic bridge. Never report VPN readiness from its presence.
+                result([
+                    "contractVersion": 1,
+                    "protocol": "mieru",
+                    "binaryInstalled": mieruCoreBundled(),
+                    "extensionBinaryInstalled": mieruCoreInExtension(),
+                    "extensionLibraryInstalled": mieruInProcessLibraryBundled(),
+                    "packetFlowBridgeReady": false,
+                    "engineReady": false,
+                    "reason": mieruCoreBundled() && mieruCoreInExtension()
+                        ? "MACOS_MIERU_PACKET_FLOW_BRIDGE_MISSING"
+                        : "MACOS_MIERU_NATIVE_CORE_NOT_BUNDLED",
+                ] as [String: Any])
+            case "macOSXrayEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "v2ray",
+                    "binaryInstalled": xrayEngineInstalled(),
+                    "packetFlowBridgeReady": false,
+                    "engineReady": false,
+                    "reason": xrayEngineInstalled()
+                        ? "MACOS_XRAY_PACKET_FLOW_BRIDGE_MISSING"
+                        : "MACOS_XRAY_ENGINE_BINARY_MISSING"
+                ] as [String: Any])
+            case "macOSHysteria2EngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "hysteria2",
+                    "binaryInstalled": hysteriaEngineInstalled(),
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_HYSTERIA2_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSShadowTlsEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "shadowtls",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SHADOWTLS_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_SHADOWTLS_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_SHADOWTLS_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSSocks5EngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "socks5",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SOCKS5_SIGNED_START_UNVERIFIED"
+                        : "MACOS_SOCKS5_PACKET_FLOW_BRIDGE_MISSING"
+                ] as [String: Any])
+            case "macOSSnellEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "snell",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SNELL_SIGNED_START_UNVERIFIED"
+                        : "MACOS_SNELL_PACKET_FLOW_BRIDGE_MISSING"
+                ] as [String: Any])
+            case "macOSNaiveEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "naive",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_NAIVE_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_NAIVE_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_NAIVE_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSAnyTlsEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "anytls",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_ANYTLS_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_ANYTLS_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_ANYTLS_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSTuicEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "tuic",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_TUIC_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_TUIC_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_TUIC_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSWireGuardEngineStatus":
+                let ready = wireGuardBackendReady()
+                result([
+                    "contractVersion": 1,
+                    "protocol": "wireguard",
+                    "extensionInstalled": extensionBundle() != nil,
+                    "packetFlowBridgeReady": ready,
+                    "engineReady": ready,
+                    "reason": ready
+                        ? "MACOS_WIREGUARD_SIGNED_START_UNVERIFIED"
+                        : "MACOS_WIREGUARD_SIGNING_OR_BACKEND_MISSING"
                 ] as [String: Any])
             case "macOSRuntimeStatus":
+                let installed = extensionBundle() != nil
+                let wireGuardReady = wireGuardBackendReady()
+                let libboxReady = libboxBackendReady()
+                let ready = wireGuardReady || libboxReady
+                // Runtime availability is not connection state. This call
+                // performs no privileged action and never claims an active VPN.
                 result([
                     "contractVersion": 1,
-                    "state": "not_installed",
-                    "engineReady": false,
+                    "state": ready ? "backend_ready_not_connected" :
+                        (installed ? "backend_not_linked" : "not_installed"),
+                    "extensionInstalled": installed,
+                    "engineReady": ready,
+                    "wireguardReady": wireGuardReady,
+                    "libboxReady": libboxReady,
                     "connected": false,
-                    "reason": "MACOS_PACKET_TUNNEL_NOT_INSTALLED",
+                    "reason": ready
+                        ? "MACOS_TUNNEL_AVAILABLE_CONNECTION_UNVERIFIED"
+                        : (installed
+                            ? "MACOS_PROTOCOL_BACKEND_NOT_LINKED"
+                            : "MACOS_PACKET_TUNNEL_NOT_INSTALLED"),
                 ] as [String: Any])
+            case "startTunnel":
+                TwinConnectMacOSVPNControl.start(
+                    call.arguments, backendLinked: wireGuardBackendReady(), result: result)
+            case "startHysteria2":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(), result: result)
+            case "getHysteria2TunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result)
+            case "startTuic":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "tuic", result: result)
+            case "getTuicTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "tuic")
+            case "startAnyTls":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "anytls", result: result)
+            case "getAnyTlsTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "anytls")
+            case "startShadowTls":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "shadowtls", result: result)
+            case "getShadowTlsTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "shadowtls")
+            case "startSocks5":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "socks5", result: result)
+            case "getSocks5TunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "socks5")
+            case "startSnell":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "snell", result: result)
+            case "getSnellTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "snell")
+            case "startNaive":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "naive", result: result)
+            case "getNaiveTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "naive")
+            case "stopTunnel":
+                TwinConnectMacOSVPNControl.stop(result)
+            case "getTunnelStatus":
+                TwinConnectMacOSVPNControl.status(result)
             default:
                 result(FlutterMethodNotImplemented)
             }

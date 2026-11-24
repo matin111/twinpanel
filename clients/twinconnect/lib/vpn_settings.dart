@@ -37,6 +37,11 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   NativeVpnCapabilities _capabilities =
       NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
   Map<String, dynamic> _guard = const {};
+  bool _macKillSwitchBusy = false;
+  bool? _macKillSwitchRequested;
+  bool _macKillSwitchConfigured = false;
+  static const MethodChannel _macVpnChannel =
+      MethodChannel('com.twinpanel.twinconnect/vpn');
   bool _checking = false;
   bool _vmGuardBusy = false;
   bool _networkResetBusy = false;
@@ -59,6 +64,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   void initState() {
     super.initState();
     _check();
+    if (Platform.isMacOS) _checkMacKillSwitch();
     if (Platform.isWindows) {
       _loadSelectedKillSwitchApp();
       _loadRoutingSettings();
@@ -112,6 +118,49 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       _guard = guard;
       _checking = false;
     });
+  }
+
+  Future<void> _checkMacKillSwitch() async {
+    if (!Platform.isMacOS) return;
+    try {
+      final result = await _macVpnChannel.invokeMapMethod<String, dynamic>(
+        'getMacKillSwitchStatus',
+      ).timeout(const Duration(seconds: 8));
+      if (!mounted || result == null || result['contractVersion'] != 1) return;
+      setState(() {
+        _macKillSwitchRequested = result['requested'] == true;
+        _macKillSwitchConfigured = result['configured'] == true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _macKillSwitchRequested = null);
+    }
+  }
+
+  Future<void> _setMacKillSwitch(bool enabled) async {
+    if (!Platform.isMacOS || _macKillSwitchBusy) return;
+    setState(() => _macKillSwitchBusy = true);
+    try {
+      final result = await _macVpnChannel.invokeMapMethod<String, dynamic>(
+        'setMacKillSwitch', <String, dynamic>{'enabled': enabled},
+      ).timeout(const Duration(seconds: 20));
+      if (result == null || result['contractVersion'] != 1 ||
+          result['requested'] != enabled) {
+        throw const FormatException('MACOS_KILLSWITCH_SAVE_NOT_CONFIRMED');
+      }
+      await _checkMacKillSwitch();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'تغییر Kill Switch انجام نشد. ابتدا VPN را قطع کن و دوباره امتحان کن.',
+            'Kill Switch change failed. Disconnect VPN and retry.',
+          )),
+        ));
+      }
+      await _checkMacKillSwitch();
+    } finally {
+      if (mounted) setState(() => _macKillSwitchBusy = false);
+    }
   }
 
   Future<void> _vmGuardAction(bool enable) async {
@@ -841,6 +890,25 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section(tr('امنیت سیستم', 'System security')),
+        if (Platform.isMacOS) ...[
+          _glass(SwitchListTile.adaptive(
+            key: const Key('macKillSwitch'),
+            title: Text(tr('Kill Switch مک', 'macOS Kill Switch')),
+            subtitle: Text(_macKillSwitchRequested == null
+                ? tr('وضعیت حفاظت نامشخص است', 'Protection status unknown')
+                : _macKillSwitchRequested == true
+                    ? (_macKillSwitchConfigured
+                        ? tr('در macOS تنظیم شده؛ تست نشت ترافیک هنوز لازم است',
+                            'Configured in macOS; leak testing still required')
+                        : tr('در انتظار نصب/فعال‌سازی VPN امضاشده',
+                            'Awaiting signed VPN installation/activation'))
+                    : tr('خاموش', 'Off')),
+            value: _macKillSwitchRequested == true,
+            onChanged: _macKillSwitchBusy || _macKillSwitchRequested == null
+                ? null : _setMacKillSwitch,
+          )),
+          const SizedBox(height: 8),
+        ],
         if (Platform.isWindows) ...[
           const SizedBox(height: 8),
           _glass(Column(

@@ -54,6 +54,15 @@ import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
 import 'ios_wireguard_controller.dart';
+import 'macos_wireguard_controller.dart';
+import 'macos_hysteria2_controller.dart';
+import 'macos_tuic_controller.dart';
+import 'macos_anytls_controller.dart';
+import 'macos_naive_controller.dart';
+import 'macos_shadowtls_controller.dart';
+import 'macos_snell_controller.dart';
+import 'macos_socks5_controller.dart';
+import 'macos_mieru_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -119,6 +128,21 @@ class _DemoServer {
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
   final IosWireGuardController _iosVpn = const IosWireGuardController();
+  final MacWireGuardController _macVpn = const MacWireGuardController();
+  final MacHysteria2Controller _macHysteria = const MacHysteria2Controller();
+  final MacTuicController _macTuic = const MacTuicController();
+  final MacAnyTlsController _macAnyTls = const MacAnyTlsController();
+  final MacNaiveController _macNaive = const MacNaiveController();
+  final MacShadowTlsController _macShadowTls = const MacShadowTlsController();
+  final MacSnellController _macSnell = const MacSnellController();
+  final MacSocks5Controller _macSocks5 = const MacSocks5Controller();
+  final MacMieruController _macMieru = const MacMieruController();
+  Timer? _macOsStatusTimer;
+  bool _macOsStatusRefreshing = false;
+  String _macOsTunnelState = 'not_configured';
+  bool get _macOsTunnelPresent => Platform.isMacOS &&
+      const {'connecting', 'os_connected_unverified',
+        'reasserting', 'disconnecting'}.contains(_macOsTunnelState);
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -849,6 +873,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      if (Platform.isMacOS) {
+        // macOS must never run the Windows service adapter on sign-out.
+        // Do not revoke login while the OS still owns a VPN tunnel.
+        var state = (await _macVpn.status())['state'];
+        if (const {'connecting', 'os_connected_unverified', 'reasserting',
+              'disconnecting'}.contains(state)) {
+          await _macVpn.stop();
+          var stopped = false;
+          for (var attempt = 0; attempt < 8; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 500));
+            state = (await _macVpn.status())['state'];
+            if (const {'disconnected', 'not_configured', 'invalid'}
+                .contains(state)) {
+              stopped = true;
+              break;
+            }
+          }
+          if (!stopped) {
+            throw const FormatException('MACOS_TUNNEL_NOT_STOPPED');
+          }
+        } else if (!const {'disconnected', 'not_configured', 'invalid'}
+            .contains(state)) {
+          throw const FormatException('MACOS_TUNNEL_STATUS_UNKNOWN');
+        }
+        if (!mounted) return;
+        setState(() {
+          _macOsTunnelState = 'disconnected';
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = null;
+        });
+        widget.onLogout();
+        return;
+      }
       if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning || _mieruProxy.isRunning || _trusttunnelProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
@@ -2147,7 +2205,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // ShadowTLS cannot be flattened into one outbound: validate the
       // subscription's two-stage Shadowsocks -> ShadowTLS chain before
       // stopping any existing connection. Other protocols are unchanged.
-      if (protocol == 'shadowtls') {
+      if (protocol == 'shadowtls' || protocol == 'snell' ||
+          protocol == 'socks5') {
         ShadowTlsChain.fromItem(matches.single);
       }
       // When switching away from a working VPN, validate before stopping
@@ -2489,6 +2548,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   void dispose() {
+    _macOsStatusTimer?.cancel();
     _previewTour?.cancel();
     _durationTicker?.cancel();
     _connectedSeconds.dispose();
@@ -2561,6 +2621,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     unawaited(_restoreManualConnectionChoice());
     _refreshNativeReadiness();
     _refreshVpnStatus();
+    if (Platform.isMacOS) {
+      _macOsStatusTimer = Timer.periodic(const Duration(seconds: 7), (_) {
+        unawaited(_refreshMacOsTunnelStatus());
+      });
+    }
     unawaited(_restoreCachedXrayInbounds());
     if (_isVitoryPlan) {
       if (_xrayAuthorized) unawaited(_loadXrayGroups(refresh: true));
@@ -2644,7 +2709,59 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Future<void> _refreshMacOsTunnelStatus() async {
+    if (!Platform.isMacOS || !mounted || _macOsStatusRefreshing) return;
+    _macOsStatusRefreshing = true;
+    try {
+      final hy2 = await _macHysteria.status();
+      final tuic = await _macTuic.status();
+      final anytls = await _macAnyTls.status();
+      final naive = await _macNaive.status();
+      final shadowtls = await _macShadowTls.status();
+      final snell = await _macSnell.status();
+      final socks5 = await _macSocks5.status();
+      if (!mounted) return;
+      const active = <String>{
+        'connecting', 'os_connected_unverified', 'reasserting', 'disconnecting',
+      };
+      // Exactly one macOS manager is active; never show 'Disconnected'
+      // because another protocol happens to be selected in the UI.
+      final status = active.contains(hy2['state']) ? hy2
+          : active.contains(tuic['state']) ? tuic
+          : active.contains(anytls['state']) ? anytls
+          : active.contains(naive['state']) ? naive
+          : active.contains(shadowtls['state']) ? shadowtls
+          : active.contains(snell['state']) ? snell
+          : active.contains(socks5['state']) ? socks5
+          : hy2['state'] != 'not_configured' ? hy2
+          : tuic['state'] != 'not_configured' ? tuic
+          : anytls['state'] != 'not_configured' ? anytls
+          : naive['state'] != 'not_configured' ? naive
+          : shadowtls['state'] != 'not_configured' ? shadowtls
+          : snell['state'] != 'not_configured' ? snell : socks5;
+      final next = status['state'] as String;
+      if (next != _macOsTunnelState) {
+        setState(() {
+          _macOsTunnelState = next;
+          // Apple's connected notification does not prove a working VPN.
+          _vpnVerified = false;
+        });
+      }
+    } catch (_) {
+      // An unavailable OS status must never become a green Connected badge.
+      if (mounted && _macOsTunnelState != 'status_unavailable') {
+        setState(() => _macOsTunnelState = 'status_unavailable');
+      }
+    } finally {
+      _macOsStatusRefreshing = false;
+    }
+  }
+
   Future<void> _refreshVpnStatus() async {
+    if (Platform.isMacOS) {
+      await _refreshMacOsTunnelStatus();
+      return;
+    }
     // Prevent method-channel calls from accumulating while Windows is busy.
     if (!Platform.isWindows || !mounted || _vpnBusy || _statusRefreshing) return;
     _statusRefreshing = true;
@@ -2736,20 +2853,191 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (!Platform.isMacOS || _vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      final status = await _macVpn.status();
+      if (const {'connecting', 'os_connected_unverified', 'reasserting'}
+          .contains(status['state'])) {
+        await _macVpn.stop();
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _macOsTunnelState = 'disconnecting';
+          _activeNodeId = null;
+        });
+        unawaited(_refreshMacOsTunnelStatus());
+        return;
+      }
+      final protocol = _filter == 'all' ? 'wireguard' : _filter;
+      if (protocol == 'hysteria2' || protocol == 'tuic' ||
+          protocol == 'anytls' || protocol == 'naive' ||
+          protocol == 'shadowtls') {
+        final entitled = widget.catalog?.entries.any((entry) =>
+            entry.protocol.code == protocol && entry.selected &&
+            entry.configRecordPresent) ?? false;
+        if (!entitled) {
+          throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+        }
+        final serverId = _selectedServerId;
+        if (serverId == null ||
+            widget.servers?.servers.any((server) => server.id == serverId)
+                != true) {
+          throw const FormatException('SELECT_MACOS_LIBBOX_SERVER');
+        }
+        final installed = protocol == 'tuic'
+            ? await _macTuic.installation()
+            : protocol == 'anytls'
+                ? await _macAnyTls.installation()
+                : protocol == 'naive'
+                    ? await _macNaive.installation()
+                    : protocol == 'shadowtls'
+                        ? await _macShadowTls.installation()
+                        : protocol == 'snell'
+                            ? await _macSnell.installation()
+                            : protocol == 'socks5'
+                                ? await _macSocks5.installation()
+                                : await _macHysteria.installation();
+        if (installed['engineReady'] != true ||
+            installed['packetFlowBridgeReady'] != true ||
+            installed['inProcessLibboxBundled'] != true) {
+          throw const FormatException('MACOS_LIBBOX_PACKET_FLOW_BRIDGE_MISSING');
+        }
+        final definition = VpnProtocols.byCode(protocol);
+        if (definition == null) {
+          throw const FormatException('MACOS_LIBBOX_PROTOCOL_UNAVAILABLE');
+        }
+        final response = await TenantApi.fromBuildConfig()
+            .loadSessionNativeProfiles(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+          protocol: definition,
+          native: const NativeProtocolReadiness(
+              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell', 'socks5'}),
+        );
+        final matches = response.items.where(
+          (item) => item['node_id']?.toString() == serverId,
+        ).toList(growable: false);
+        if (matches.length != 1) {
+          throw const FormatException('MACOS_LIBBOX_SERVER_PROFILE_MISSING');
+        }
+        if (protocol == 'tuic') {
+          await _macTuic.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'anytls') {
+          await _macAnyTls.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'naive') {
+          await _macNaive.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'shadowtls') {
+          await _macShadowTls.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'snell') {
+          await _macSnell.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'socks5') {
+          await _macSocks5.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else {
+          await _macHysteria.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        }
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _macOsTunnelState = 'connecting';
+          _activeNodeId = serverId;
+        });
+        unawaited(_refreshMacOsTunnelStatus());
+        return;
+      }
+      if (protocol == 'mieru') {
+        final entitled = widget.catalog?.entries.any((entry) =>
+            entry.protocol.code == 'mieru' && entry.selected &&
+            entry.configRecordPresent) ?? false;
+        if (!entitled) {
+          throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+        }
+        // Mieru requires its own signed in-process packet-flow bridge.
+        // The official standalone core may be bundled but cannot start
+        // a VPN until that bridge is installed and independently tested.
+        final installed = await _macMieru.installation();
+        if (installed['engineReady'] != true ||
+            installed['packetFlowBridgeReady'] != true) {
+          throw FormatException(installed['reason'] as String);
+        }
+        throw const FormatException('MACOS_MIERU_CONNECTION_NOT_VERIFIED');
+      }
+      if (protocol != 'wireguard') {
+        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
+      }
+      final serverId = _selectedServerId;
+      if (serverId == null) {
+        throw const FormatException('SELECT_WIREGUARD_SERVER');
+      }
+      // The macOS host bridge is independent of Windows protocol processes.
+      // An unsigned preview never asserts a working Network Extension.
       final capabilities = await NativeVpnBridge.probe();
       if (!capabilities.engineReady || !capabilities.fullTunnel) {
         throw const FormatException('MACOS_PACKET_TUNNEL_NOT_INSTALLED');
       }
+      final installed = await _macVpn.runtime();
+      if (installed['engineReady'] != true) {
+        throw FormatException(installed['reason'] is String
+            ? installed['reason'] as String : 'MACOS_WIREGUARD_BACKEND_NOT_LINKED');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+        api.loadSessionProtocolCatalog(
+            panel: widget.panel, sessionToken: widget.sessionToken),
+      ]);
+      final policy = checks[0] as VpnPolicy;
       final native = await NativeVpnBridge.protocolReadiness(
           validatedCapabilities: capabilities);
-      final selectedProtocol = _filter == 'all' ? null : _filter;
-      if (selectedProtocol == null || !_protocolEntitled(selectedProtocol) ||
-          !native.supports(selectedProtocol)) {
-        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
-      }
-      // Do not report success until a correctly signed, fully functional
-      // Network Extension connects and verifies actual tunnel traffic.
-      throw const FormatException('MACOS_VPN_CONNECTOR_NOT_LINKED');
+      final candidate = await ConnectionBootstrap(api: api).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: serverId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+            checks[1] as PanelProtocolCatalog),
+      );
+      final profile = WindowsWireGuardController.configForSingleNode(
+          candidate.profiles, serverId);
+      await _macVpn.start(
+        profile: profile.config,
+        namespace: widget.panel.namespace,
+        account: widget.username,
+      );
+      // OS acceptance does not prove a peer handshake or working Internet.
+      if (mounted) setState(() {
+        _vpnUp = false;
+        _vpnVerified = false;
+        _activeNodeId = serverId;
+      });
     } catch (error) {
       if (mounted) setState(() => _vpnError = _errorText(error));
     } finally {
@@ -4092,7 +4380,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                           padding: EdgeInsets.all(11),
                           child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                      : Icon((_vpnUp || _modernUp)
+                      : Icon((_vpnUp || _modernUp || _macOsTunnelPresent)
                           ? Icons.stop_rounded : Icons.bolt_rounded,
                           color: Colors.white, size: 23),
                   ),
@@ -4103,7 +4391,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     children: [
                       Text(_vpnBusy
                           ? tr('در حال اتصال', 'Connecting')
-                          : (_vpnUp || _modernUp)
+                          : (_vpnUp || _modernUp || _macOsTunnelPresent)
                             ? tr('قطع اتصال', 'Disconnect')
                             : tr('اتصال سریع', 'Connect now'),
                         style: const TextStyle(color: Colors.white,
@@ -5167,7 +5455,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(_modernUp ? tr('تونل فعال', 'Tunnel active') :
+            smallPill(
+                Platform.isMacOS && _macOsTunnelState == 'os_connected_unverified'
+                  ? tr('اتصال سیستم‌عامل؛ ترافیک تأیید نشده',
+                      'OS connected; traffic unverified')
+                : Platform.isMacOS &&
+                    const {'connecting', 'reasserting'}.contains(_macOsTunnelState)
+                  ? tr('در حال اتصال در macOS', 'macOS connecting')
+                : Platform.isMacOS && _macOsTunnelState == 'status_unavailable'
+                  ? tr('وضعیت نامشخص', 'Status unavailable')
+                : Platform.isMacOS && _macOsTunnelState == 'disconnecting'
+                  ? tr('در حال قطع اتصال', 'Disconnecting')
+                : _modernUp ? tr('تونل فعال', 'Tunnel active') :
                 _vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
                 _vpnUp ? tr('رابط فعال', 'Interface active') :
                 tr('قطع', 'Disconnected')),

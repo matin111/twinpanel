@@ -1,0 +1,38 @@
+name: TwinConnect macOS Panel-to-Proxy Flutter Tests
+
+on:
+  push:
+    branches:
+      - feat/twinconnect-macos-packet-tunnel-foundation-20261116
+    paths:
+      - 'clients/twinconnect/lib/macos_standalone_panel_profile.dart'
+      - 'clients/twinconnect/lib/macos_standalone_proxy_runtime.dart'
+      - 'clients/twinconnect/lib/macos_standalone_connection_card.dart'
+      - 'clients/twinconnect/lib/main.dart'
+      - 'clients/twinconnect/test/macos_standalone_panel_profile_test.dart'
+      - 'clients/twinconnect/test/macos_standalone_ui_contract_test.dart'
+      - '.github/workflows/twinconnect-macos-panel-proxy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dart-panel-proxy-contracts:
+    runs-on: macos-15
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Resolve Flutter packages
+        run: flutter pub get
+      - name: Analyze macOS connection adapter
+        run: dart analyze lib/macos_standalone_panel_profile.dart lib/macos_standalone_proxy_runtime.dart lib/macos_standalone_connection_card.dart
+      - name: Test panel scopes and UI separation
+        run: flutter test --reporter expanded test/macos_standalone_panel_profile_test.dart test/macos_standalone_ui_contract_test.dart

@@ -1,0 +1,6751 @@
+// Native AppKit rendering of the shared TwinConnect appearance, without Metal.
+// The visual design mirrors the Flutter desktop/mobile experience while
+// strictly keeping VPN unavailable until a signed and verified PacketTunnel.
+import Cocoa
+import CryptoKit
+
+// Low-cost AppKit renderer for remote/macOS machines without a working Metal
+// backend. Set TWINCONNECT_MAC_LIGHTWEIGHT_UI=0 before launching to opt out.
+private enum TwinNativePreferences {
+    static let appearanceKey = "TwinConnect.native.appearance"
+    static let motionKey = "TwinConnect.native.reduceMotion"
+    static var light: Bool {
+        UserDefaults.standard.string(forKey: appearanceKey) == "light"
+    }
+    static var reducedMotion: Bool {
+        UserDefaults.standard.bool(forKey: motionKey) ||
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+}
+
+private enum TwinNativeRenderBudget {
+    static let lightweight =
+        ProcessInfo.processInfo.environment["TWINCONNECT_MAC_LIGHTWEIGHT_UI"] != "0"
+}
+
+private final class TwinNativeFlippedDocument: NSView {
+    override var isFlipped: Bool { true }
+}
+
+private final class TwinNativeBackdrop: NSView {
+    // Retina vector artwork inspired by the Windows spatial atmosphere.
+    // Drawn on CPU: supported on the Metal-less Catalina test machine.
+    // All highlights derive from the authenticated panel theme.
+    var base = NSColor(calibratedRed: 0.032, green: 0.11, blue: 0.145, alpha: 1)
+    var glow = NSColor(calibratedRed: 0.10, green: 0.47, blue: 0.55, alpha: 1)
+    private let ambientAura = CAGradientLayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        ambientAura.type = .radial
+        ambientAura.startPoint = CGPoint(x: 0.73, y: 0.79)
+        ambientAura.endPoint = CGPoint(x: 1.40, y: 1.37)
+        ambientAura.locations = [0, 0.45, 1]
+        ambientAura.opacity = 0.20
+        layer?.insertSublayer(ambientAura, at: 0)
+    }
+
+    required init?(coder: NSCoder) { return nil }
+
+    func beginAmbientMotion() {
+        // Ambient motion is decoration ONLY. It is not a fake VPN handshake,
+        // download activity, or an offline "connected" animation.
+        ambientAura.colors = [
+            glow.withAlphaComponent(0.30).cgColor,
+            glow.withAlphaComponent(0.12).cgColor,
+            glow.withAlphaComponent(0).cgColor
+        ]
+        guard !TwinNativeRenderBudget.lightweight,
+              !TwinNativePreferences.reducedMotion,
+              ambientAura.animation(forKey: "ambientBreath") == nil
+        else { return }
+        let breathe = CABasicAnimation(keyPath: "opacity")
+        breathe.fromValue = 0.12
+        breathe.toValue = 0.36
+        breathe.duration = 9
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ambientAura.add(breathe, forKey: "ambientBreath")
+    }
+
+    override func layout() {
+        super.layout()
+        ambientAura.frame = bounds
+    }
+
+    private func radialLight(_ context: CGContext, center: CGPoint,
+                             radius: CGFloat, tint: NSColor, opacity: CGFloat) {
+        let clear = tint.withAlphaComponent(0).cgColor
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [tint.withAlphaComponent(opacity).cgColor,
+                     tint.withAlphaComponent(opacity * 0.42).cgColor,
+                     clear] as CFArray,
+            locations: [0, 0.35, 1]
+        ) else { return }
+        context.drawRadialGradient(
+            gradient, startCenter: center, startRadius: 0,
+            endCenter: center, endRadius: radius,
+            options: [.drawsAfterEndLocation])
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let area = bounds
+        let w = area.width
+        let h = area.height
+        let accent = glow
+        let frost = accent.blended(withFraction: 0.57, of: .white) ?? accent
+        let shade = base.blended(withFraction: TwinNativePreferences.light ? 0.15 : 0.40,
+                                 of: TwinNativePreferences.light ? .white : .black) ?? base
+
+        // Deep architectural backdrop rather than flat aqua wallpaper.
+        NSGradient(colors: [
+            shade, base,
+            base.blended(withFraction: 0.16, of: accent) ?? base,
+            shade
+        ])?.draw(in: area, angle: 138)
+
+        if !TwinNativeRenderBudget.lightweight,
+           let context = NSGraphicsContext.current?.cgContext {
+            context.saveGState()
+            // Off-canvas light shafts give believable dimensional depth.
+            radialLight(context,
+                center: CGPoint(x: w * 0.74, y: h * 1.02),
+                radius: max(w, h) * 0.67,
+                tint: accent, opacity: 0.50)
+            radialLight(context,
+                center: CGPoint(x: w * 1.03, y: h * 0.28),
+                radius: max(w, h) * 0.48,
+                tint: frost, opacity: 0.19)
+            radialLight(context,
+                center: CGPoint(x: w * 0.25, y: h * -0.18),
+                radius: max(w, h) * 0.52,
+                tint: accent, opacity: 0.20)
+            context.restoreGState()
+        }
+
+        // An asymmetric luminous orbital feature sits mostly behind the
+        // content, with enough of its sweep visible in the page margins.
+        if TwinNativeRenderBudget.lightweight { return }
+        let origin = CGPoint(x: w * 0.87, y: h * 0.52)
+        for index in 0..<7 {
+            let expansion = CGFloat(index) * 31
+            let ellipse = NSBezierPath(ovalIn: NSRect(
+                x: origin.x - (w * 0.28 + expansion),
+                y: origin.y - (h * 0.47 + expansion * 0.76),
+                width: (w * 0.28 + expansion) * 2,
+                height: (h * 0.47 + expansion * 0.76) * 2))
+            ellipse.lineWidth = index == 0 ? 1.5 : 0.65
+            frost.withAlphaComponent(index == 0 ? 0.20 : 0.075)
+                .setStroke()
+            ellipse.stroke()
+        }
+
+        // A second broad ribbon curves across the canvas; it avoids the
+        // sharp repeated waves that made the first design look dated.
+        for index in 0..<4 {
+            let offset = CGFloat(index) * 29
+            let ribbon = NSBezierPath()
+            ribbon.move(to: CGPoint(x: -w * 0.15, y: h * 0.12 + offset))
+            ribbon.curve(to: CGPoint(x: w * 1.13, y: h * 0.78 + offset),
+                         controlPoint1: CGPoint(x: w * 0.31, y: h * 0.59 + offset),
+                         controlPoint2: CGPoint(x: w * 0.56, y: -h * 0.19 + offset))
+            ribbon.lineWidth = index == 0 ? 1.25 : 0.75
+            accent.withAlphaComponent(index == 0 ? 0.17 : 0.065)
+                .setStroke()
+            ribbon.stroke()
+        }
+
+        // Small, restrained specular accents—not a starfield texture.
+        for index in 0..<13 {
+            let x = CGFloat((index * 83 + 47) % 241) / 241
+            let y = CGFloat((index * 61 + 19) % 229) / 229
+            let radius: CGFloat = index.isMultiple(of: 4) ? 1.25 : 0.65
+            let sparkle = NSBezierPath(ovalIn: NSRect(
+                x: w * x - radius, y: h * y - radius,
+                width: radius * 2, height: radius * 2))
+            frost.withAlphaComponent(index.isMultiple(of: 4) ? 0.33 : 0.12)
+                .setFill()
+            sparkle.fill()
+        }
+    }
+}
+
+private final class TwinNativePremiumButton: NSButton {
+    private let accentGradient = CAGradientLayer()
+    private let glassEdge = CAGradientLayer()
+    private var glassLayersAttached = false
+
+    func setAccentGradient(_ top: NSColor, _ bottom: NSColor) {
+        wantsLayer = true
+        // A transparent gradient cannot look like glass if the parent layer
+        // carries the old opaque button paint underneath it.
+        layer?.backgroundColor = NSColor.clear.cgColor
+        accentGradient.colors = [top.cgColor, bottom.cgColor]
+        accentGradient.startPoint = CGPoint(x: 0, y: 1)
+        accentGradient.endPoint = CGPoint(x: 1, y: 0)
+        accentGradient.locations = [0, 1]
+        glassEdge.colors = [
+            NSColor.white.withAlphaComponent(0.35).cgColor,
+            NSColor.white.withAlphaComponent(0.025).cgColor
+        ]
+        glassEdge.startPoint = CGPoint(x: 0, y: 0.5)
+        glassEdge.endPoint = CGPoint(x: 1, y: 0.5)
+        if !glassLayersAttached {
+            layer?.insertSublayer(accentGradient, at: 0)
+            layer?.insertSublayer(glassEdge, above: accentGradient)
+            glassLayersAttached = true
+        }
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let radius = layer?.cornerRadius ?? 14
+        accentGradient.frame = bounds
+        accentGradient.cornerRadius = radius
+        glassEdge.frame = NSRect(x: 1, y: max(0, bounds.height - 1.5),
+                                width: max(0, bounds.width - 2), height: 1)
+    }
+}
+
+// Uses Core Animation's vector gradient, not a raster image or Metal shader.
+// Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
+private final class TwinNativeGlassCard: NSView {
+    enum Style: Equatable { case panel, inset, metric, sidebar }
+    private let glassGradient = CAGradientLayer()
+    private let upperEdge = CAGradientLayer()
+    private let blur = NSVisualEffectView(frame: .zero)
+    private let tintOverlay = NSView(frame: .zero)
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        // Actual AppKit vibrancy/blur, not a nearly opaque painted rectangle.
+        // withinWindow works on Catalina without an app Metal renderer.
+        // Catalina's vibrancy material is neutral GREY by design. Keep a
+        // small amount of real blur but do NOT let its opaque charcoal tint
+        // replace the tenant's blue/brand-colored glass surfaces.
+        blur.material = .sidebar
+        blur.blendingMode = .withinWindow
+        blur.state = .active
+        blur.alphaValue = TwinNativeRenderBudget.lightweight ? 0 : 0.14
+        if TwinNativeRenderBudget.lightweight { blur.state = .inactive }
+        blur.wantsLayer = true
+        addSubview(blur)
+        tintOverlay.wantsLayer = true
+        addSubview(tintOverlay)
+        glassGradient.startPoint = CGPoint(x: 0, y: 1)
+        glassGradient.endPoint = CGPoint(x: 1, y: 0)
+        glassGradient.locations = [0, 0.55, 1]
+        tintOverlay.layer?.addSublayer(glassGradient)
+        // One-pixel specular edge, following the Windows card vocabulary.
+        upperEdge.colors = [
+            NSColor(calibratedRed: 0.44, green: 0.91, blue: 0.94,
+                    alpha: 0.24).cgColor,
+            NSColor(calibratedRed: 0.44, green: 0.91, blue: 0.94,
+                    alpha: 0.025).cgColor
+        ]
+        upperEdge.startPoint = CGPoint(x: 0, y: 0.5)
+        upperEdge.endPoint = CGPoint(x: 1, y: 0.5)
+        tintOverlay.layer?.addSublayer(upperEdge)
+        apply(.panel)
+    }
+    required init?(coder: NSCoder) { return nil }
+    func apply(_ style: Style, accent: NSColor = NSColor(
+        calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1),
+        background: NSColor? = nil, surface: NSColor? = nil) {
+        // Compose all surfaces from the panel's colors and the SAME dark
+        // blue foundation as the backdrop. Actual macOS vibrancy alone
+        // turns these surfaces grey on Catalina.
+        let neutral: NSColor
+        let strength: CGFloat
+        switch style {
+        case .panel:
+            neutral = NSColor(calibratedRed: 0.046, green: 0.158,
+                              blue: 0.207, alpha: 1)
+            strength = 0.24
+        case .inset:
+            neutral = NSColor(calibratedRed: 0.070, green: 0.200,
+                              blue: 0.255, alpha: 1)
+            strength = 0.28
+        case .metric:
+            neutral = NSColor(calibratedRed: 0.041, green: 0.159,
+                              blue: 0.223, alpha: 1)
+            strength = 0.25
+        case .sidebar:
+            neutral = NSColor(calibratedRed: 0.024, green: 0.109,
+                              blue: 0.151, alpha: 1)
+            strength = 0.18
+        }
+        if TwinNativePreferences.light {
+            let white = NSColor(calibratedWhite: 0.99, alpha: 1)
+            let brand = white.blended(withFraction: 0.08, of: accent) ?? white
+            let pale = white.blended(withFraction: 0.14, of: accent) ?? white
+            blur.appearance = NSAppearance(named: .aqua)
+            glassGradient.colors = [
+                white.withAlphaComponent(0.95).cgColor,
+                brand.withAlphaComponent(0.93).cgColor,
+                pale.withAlphaComponent(0.92).cgColor
+            ]
+            upperEdge.colors = [
+                accent.withAlphaComponent(0.22).cgColor,
+                accent.withAlphaComponent(0.04).cgColor
+            ]
+            return
+        }
+        let supplied = style == .sidebar ?
+            (background ?? surface) : (surface ?? background)
+        let foundation = supplied.flatMap {
+            neutral.blended(withFraction: 0.38, of: $0)
+        } ?? neutral
+        let tone = foundation.blended(withFraction: strength, of: accent) ?? foundation
+        let upper = tone.blended(withFraction: 0.18, of: .white) ?? tone
+        let lower = tone.blended(withFraction: 0.12, of: .black) ?? tone
+        // High-enough tinted overlay to defeat the grey vibrancy material,
+        // but still partially transparent over the artwork.
+        let topAlpha: CGFloat = style == .sidebar ? 0.90 : 0.81
+        let middleAlpha: CGFloat = style == .sidebar ? 0.82 : 0.70
+        let bottomAlpha: CGFloat = style == .sidebar ? 0.88 : 0.78
+        glassGradient.colors = [
+            upper.withAlphaComponent(topAlpha).cgColor,
+            tone.withAlphaComponent(middleAlpha).cgColor,
+            lower.withAlphaComponent(bottomAlpha).cgColor
+        ]
+        upperEdge.colors = [
+            accent.blended(withFraction: 0.42, of: .white)?
+                .withAlphaComponent(0.48).cgColor ??
+                accent.withAlphaComponent(0.48).cgColor,
+            accent.withAlphaComponent(0.04).cgColor
+        ]
+    }
+    override func layout() {
+        super.layout()
+        blur.frame = bounds
+        tintOverlay.frame = bounds
+        let radius = layer?.cornerRadius ?? 20
+        blur.layer?.cornerRadius = radius
+        blur.layer?.masksToBounds = true
+        tintOverlay.layer?.cornerRadius = radius
+        tintOverlay.layer?.masksToBounds = true
+        glassGradient.frame = bounds
+        glassGradient.cornerRadius = radius
+        upperEdge.frame = NSRect(x: 1, y: bounds.height - 1.5,
+                                 width: max(0, bounds.width - 2), height: 1)
+    }
+}
+
+// Compact traffic chart. Every point comes from a successful measurement of
+// this local Hysteria2 proxy; zero throughput is drawn as a flat line.
+private final class TwinNativeTrafficSparkline: NSView {
+    var samples: [Double] = [] {
+        didSet { needsDisplay = true }
+    }
+    var accent = NSColor(calibratedRed: 0.18, green: 0.90,
+                         blue: 0.77, alpha: 1) {
+        didSet { needsDisplay = true }
+    }
+    override var isOpaque: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let rect = bounds.insetBy(dx: 2, dy: 3)
+        guard rect.width > 0, rect.height > 0 else { return }
+        let baseline = NSBezierPath()
+        baseline.move(to: CGPoint(x: rect.minX, y: rect.minY + 2))
+        baseline.line(to: CGPoint(x: rect.maxX, y: rect.minY + 2))
+        accent.withAlphaComponent(0.17).setStroke()
+        baseline.lineWidth = 0.8
+        baseline.stroke()
+        guard samples.count >= 2 else { return }
+        let peak = max(samples.max() ?? 0, 1024.0)
+        let points = samples.enumerated().map { index, value -> CGPoint in
+            let x = rect.minX + rect.width * CGFloat(index) /
+                CGFloat(max(1, samples.count - 1))
+            let y = rect.minY + 2 + CGFloat(max(0, value) / peak) *
+                max(1, rect.height - 5)
+            return CGPoint(x: x, y: y)
+        }
+        let line = NSBezierPath()
+        line.move(to: points[0])
+        for point in points.dropFirst() { line.line(to: point) }
+        let fill = NSBezierPath()
+        fill.move(to: CGPoint(x: points[0].x, y: rect.minY + 2))
+        for point in points { fill.line(to: point) }
+        fill.line(to: CGPoint(x: points[points.count - 1].x,
+                              y: rect.minY + 2))
+        fill.close()
+        accent.withAlphaComponent(0.10).setFill()
+        fill.fill()
+        if !TwinNativeRenderBudget.lightweight {
+            accent.withAlphaComponent(0.20).setStroke()
+            line.lineWidth = 4
+            line.stroke()
+        }
+        accent.withAlphaComponent(0.94).setStroke()
+        line.lineWidth = 1.65
+        line.stroke()
+    }
+}
+
+// Lightweight vector hero: visible while offline, subtly animated only
+// when the verified Hysteria2 SOCKS listener is active. It never signals VPN.
+private final class TwinNativeNetworkFabric: NSView {
+    var proxyActive = false {
+        didSet { needsDisplay = true; updatePulse() }
+    }
+    private let halo = CAShapeLayer()
+    private var travelDots = [CAShapeLayer]()
+    private var animatedCanvasSize: CGSize = .zero
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        halo.fillColor = NSColor.clear.cgColor
+        halo.strokeColor = NSColor(calibratedRed: 0.35, green: 0.94,
+                                   blue: 0.84, alpha: 0.80).cgColor
+        halo.lineWidth = 1.8
+        halo.opacity = 0
+        layer?.addSublayer(halo)
+        // Four small Core Animation layers follow the existing paths.
+        // This is decorative motion, NOT synthetic download activity.
+        for _ in 0..<4 {
+            let dot = CAShapeLayer()
+            dot.path = CGPath(ellipseIn: CGRect(
+                x: -3.25, y: -3.25, width: 6.5, height: 6.5),
+                transform: nil)
+            dot.fillColor = NSColor(calibratedRed: 0.32, green: 0.99,
+                                    blue: 0.88, alpha: 1).cgColor
+            dot.strokeColor = NSColor.white.withAlphaComponent(0.48).cgColor
+            dot.lineWidth = 0.65
+            dot.opacity = 0
+            layer?.addSublayer(dot)
+            travelDots.append(dot)
+        }
+    }
+
+    required init?(coder: NSCoder) { return nil }
+    override var isOpaque: Bool { false }
+
+    override func layout() {
+        super.layout()
+        halo.frame = bounds
+        let radius = min(bounds.height * 0.35, 54)
+        halo.path = CGPath(ellipseIn: CGRect(
+            x: bounds.midX - radius, y: bounds.midY - radius,
+            width: radius * 2, height: radius * 2), transform: nil)
+        if animatedCanvasSize != bounds.size {
+            animatedCanvasSize = bounds.size
+            updateTravellingDots()
+        }
+    }
+
+    private func updatePulse() {
+        updateTravellingDots()
+        halo.removeAllAnimations()
+        halo.opacity = proxyActive ? 0.62 : 0
+        guard proxyActive,
+              !TwinNativePreferences.reducedMotion else { return }
+        // Two Core Animation properties only: no high-frequency AppKit redraw
+        // or artificial download/upload animation on the cloud Mac.
+        let breathe = CABasicAnimation(keyPath: "transform.scale")
+        breathe.fromValue = 0.88
+        breathe.toValue = 1.22
+        breathe.duration = 3.4
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        halo.add(breathe, forKey: "networkPulse")
+        let shimmer = CABasicAnimation(keyPath: "opacity")
+        shimmer.fromValue = 0.24
+        shimmer.toValue = 0.73
+        shimmer.duration = 3.4
+        shimmer.autoreverses = true
+        shimmer.repeatCount = .infinity
+        shimmer.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        halo.add(shimmer, forKey: "networkGlow")
+    }
+
+    private func updateTravellingDots() {
+        let running = proxyActive &&
+            !TwinNativePreferences.reducedMotion &&
+            bounds.width > 100 && bounds.height > 80
+        for (index, dot) in travelDots.enumerated() {
+            dot.removeAllAnimations()
+            dot.opacity = running ? 0.96 : 0
+            guard running else { continue }
+            let side: CGFloat = index.isMultiple(of: 2) ? -1 : 1
+            let lane: CGFloat = index < 2 ? -0.18 : 0.19
+            let x = bounds.midX
+            let y = bounds.midY
+            let path = CGMutablePath()
+            let begin = CGPoint(x: x + side * 20,
+                                y: y + bounds.height * lane * 0.12)
+            let finish = CGPoint(x: x + side * bounds.width * 0.42,
+                                 y: y + bounds.height * lane)
+            path.move(to: begin)
+            path.addCurve(to: finish,
+                control1: CGPoint(
+                    x: x + side * bounds.width * 0.18,
+                    y: y + bounds.height * lane * 0.29),
+                control2: CGPoint(
+                    x: x + side * bounds.width * 0.32,
+                    y: y + bounds.height * lane * 0.90))
+            dot.position = begin
+            let travel = CAKeyframeAnimation(keyPath: "position")
+            travel.path = path
+            travel.calculationMode = .paced
+            travel.duration = index < 2 ? 2.9 : 3.5
+            travel.beginTime = CACurrentMediaTime() +
+                Double(index % 2) * 0.65 + Double(index / 2) * 0.38
+            travel.repeatCount = .infinity
+            travel.isRemovedOnCompletion = false
+            dot.add(travel, forKey: "movingNetworkDot")
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
+        let outline = NSBezierPath(roundedRect: rect, xRadius: 25, yRadius: 25)
+        NSGradient(colors: [
+            NSColor(calibratedRed: 0.063, green: 0.118, blue: 0.165, alpha: 1),
+            NSColor(calibratedRed: 0.09, green: 0.208, blue: 0.263, alpha: 1),
+            NSColor(calibratedRed: 0.067, green: 0.149, blue: 0.196, alpha: 1)
+        ])?.draw(in: outline, angle: -40)
+        NSColor(calibratedRed: 0.54, green: 0.82, blue: 0.84,
+                alpha: 0.26).setStroke()
+        outline.lineWidth = 1
+        outline.stroke()
+
+        let cx = rect.midX
+        let cy = rect.midY
+        let accent = NSColor(calibratedRed: 0.30, green: 0.90,
+                             blue: 0.83, alpha: 1)
+        for radius in [CGFloat(25), 44, 64] {
+            let ring = NSBezierPath(ovalIn: NSRect(
+                x: cx - radius, y: cy - radius,
+                width: radius * 2, height: radius * 2))
+            accent.withAlphaComponent(proxyActive ? 0.25 : 0.11).setStroke()
+            ring.lineWidth = 1
+            ring.stroke()
+        }
+        // A clean bilateral network drawing, not an empty dark rectangle.
+        for index in 0..<13 {
+            let t = CGFloat(index) / 12
+            let spread = (t - 0.5) * rect.height * 0.70
+            for side in [CGFloat(-1), CGFloat(1)] {
+                let strand = NSBezierPath()
+                let x = cx + side * rect.width * 0.42
+                strand.move(to: CGPoint(x: cx + side * 16, y: cy + spread * 0.11))
+                strand.curve(to: CGPoint(x: x, y: cy + spread),
+                             controlPoint1: CGPoint(x: cx + side * rect.width * 0.19,
+                                                    y: cy + spread * 0.30),
+                             controlPoint2: CGPoint(x: cx + side * rect.width * 0.33,
+                                                    y: cy + spread * 0.90))
+                strand.lineWidth = index.isMultiple(of: 3) ? 1.15 : 0.65
+                accent.withAlphaComponent(
+                    proxyActive ? (index.isMultiple(of: 3) ? 0.75 : 0.40) :
+                                  (index.isMultiple(of: 3) ? 0.32 : 0.16)
+                ).setStroke()
+                strand.stroke()
+            }
+        }
+        // Network nodes move on CAKeyframeAnimation paths above this
+        // vector drawing, so no redraw loop runs on the Mac's CPU.
+        let hub = NSBezierPath(roundedRect: NSRect(
+            x: cx - 21, y: cy - 24, width: 42, height: 48),
+            xRadius: 13, yRadius: 13)
+        NSColor(calibratedRed: 0.04, green: 0.20, blue: 0.25, alpha: 1).setFill()
+        hub.fill()
+        accent.withAlphaComponent(proxyActive ? 0.96 : 0.59).setStroke()
+        hub.lineWidth = 1.7
+        hub.stroke()
+        for offset in [-9.0, 0.0, 9.0] {
+            let segment = NSBezierPath()
+            segment.move(to: CGPoint(x: cx - 9, y: cy + CGFloat(offset)))
+            segment.line(to: CGPoint(x: cx + 9, y: cy + CGFloat(offset)))
+            segment.lineWidth = 1.3
+            segment.stroke()
+        }
+    }
+}
+
+class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
+                                       NSTableViewDelegate {
+    private let directory = TwinConnectMacOSNativeDirectory()
+    private var accountSession: TwinMacNativeSession?
+    private var snapshot: TwinMacNativeSnapshot?
+    private var status = ""
+    private var busy = false
+    private var refreshGeneration = 0
+    private var nativeContentWidth: CGFloat = 1100
+    private var observesWindowSize = false
+    private var didAttemptSessionRestore = false
+    private var tenantLogo: NSImage?
+    private var logoGeneration = 0
+    // Match Flutter sections: Quick connect / Locations / Settings / Account.
+    private var tab = 0
+    private weak var nativeKillSwitchToggle: NSSwitch?
+    private weak var nativeKillSwitchStatusLabel: NSTextField?
+    private weak var nativeKillSwitchResetButton: NSButton?
+    private var nativeKillSwitchActionBusy = false
+    private let nativeKillSwitchControlRoot =
+        "/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl"
+    private var country = "All countries"
+    private var expandedCountries = Set<String>()
+    private var locationCountryIDs = [String]()
+    private var locationRowIDs = [String]()
+    private var locationSearch = ""
+    private weak var locationsScrollView: NSScrollView?
+    private var locationsScrollOffset: CGFloat = 0
+    private var fastestAutoSelectPending = false
+    private var fastestBusy = false
+    private var fastestStatus = ""
+    private var fastestGeneration = 0
+    private var protocolChipCodes = [String?]()
+    private var showAllProtocolChips = true
+    private var activeProtocol: String?
+    // The three V2Ray transport choices map to distinct server_groups IDs.
+    private let v2rayInboundIDs = ["tcp_tls", "websocket_tls", "xhttp_reality"]
+    private let v2rayInboundLabels = ["TCP TLS", "WebSocket TLS", "XHTTP Reality"]
+    private var activeV2RayInbound = "websocket_tls"
+    private var xrayInboundIndex = [String: [TwinMacNativeXrayInbound]]()
+    private var xrayIndexLoaded = false
+    private var xrayIndexLoading = false
+    private var xrayIndexError: String?
+    private var xrayInboundChoices = [(String, String)]()
+    private var xrayInboundRtts = [String: Int]()
+    private var xrayInboundProbing = Set<String>()
+    private var xrayIndexGeneration = 0
+    private var activeServer: String?
+    private var nodePingResults = [String: TwinMacNativePingResult]()
+    private var nodePingBusy = Set<String>()
+    private var nodePingQueue = [TwinMacNativeServer]()
+    private var pingAllBusy = false
+    private var pingGeneration = 0
+    private var didAutoPing = false
+    private var pingRedrawScheduled = false
+    private var localProxyBusy = false
+    private var localProxyStatus = ""
+    private var l2tpBusy = false
+    private var l2tpStatus = ""
+    private var l2tpTask: Process?
+    private var l2tpReconnectProfile: Data?
+    private var l2tpReconnectAccount: String?
+    private var l2tpReconnectOrigin: URL?
+    private var l2tpReconnectServer: String?
+    private var l2tpGeneration = 0
+    private var l2tpSystemRouteVerified = false
+    private var l2tpConnectedAt: Date?
+    private var l2tpRoutePollBusy = false
+    private var l2tpRouteLastPoll = Date.distantPast
+    private var ciscoAuthBusy = false
+    private var ciscoAuthStatus = ""
+    private let ciscoSafetyHold = true // Static-IP recovery not yet verified.
+    private var ciscoTunnelBusy = false
+    private var ciscoTunnelStatus = ""
+    private var ciscoSystemRouteVerified = false
+    private var ciscoConnectedAt: Date?
+    private var openVPNConnectedAt: Date?
+    private var ciscoRoutePollBusy = false
+    private var ciscoRouteLastPoll = Date.distantPast
+    private var wireGuardProbeTask: Process?
+    // A fresh authenticated profile is retained in memory only, scoped to
+    // this account, panel and server. Never write keys/config to disk.
+    private var openVPNReconnectProfile: Data?
+    private var openVPNReconnectAccount: String?
+    private var openVPNReconnectOrigin: URL?
+    private var openVPNReconnectServer: String?
+    private var wireGuardReconnectProfile: Data?
+    private var wireGuardReconnectProtocol: String?
+    private var wireGuardReconnectAccount: String?
+    private var wireGuardReconnectServer: String?
+    private var wireGuardReconnectOrigin: URL?
+    private var wireGuardProbeBusy = false
+    private var wireGuardProbeGeneration = 0
+    private var wireGuardProbeStatus = ""
+    private var wireGuardConnectionProtocol = "wireguard"
+    private var wireGuardConnectionTitle: String {
+        wireGuardConnectionProtocol == "amneziawg" ? "AmneziaWG" : "WireGuard"
+    }
+    private var selectedWireGuardFamily: Bool {
+        activeProtocol == "wireguard" || activeProtocol == "amneziawg"
+    }
+    private var wireGuardSystemRouteVerified = false
+    private var wireGuardConnectedAt: Date?
+    private var wireGuardRoutePollBusy = false
+    private var wireGuardRouteLastPoll = Date.distantPast
+    private var ciscoTunnelTask: Process?
+    private var ciscoReconnectProfile: Data?
+    private var ciscoReconnectAccount: String?
+    private var ciscoReconnectOrigin: URL?
+    private var ciscoReconnectServer: String?
+    private var ciscoTunnelGeneration = 0
+    private let proxyAttemptQueue = DispatchQueue(
+        label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
+    private var localProxyActive = false
+    // Experimental, separately installed root-owned local-console TUN service.
+    // Never label engine start as verified system VPN.
+    private var fullTunActive = false
+    private var fullTunKillSwitchCandidate = false
+    private var fullTunReconnectProfile: Data?
+    private var fullTunReconnectProtocol: String?
+    private var fullTunReconnectAccount: String?
+    private var fullTunReconnectOrigin: URL?
+    private var fullTunReconnectServer: String?
+    // Attested by the root-owned engine's ACTIVE configuration, never the
+    // current protocol picker (which can change while VPN is running).
+    private var fullTunConnectedProtocol: String?
+    private var fullTunObservedExitIP: String?
+    private var fullTunEgressConfirmedAt: Date?
+    private var fullTunProbeBusy = false
+    private var fullTunProbeLastAt = Date.distantPast
+    private var fullTunTrafficBusy = false
+    private var fullTunTrafficLastAt = Date.distantPast
+    private var fullTunTrafficInterface: String?
+    private var fullTunStartedAt: Date?
+    private var openVPNAppSessionActive = false
+    private var openVPNSystemRouteVerified = false
+    private var openVPNExitIP: String?
+    private var openVPNPing: Double?
+    private weak var openVPNPingText: NSTextField?
+    private weak var openVPNIPText: NSTextField?
+    private var openVPNTelemetryBusy = false
+    private var openVPNTelemetryAt = Date.distantPast
+    private var openVPNLastTraffic: (download: Int64, upload: Int64, at: Date)?
+    private var openVPNAppStatusPollAt = Date.distantPast
+    private var fullTunBusy = false
+    private var fullTunStatusPollBusy = false
+    private var fullTunStatusLastPoll = Date.distantPast
+    // Status socket contention is not proof the tunnel stopped. Keep pending
+    // checks separate from actual "engine_running_unverified" evidence.
+    private var fullTunStatusUncertain = false
+    private var fullTunStatusMisses = 0
+    // This is set only after a successful HTTPS probe and is independent
+    // of the protocol currently highlighted in the location picker.
+    private var verifiedProxyProtocol: String?
+    private var localProxyExitIP: String?
+    private var localProxyGeneration = 0
+    private var localProxyStartedAt: Date?
+    private var trafficTimer: Timer?
+    private var trafficPollBusy = false
+    private var lastTraffic: (download: Int64, upload: Int64, at: Date)?
+    // Recent counter samples yield a rolling 3-second average. This is
+    // genuine transfer speed, not generated network traffic.
+    private var recentTraffic = [(download: Int64, upload: Int64, at: Date)]()
+    private var downloadSpeed = "—"
+    private var uploadSpeed = "—"
+    private var downloadedTotal = "—"
+    private var uploadedTotal = "—"
+    private weak var downloadSpeedText: NSTextField?
+    private weak var uploadSpeedText: NSTextField?
+    private weak var downloadedTotalText: NSTextField?
+    private weak var uploadedTotalText: NSTextField?
+    private weak var downloadChart: TwinNativeTrafficSparkline?
+    private weak var uploadChart: TwinNativeTrafficSparkline?
+    private var downloadHistory = [Double]()
+    private var uploadHistory = [Double]()
+    private weak var proxyUptimeText: NSTextField?
+    private var cliTunCheckBusy = false
+    private weak var usernameField: NSTextField?
+    private weak var passwordField: NSSecureTextField?
+
+    private var lightAppearance: Bool { TwinNativePreferences.light }
+    private var foreground: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.09, green: 0.20, blue: 0.26, alpha: 1) :
+            NSColor(calibratedWhite: 0.96, alpha: 1)
+    }
+    private var base: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.91, green: 0.95, blue: 0.97, alpha: 1) :
+            NSColor(calibratedRed: 0.035, green: 0.105, blue: 0.143, alpha: 1)
+    }
+    private var panelColor: NSColor {
+        lightAppearance ? NSColor(calibratedWhite: 0.97, alpha: 1) :
+            NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.24, alpha: 0.85)
+    }
+    private var muted: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.28, green: 0.39, blue: 0.45, alpha: 1) :
+            NSColor(calibratedRed: 0.69, green: 0.79, blue: 0.82, alpha: 1)
+    }
+    private let teal = NSColor(calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1)
+    private var sea: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.08, green: 0.43, blue: 0.43, alpha: 1) :
+            NSColor(calibratedRed: 0.40, green: 0.72, blue: 0.70, alpha: 1)
+    }
+    private var amber: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.63, green: 0.34, blue: 0.08, alpha: 1) :
+            NSColor(calibratedRed: 1.0, green: 0.78, blue: 0.51, alpha: 1)
+    }
+
+    override func loadView() {
+        view = build()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if !observesWindowSize {
+            observesWindowSize = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(nativeWindowResized(_:)),
+                name: NSWindow.didResizeNotification, object: nil)
+        }
+        if let current = view.window?.contentView?.bounds.width {
+            nativeContentWidth = current
+        }
+        if trafficTimer == nil {
+            // Capture short genuine transfers without repeatedly rebuilding
+            // the heavy cloud AppKit view or running any speed-test traffic.
+            let timer = Timer(timeInterval: 1.0, repeats: true) {
+                [weak self] _ in self?.refreshTrafficMetrics()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            trafficTimer = timer
+        }
+        // The unsigned AppKit fallback must use the same rotating token flow
+        // as the authenticated client; never store or replay a password.
+        if !didAttemptSessionRestore {
+            didAttemptSessionRestore = true
+            directory.restoreSavedSession { [weak self] result in
+                guard let self = self, self.accountSession == nil,
+                      !self.busy else { return }
+                switch result {
+                case .success(let session):
+                    self.showAuthenticatedSession(session)
+                case .failure(let error):
+                    if error.localizedDescription != "NO_SAVED_SESSION" {
+                        self.status = "Automatic sign-in unavailable: " +
+                            error.localizedDescription
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        trafficTimer?.invalidate()
+        trafficTimer = nil
+    }
+
+    deinit {
+        ciscoTunnelTask?.terminate()
+        trafficTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func nativeWindowResized(_ notification: Notification) {
+        guard let source = notification.object as? NSWindow,
+              source === view.window, accountSession != nil else { return }
+        let latest = source.contentView?.bounds.width ?? source.frame.width
+        let wasWide = nativeContentWidth - 306 >= 790
+        let becomesWide = latest - 306 >= 790
+        let significant = abs(latest - nativeContentWidth) > 120
+        nativeContentWidth = latest
+        if tab == 0 && (wasWide != becomesWide || significant) {
+            view = build()
+        }
+    }
+
+    private func panelHexColor(_ hex: String?) -> NSColor? {
+        guard let hex = hex,
+              hex.range(of: "^#[0-9a-fA-F]{6}$",
+                        options: .regularExpression) != nil,
+              let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        return NSColor(calibratedRed: CGFloat((value >> 16) & 255) / 255,
+                       green: CGFloat((value >> 8) & 255) / 255,
+                       blue: CGFloat(value & 255) / 255, alpha: 1)
+    }
+
+    private func panelBackgroundColor() -> NSColor? {
+        panelHexColor(accountSession?.backgroundHex)
+    }
+
+    private func panelCardColor() -> NSColor? {
+        panelHexColor(accountSession?.cardHex)
+    }
+
+    private func tint() -> NSColor {
+        // The panel's primary_color is authoritative. Invalid/missing
+        // values fall back to the default accent instead of assuming a tenant.
+        let brand = panelHexColor(accountSession?.accentHex) ?? teal
+        return lightAppearance ? (brand.blended(withFraction: 0.30, of: .black) ?? brand) : brand
+    }
+
+    private func text(_ string: String, size: CGFloat = 13,
+                      weight: NSFont.Weight = .regular,
+                      color: NSColor? = nil) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: string)
+        label.font = NSFont.systemFont(ofSize: size, weight: weight)
+        label.textColor = color ?? foreground
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        label.alignment = .left
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return label
+    }
+
+    private func stack(_ axis: NSUserInterfaceLayoutOrientation = .vertical,
+                       spacing: CGFloat = 13) -> NSStackView {
+        let result = NSStackView()
+        result.orientation = axis
+        result.alignment = axis == .vertical ? .leading : .centerY
+        result.spacing = spacing
+        result.translatesAutoresizingMaskIntoConstraints = false
+        return result
+    }
+
+    private func spaced(_ root: NSView, _ contents: NSView,
+                        inset: CGFloat = 20) {
+        contents.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(contents)
+        NSLayoutConstraint.activate([
+            contents.leadingAnchor.constraint(equalTo: root.leadingAnchor,
+                                              constant: inset),
+            contents.trailingAnchor.constraint(equalTo: root.trailingAnchor,
+                                               constant: -inset),
+            contents.topAnchor.constraint(equalTo: root.topAnchor,
+                                          constant: inset),
+            contents.bottomAnchor.constraint(equalTo: root.bottomAnchor,
+                                             constant: -inset)
+        ])
+    }
+
+    private func card(_ children: [NSView], radius: CGFloat = 22,
+                      padding: CGFloat = 21,
+                      style: TwinNativeGlassCard.Style = .panel) -> NSView {
+        let box = TwinNativeGlassCard(frame: .zero)
+        box.apply(style, accent: tint(),
+                  background: panelBackgroundColor(), surface: panelCardColor())
+        box.translatesAutoresizingMaskIntoConstraints = false
+        box.wantsLayer = true
+        box.layer?.cornerRadius = radius
+        // Nested data tiles should read as one interface, not a maze of
+        // thick outlines. Only top-level panels receive a stronger edge.
+        box.layer?.borderWidth = style == .panel ? 0.8 : 0.45
+        box.layer?.borderColor = tint().withAlphaComponent(
+            style == .panel ? 0.35 : 0.17).cgColor
+        box.layer?.shadowColor = NSColor.black.cgColor
+        box.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 :
+            (style == .panel ? 0.10 : 0.025)
+        box.layer?.shadowRadius = style == .panel ? 14 : 5
+        box.layer?.shadowOffset = CGSize(width: 0, height: -3)
+        let column = stack(spacing: 13)
+        // Let every glass panel fill the available width; plain NSView
+        // children have no intrinsic width and otherwise disappear.
+        column.alignment = .leading
+        for child in children {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            child.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            column.addArrangedSubview(child)
+            // In AppKit a child NSView without an intrinsic width can shrink
+            // to its title: every panel uses the full width of its column.
+            child.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        }
+        spaced(box, column, inset: padding)
+        return box
+    }
+
+    private func pill(_ value: String, color: NSColor? = nil) -> NSView {
+        let background = TwinNativeGlassCard(frame: .zero)
+        background.apply(.inset, accent: color ?? tint(),
+                         background: panelBackgroundColor(),
+                         surface: panelCardColor())
+        background.layer?.cornerRadius = 13
+        background.layer?.borderColor = (color ?? tint())
+            .withAlphaComponent(0.37).cgColor
+        background.layer?.borderWidth = 1
+        let label = text(value, size: 12, weight: .semibold,
+                         color: color ?? sea)
+        spaced(background, label, inset: 9)
+        return background
+    }
+
+    private func button(_ title: String, action: Selector, tag: Int = 0,
+                        primary: Bool = false, mutedButton: Bool = false)
+                        -> TwinNativePremiumButton {
+        let control = TwinNativePremiumButton(title: title, target: self,
+                                               action: action)
+        control.isBordered = false
+        control.bezelStyle = .rounded
+        control.tag = tag
+        control.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        control.wantsLayer = true
+        control.layer?.cornerRadius = 14
+        control.layer?.borderWidth = 1
+        let color = lightAppearance ? foreground : (primary ? NSColor.white :
+            NSColor(calibratedWhite: 0.94, alpha: 1))
+        // Never paint an opaque backing behind translucent button glass.
+        control.layer?.backgroundColor = NSColor.clear.cgColor
+        control.layer?.borderColor = tint().withAlphaComponent(
+            primary ? 0.53 : 0.25).cgColor
+        // Every clickable surface is glass, and all chroma comes from the
+        // authenticated panel brand rather than a hard-coded cyan scheme.
+        let brand = tint()
+        let upper = primary ?
+            (brand.blended(withFraction: 0.23, of: .white) ?? brand) :
+            (NSColor(calibratedRed: 0.15, green: 0.25, blue: 0.30, alpha: 1)
+                .blended(withFraction: 0.32, of: brand) ?? brand)
+        let lower = primary ?
+            (brand.blended(withFraction: 0.18, of: .black) ?? brand) :
+            (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.22, alpha: 1)
+                .blended(withFraction: 0.22, of: brand) ?? brand)
+        if lightAppearance {
+            control.setAccentGradient(
+                (NSColor.white.blended(withFraction: primary ? 0.30 : 0.08, of: brand) ?? .white),
+                (NSColor.white.blended(withFraction: primary ? 0.42 : 0.14, of: brand) ?? .white))
+        } else {
+            control.setAccentGradient(
+                upper.withAlphaComponent(primary ? 0.64 : 0.36),
+                lower.withAlphaComponent(primary ? 0.52 : 0.27))
+        }
+        control.layer?.borderColor = brand.withAlphaComponent(
+            primary ? 0.74 : 0.38).cgColor
+        control.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [.foregroundColor: color,
+                         .font: NSFont.systemFont(ofSize: 13,
+                                                 weight: .semibold)]
+        )
+        // Navigation stays usable while the account API is refreshing.
+        control.isEnabled = true
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
+            .isActive = true
+        return control
+    }
+
+    private func separator() -> NSView {
+        let line = NSView()
+        line.wantsLayer = true
+        line.layer?.backgroundColor = tint().withAlphaComponent(0.23).cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return line
+    }
+
+    private func build() -> NSView {
+        // Actions and ping redraws recreate the AppKit tree. Keep the visible
+        // country on screen instead of jumping to the top after every click.
+        if tab == 1, let previous = locationsScrollView, previous.window != nil {
+            locationsScrollOffset = max(0, previous.contentView.bounds.origin.y)
+        }
+        let root = TwinNativeBackdrop(frame:
+            NSRect(x: 0, y: 0, width: 1180, height: 740))
+        let configuredBackground = lightAppearance ? base :
+            (panelBackgroundColor()?.blended(withFraction: 0.60, of: base) ?? base)
+        root.base = configuredBackground.blended(
+            withFraction: lightAppearance ? 0.06 : 0.19, of: tint()) ?? base
+        root.appearance = NSAppearance(named: lightAppearance ? .aqua : .darkAqua)
+        root.glow = tint()
+        root.beginAmbientMotion()
+        if accountSession == nil {
+            buildLogin(in: root)
+        } else {
+            buildShell(in: root)
+        }
+        return root
+    }
+
+    private func styleInputField<T: NSTextField>(_ field: T, placeholder: String) -> T {
+        field.placeholderString = placeholder
+        field.focusRingType = .exterior
+        field.isBezeled = false
+        field.isEditable = true
+        field.isSelectable = true
+        field.drawsBackground = true
+        field.backgroundColor = lightAppearance ? .white :
+            NSColor(calibratedRed: 0.16, green: 0.23, blue: 0.28, alpha: 1)
+        field.textColor = foreground
+        field.font = NSFont.systemFont(ofSize: 15)
+        field.controlSize = .large
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        return field
+    }
+
+    private func buildLogin(in root: NSView) {
+        // Match the shared login: a simple welcome heading, username,
+        // password and one action. No brand or extra explanatory copy.
+        let form = stack(spacing: 15)
+        form.addArrangedSubview(text("Welcome back", size: 27, weight: .bold))
+        let username = styleInputField(NSTextField(), placeholder: "Username")
+        usernameField = username
+        let password = styleInputField(NSSecureTextField(), placeholder: "Password")
+        passwordField = password
+        form.addArrangedSubview(username)
+        form.addArrangedSubview(password)
+
+        let enter = button(busy ? "Signing in…" : "Sign in",
+                           action: #selector(signIn(_:)), primary: true)
+        form.addArrangedSubview(enter)
+        enter.heightAnchor.constraint(equalToConstant: 51).isActive = true
+        // AppKit NSStackView uses intrinsic-width hugging by default.
+        // Explicitly stretch all controls across the centered login card.
+        username.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+        password.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+        enter.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+
+        // Authentication errors are actionable and never silently swallowed.
+        if !status.isEmpty {
+            form.addArrangedSubview(text(status, size: 12,
+                                       color: status.hasPrefix("Sign-in failed")
+                                       ? amber : muted))
+        }
+
+        let glass = card([form], radius: 26, padding: 30)
+        root.addSubview(glass)
+        NSLayoutConstraint.activate([
+            glass.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            glass.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            glass.widthAnchor.constraint(equalToConstant: 440),
+            glass.leadingAnchor.constraint(greaterThanOrEqualTo:
+                root.leadingAnchor, constant: 20),
+            glass.trailingAnchor.constraint(lessThanOrEqualTo:
+                root.trailingAnchor, constant: -20),
+            form.widthAnchor.constraint(equalTo: glass.widthAnchor, constant: -60)
+        ])
+    }
+
+    private func buildShell(in root: NSView) {
+        let sidebar = buildSidebar()
+        sidebar.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(sidebar)
+        NSLayoutConstraint.activate([
+            sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            sidebar.topAnchor.constraint(equalTo: root.topAnchor),
+            sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            sidebar.widthAnchor.constraint(equalToConstant: 258)
+        ])
+        let workspace = stack(spacing: 18)
+        // A vertical NSStackView with .leading alignment gives its NSView
+        // cards no full-width constraint. They can collapse to zero width.
+        workspace.alignment = .leading
+        let heading = stack(.horizontal, spacing: 12)
+        heading.alignment = .centerY
+        let titles = ["Quick Connect", "Locations", "Settings", "My Account"]
+        heading.addArrangedSubview(text(titles[tab], size: 25, weight: .bold))
+        let headerSpace = NSView()
+        headerSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        heading.addArrangedSubview(headerSpace)
+        // The Windows reference has its only offline badge above the hero,
+        // not a duplicate badge in the page title.
+        // Keep the title outside the scroll view so it never scrolls offscreen.
+        root.addSubview(heading)
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            heading.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor,
+                                             constant: 24),
+            heading.trailingAnchor.constraint(equalTo: root.trailingAnchor,
+                                              constant: -24),
+            heading.topAnchor.constraint(equalTo: root.topAnchor, constant: 21)
+        ])
+        // NSStackView's .width alignment equalizes widths without fixing
+        // horizontal origins. That caused Locations, Settings, and Account
+        // panels to collect along the right edge of the macOS viewport.
+        // Anchor every page to the leading edge and the full content width.
+        func addPage(_ page: NSView) {
+            page.translatesAutoresizingMaskIntoConstraints = false
+            page.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            workspace.addArrangedSubview(page)
+            page.widthAnchor.constraint(equalTo: workspace.widthAnchor)
+                .isActive = true
+        }
+        switch tab {
+        case 0:
+            let availableWidth = nativeContentWidth - 258 - 48
+            if availableWidth >= 790 {
+                let pair = stack(.horizontal, spacing: 14)
+                pair.alignment = .top
+                pair.distribution = .fillEqually
+                let connection = connectPage()
+                let network = networkStatusPage()
+                pair.addArrangedSubview(connection)
+                pair.addArrangedSubview(network)
+                network.heightAnchor.constraint(equalTo: connection.heightAnchor)
+                    .isActive = true
+                addPage(pair)
+            } else {
+                addPage(connectPage())
+                addPage(networkStatusPage())
+            }
+        case 1: addPage(locationsPage())
+        case 2: addPage(settingsPage())
+        default: addPage(accountPage())
+        }
+        // Technical diagnostics belong in Settings, not in the user-facing
+        // page canvas. The shell mirrors the clean Windows dashboard.
+        // Keep the dashboard visible even before the account snapshot arrives
+        // or when its contents exceed the macOS window height.
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        // On Catalina remote desktops, overlay scrollbars and trackpad
+        // gestures can hide the only indication that content continues.
+        scroll.autohidesScrollers = false
+        scroll.verticalScrollElasticity = .allowed
+        scroll.hasHorizontalScroller = false
+        scroll.borderType = .noBorder
+
+        let document = TwinNativeFlippedDocument()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(workspace)
+        NSLayoutConstraint.activate([
+            workspace.leadingAnchor.constraint(equalTo: document.leadingAnchor,
+                                               constant: 24),
+            workspace.trailingAnchor.constraint(equalTo: document.trailingAnchor,
+                                                constant: -24),
+            workspace.topAnchor.constraint(equalTo: document.topAnchor,
+                                           constant: 4),
+            workspace.bottomAnchor.constraint(equalTo: document.bottomAnchor,
+                                              constant: -18)
+        ])
+        scroll.documentView = document
+        if tab == 1 { locationsScrollView = scroll }
+        root.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor,
+                                          constant: 11),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            document.heightAnchor.constraint(greaterThanOrEqualTo:
+                                             scroll.contentView.heightAnchor)
+        ])
+        // Force the document to lay out its full natural height rather than
+        // treating the visible clip as the entire page. No off-screen cards
+        // should be unreachable by the mouse wheel or scrollbar.
+        workspace.setContentHuggingPriority(.required, for: .vertical)
+        document.layoutSubtreeIfNeeded()
+        scroll.reflectScrolledClipView(scroll.contentView)
+        if tab == 1 {
+            let offset = locationsScrollOffset
+            // The new scroll clip does not have a final size until this view
+            // is attached. Restore only after AppKit completes its layout.
+            DispatchQueue.main.async { [weak scroll] in
+                guard let scroll = scroll, scroll.window != nil else { return }
+                scroll.layoutSubtreeIfNeeded()
+                scroll.documentView?.layoutSubtreeIfNeeded()
+                let clip = scroll.contentView
+                let maxY = max(0, (scroll.documentView?.bounds.height ?? 0) -
+                               clip.bounds.height)
+                let targetY = min(max(0, offset), maxY)
+                clip.scroll(to: NSPoint(x: 0, y: targetY))
+                scroll.reflectScrolledClipView(clip)
+            }
+        }
+    }
+
+    // Native vector glyphs keep the Windows icon language sharp on Retina
+    // and on Catalina, where SF Symbols systemSymbolName is unavailable.
+    // 0 bolt, 1 location, 2 settings, 3 account, 4 support,
+    // 5 renewal, 6 website.
+    private func sidebarIcon(_ kind: Int) -> NSImage {
+        let output = NSImage(size: NSSize(width: 23, height: 23),
+                             flipped: false) { rect in
+            let unit = rect.width / 20
+            func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
+                NSPoint(x: x * unit, y: y * unit)
+            }
+            let path = NSBezierPath()
+            path.lineWidth = 1.85 * unit
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            switch kind {
+            case 0:
+                path.move(to: pt(11, 18))
+                path.line(to: pt(5, 9))
+                path.line(to: pt(10, 9))
+                path.line(to: pt(8, 2))
+                path.line(to: pt(16, 12))
+                path.line(to: pt(11, 12))
+                path.close()
+            case 1:
+                path.move(to: pt(10, 2))
+                path.curve(to: pt(4, 11), controlPoint1: pt(7, 6),
+                          controlPoint2: pt(4, 8))
+                path.curve(to: pt(16, 11), controlPoint1: pt(4, 19),
+                          controlPoint2: pt(16, 19))
+                path.curve(to: pt(10, 2), controlPoint1: pt(16, 8),
+                          controlPoint2: pt(13, 6))
+                path.appendOval(in: NSRect(x: 8 * unit, y: 10 * unit,
+                                          width: 4 * unit, height: 4 * unit))
+            case 2:
+                // Windows sidebar uses the three horizontal sliders icon.
+                for (y, knob) in [(CGFloat(5), CGFloat(7)),
+                                  (CGFloat(10), CGFloat(13)),
+                                  (CGFloat(15), CGFloat(8))] {
+                    path.move(to: pt(2, y))
+                    path.line(to: pt(18, y))
+                    path.appendOval(in: NSRect(x: (knob - 1.8) * unit,
+                                              y: (y - 1.8) * unit,
+                                              width: 3.6 * unit,
+                                              height: 3.6 * unit))
+                }
+            case 3:
+                path.appendOval(in: NSRect(x: 7 * unit, y: 11 * unit,
+                                          width: 6 * unit, height: 6 * unit))
+                path.move(to: pt(3, 3))
+                path.curve(to: pt(17, 3), controlPoint1: pt(2, 12),
+                          controlPoint2: pt(18, 12))
+            case 4:
+                path.move(to: pt(3, 9))
+                path.curve(to: pt(17, 9), controlPoint1: pt(2, 20),
+                          controlPoint2: pt(18, 20))
+                path.move(to: pt(3, 10))
+                path.line(to: pt(3, 5))
+                path.line(to: pt(6, 5))
+                path.line(to: pt(6, 11))
+                path.move(to: pt(17, 10))
+                path.line(to: pt(17, 5))
+                path.line(to: pt(14, 5))
+                path.line(to: pt(14, 11))
+            case 5:
+                path.move(to: pt(16, 12))
+                path.curve(to: pt(5, 6), controlPoint1: pt(18, 5),
+                          controlPoint2: pt(9, 2))
+                path.move(to: pt(5, 6))
+                path.line(to: pt(5, 11))
+                path.line(to: pt(10, 11))
+                path.move(to: pt(4, 9))
+                path.curve(to: pt(15, 14), controlPoint1: pt(2, 16),
+                          controlPoint2: pt(11, 18))
+            default:
+                path.appendOval(in: NSRect(x: 2 * unit, y: 2 * unit,
+                                          width: 16 * unit, height: 16 * unit))
+                path.appendOval(in: NSRect(x: 7 * unit, y: 2 * unit,
+                                          width: 6 * unit, height: 16 * unit))
+                path.move(to: pt(2, 10))
+                path.line(to: pt(18, 10))
+            }
+            NSColor.white.setStroke()
+            path.stroke()
+            return true
+        }
+        output.isTemplate = true
+        return output
+    }
+
+    private func buildSidebar() -> NSView {
+        // One continuous Windows-style canvas spans BOTH the navigation
+        // and content. Do not install a second full-height tinted glass card
+        // over the sidebar: it creates a hard vertical seam and hides the
+        // branded radial artwork beneath it.
+        let side = NSView(frame: .zero)
+        side.translatesAutoresizingMaskIntoConstraints = false
+        side.wantsLayer = true
+        side.layer?.backgroundColor = NSColor.clear.cgColor
+        side.layer?.borderWidth = 0
+        // Individual navigation controls stay glass. The sidebar itself
+        // intentionally paints nothing, exposing TwinNativeBackdrop below.
+
+        let content = stack(spacing: 12)
+        content.alignment = .leading
+        let logo = NSView()
+        logo.wantsLayer = true
+        logo.layer?.cornerRadius = 13
+        logo.layer?.backgroundColor = tint().cgColor
+        logo.layer?.borderColor = sea.withAlphaComponent(0.38).cgColor
+        logo.layer?.borderWidth = 1
+        logo.translatesAutoresizingMaskIntoConstraints = false
+        logo.widthAnchor.constraint(equalToConstant: 47).isActive = true
+        logo.heightAnchor.constraint(equalToConstant: 47).isActive = true
+        let resolvedBrandImage: NSImage? = tenantLogo ?? NSApplication.shared.applicationIconImage
+        if let brandImage = resolvedBrandImage {
+            let image = NSImageView(image: brandImage)
+            image.imageScaling = .scaleProportionallyUpOrDown
+            image.translatesAutoresizingMaskIntoConstraints = false
+            logo.addSubview(image)
+            NSLayoutConstraint.activate([
+                image.leadingAnchor.constraint(equalTo: logo.leadingAnchor, constant: 3),
+                image.trailingAnchor.constraint(equalTo: logo.trailingAnchor, constant: -3),
+                image.topAnchor.constraint(equalTo: logo.topAnchor, constant: 3),
+                image.bottomAnchor.constraint(equalTo: logo.bottomAnchor, constant: -3)
+            ])
+        } else {
+            let infinity = text("∞", size: 26, weight: .bold)
+            infinity.translatesAutoresizingMaskIntoConstraints = false
+            logo.addSubview(infinity)
+            NSLayoutConstraint.activate([
+                infinity.centerXAnchor.constraint(equalTo: logo.centerXAnchor),
+                infinity.centerYAnchor.constraint(equalTo: logo.centerYAnchor)
+            ])
+        }
+        let logoRow = stack(.horizontal, spacing: 0)
+        let startSpace = NSView()
+        let endSpace = NSView()
+        logoRow.addArrangedSubview(startSpace)
+        logoRow.addArrangedSubview(logo)
+        logoRow.addArrangedSubview(endSpace)
+        startSpace.widthAnchor.constraint(equalTo: endSpace.widthAnchor).isActive = true
+        content.addArrangedSubview(logoRow)
+        logoRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        // Preserve the tenant-defined brand, but normalize the common VPN
+        // acronym casing in titles (e.g. "Matin Vpn" -> "Matin VPN").
+        let rawBrand = accountSession?.brandName ?? "TwinConnect"
+        let displayBrand = rawBrand.replacingOccurrences(
+            of: " vpn", with: " VPN", options: .caseInsensitive)
+        let brand = text(displayBrand, size: 18, weight: .bold)
+        brand.alignment = .center
+        content.addArrangedSubview(brand)
+        brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        content.setCustomSpacing(31, after: brand)
+
+        let navs = ["Quick Connect", "Locations", "Settings", "Account"]
+        let selectedLocation = snapshot?.servers.first { $0.id == activeServer }
+        let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"
+        for (index, label) in navs.enumerated() {
+            // Center the whole icon + label group inside each navigation
+            // card. Leading alignment plus whitespace in the title pushed
+            // all labels against the left edge on Catalina.
+            // NSButton's imageLeft cell keeps the image anchored to the
+            // leading edge even when its title is centered. Use one centered
+            // overlay for BOTH glyph and text, preserving the real button hit
+            // target and accessibility title.
+            let control = button(label,
+                action: #selector(changeTab(_:)), tag: index,
+                primary: tab == index, mutedButton: true)
+            control.title = ""
+            control.attributedTitle = NSAttributedString(string: "")
+            control.setAccessibilityLabel(label)
+            let centeredLabel = stack(.horizontal, spacing: 12)
+            centeredLabel.alignment = .centerY
+            if index == 1 {
+                centeredLabel.addArrangedSubview(
+                    text(selectedFlag, size: 21, weight: .medium))
+            } else {
+                let glyph = NSImageView(image: sidebarIcon(index))
+                glyph.imageScaling = .scaleProportionallyDown
+                glyph.contentTintColor = tab == index && !lightAppearance ? NSColor.white : tint()
+                glyph.translatesAutoresizingMaskIntoConstraints = false
+                glyph.widthAnchor.constraint(equalToConstant: 23).isActive = true
+                glyph.heightAnchor.constraint(equalToConstant: 23).isActive = true
+                centeredLabel.addArrangedSubview(glyph)
+            }
+            centeredLabel.addArrangedSubview(
+                text(label, size: 13, weight: .semibold))
+            centeredLabel.setContentHuggingPriority(.required, for: .horizontal)
+            control.addSubview(centeredLabel)
+            NSLayoutConstraint.activate([
+                centeredLabel.centerXAnchor.constraint(equalTo: control.centerXAnchor),
+                centeredLabel.centerYAnchor.constraint(equalTo: control.centerYAnchor),
+                centeredLabel.leadingAnchor.constraint(
+                    greaterThanOrEqualTo: control.leadingAnchor, constant: 12),
+                centeredLabel.trailingAnchor.constraint(
+                    lessThanOrEqualTo: control.trailingAnchor, constant: -12)
+            ])
+            control.heightAnchor.constraint(equalToConstant: 54).isActive = true
+            control.layer?.cornerRadius = 16
+            control.layer?.borderWidth = 1
+            if lightAppearance {
+                control.setAccentGradient(
+                    NSColor.white.blended(withFraction: tab == index ? 0.26 : 0.05, of: tint()) ?? .white,
+                    NSColor.white.blended(withFraction: tab == index ? 0.37 : 0.11, of: tint()) ?? .white)
+            } else if tab == index {
+                control.setAccentGradient(
+                    (tint().blended(withFraction: 0.26, of: .white) ?? tint())
+                        .withAlphaComponent(0.70),
+                    (tint().blended(withFraction: 0.16, of: .black) ?? tint())
+                        .withAlphaComponent(0.54))
+                control.layer?.borderColor = tint().withAlphaComponent(0.48).cgColor
+            } else {
+                control.setAccentGradient(
+                    (NSColor(calibratedRed: 0.14, green: 0.25, blue: 0.30, alpha: 1)
+                        .blended(withFraction: 0.30, of: tint()) ?? tint())
+                        .withAlphaComponent(0.38),
+                    (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.21, alpha: 1)
+                        .blended(withFraction: 0.19, of: tint()) ?? tint())
+                        .withAlphaComponent(0.26))
+                control.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
+            }
+            content.addArrangedSubview(control)
+            control.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
+
+        let quick = stack(.horizontal, spacing: 5)
+        quick.distribution = .fillEqually
+        let linkDefinitions: [(String, Int, Selector, URL?)] = [
+            ("Support", 4, #selector(openSupport(_:)), accountSession?.supportURL),
+            ("Renew", 5, #selector(openRenewal(_:)), accountSession?.renewalURL),
+            ("Website", 6, #selector(openWebsite(_:)), accountSession?.websiteURL)
+        ]
+        for (title, kind, action, target) in linkDefinitions where target != nil {
+            let link = button(title, action: action, mutedButton: true)
+            link.image = sidebarIcon(kind)
+            link.imagePosition = .imageAbove
+            link.imageScaling = .scaleProportionallyDown
+            link.contentTintColor = sea
+            link.heightAnchor.constraint(equalToConstant: 62).isActive = true
+            link.layer?.cornerRadius = 12
+            link.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
+            if !lightAppearance {
+            link.setAccentGradient(
+                (NSColor(calibratedRed: 0.15, green: 0.27, blue: 0.32, alpha: 1)
+                    .blended(withFraction: 0.32, of: tint()) ?? tint())
+                    .withAlphaComponent(0.39),
+                (NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.23, alpha: 1)
+                    .blended(withFraction: 0.20, of: tint()) ?? tint())
+                    .withAlphaComponent(0.27))
+            }
+            quick.addArrangedSubview(link)
+        }
+        if accountSession?.supportURL != nil ||
+           accountSession?.renewalURL != nil ||
+           accountSession?.websiteURL != nil {
+            let links = card([quick], radius: 14, padding: 7)
+            content.addArrangedSubview(links)
+            links.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
+
+        // Keep account details at the bottom, like the Windows sidebar.
+        let flexSpacer = NSView()
+        flexSpacer.translatesAutoresizingMaskIntoConstraints = false
+        flexSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        content.addArrangedSubview(flexSpacer)
+        let summary = stack(spacing: 5)
+        summary.addArrangedSubview(text(accountSession?.username ?? "",
+                                        size: 11, weight: .semibold))
+        let identity = card([summary], radius: 18, padding: 12)
+        content.addArrangedSubview(identity)
+        identity.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        // Settings already has its own navigation tab. Avoid duplicate gear
+        // and a language-looking control that only redirected to Settings.
+        // Keep account identity; no functional navigation is removed.
+        // Independent vertical safe-areas match the Windows navigation:
+        // branding starts below the title bar; the language/gear controls
+        // float above the bottom edge rather than touching the window.
+        content.translatesAutoresizingMaskIntoConstraints = false
+        side.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: side.leadingAnchor,
+                                             constant: 17),
+            content.trailingAnchor.constraint(equalTo: side.trailingAnchor,
+                                              constant: -17),
+            content.topAnchor.constraint(equalTo: side.topAnchor, constant: 27),
+            content.bottomAnchor.constraint(equalTo: side.bottomAnchor,
+                                            constant: -46)
+        ])
+        return side
+    }
+
+    private var connectedProtocolTitle: String {
+        guard localProxyActive else { return "" }
+        switch verifiedProxyProtocol {
+        case "hysteria2": return "Hysteria2"
+        case "tuic": return "TUIC"
+        case "anytls": return "AnyTLS"
+        case "socks5": return "SOCKS5"
+        case "snell": return "Snell"
+        case "naive": return "NaiveProxy"
+        case "shadowtls": return "ShadowTLS"
+        case "mieru": return "Mieru"
+        case "v2ray": return "V2Ray"
+        default: return "Proxy"
+        }
+    }
+
+    private func fullTunProtocolTitle(_ code: String) -> String? {
+        switch code {
+        case "v2ray": return "V2Ray"
+        case "hysteria2": return "Hysteria2"
+        case "tuic": return "TUIC"
+        case "anytls": return "AnyTLS"
+        case "socks5": return "SOCKS5"
+        case "snell": return "Snell"
+        case "naive": return "NaiveProxy"
+        case "shadowtls": return "ShadowTLS"
+        case "mieru": return "Mieru"
+        case "trusttunnel": return "TrustTunnel"
+        case "sudoku": return "Sudoku"
+        default: return nil
+        }
+    }
+
+    private var activeFullTunTitle: String? {
+        return fullTunConnectedProtocol.flatMap { fullTunProtocolTitle($0) }
+    }
+
+    private var fullTunConnectedSuffix: String {
+        return activeFullTunTitle.map { " · " + $0 } ?? ""
+    }
+
+    private func elapsedConnectionTime(_ startedAt: Date) -> String {
+        let seconds = max(0, Int(Date().timeIntervalSince(startedAt)))
+        return String(format: "%02d:%02d:%02d",
+                      seconds / 3600, (seconds / 60) % 60, seconds % 60)
+    }
+
+    private var verifiedConnectionStart: Date? {
+        if l2tpSystemRouteVerified { return l2tpConnectedAt }
+        if wireGuardSystemRouteVerified { return wireGuardConnectedAt }
+        if ciscoSystemRouteVerified { return ciscoConnectedAt }
+        if openVPNSystemRouteVerified { return openVPNConnectedAt }
+        if localProxyActive { return localProxyStartedAt }
+        return nil
+    }
+
+    private func updateConnectionDuration() {
+        if fullTunActive, let startedAt = fullTunStartedAt {
+            proxyUptimeText?.stringValue = "◷  " +
+                (activeFullTunTitle ?? "TUN session") + "  " +
+                elapsedConnectionTime(startedAt)
+            return
+        }
+        if let startedAt = verifiedConnectionStart {
+            let protocolName = l2tpSystemRouteVerified ? "L2TP" :
+                (wireGuardSystemRouteVerified ? wireGuardConnectionTitle :
+                (ciscoSystemRouteVerified ? "Cisco" :
+                (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)))
+            proxyUptimeText?.stringValue = "◷  " + protocolName + "  " +
+                elapsedConnectionTime(startedAt)
+        }
+    }
+
+    // "Connected" is grounded in a recent system HTTPS exit probe AND the
+    // locally observed kernel utun route. It does not imply a 30-day uptime.
+    private var fullTunHTTPSConnected: Bool {
+        fullTunActive && !fullTunStatusUncertain &&
+            fullTunObservedExitIP != nil &&
+            fullTunEgressConfirmedAt.map {
+                Date().timeIntervalSince($0) >= 0 &&
+                Date().timeIntervalSince($0) < 45
+            } == true
+    }
+
+    private var verifiedHeroConnectionLabel: String {
+        // The unsigned V2Ray TUN is asynchronous. Show the pending request
+        // immediately, not Offline, until the controller confirms its result.
+        if fullTunBusy && activeProtocol != "openvpn" {
+            return fullTunActive ? "◌  Disconnecting…" : "◌  Connecting…"
+        }
+        if fullTunStatusUncertain { return "◌  Checking TUN…" }
+        if localProxyActive { return "◉  " + connectedProtocolTitle + " proxy active" }
+        if openVPNSystemRouteVerified { return "◉  Connected · OpenVPN" }
+        if l2tpSystemRouteVerified { return "◉  Connected · L2TP" }
+        if activeProtocol == "l2tp" && (l2tpBusy || l2tpTask != nil) {
+            return "◌  Connecting…"
+        }
+        if activeProtocol == "l2tp" && l2tpStatus.hasPrefix("L2TP_") &&
+           l2tpStatus != "L2TP_SYSTEM_DISCONNECTED" {
+            return "◌  L2TP · Connection failed"
+        }
+        if activeProtocol == "openvpn" && fullTunBusy {
+            return openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…"
+        }
+        if openVPNAppSessionActive { return "◉  OpenVPN · Tunnel only" }
+        if wireGuardSystemRouteVerified { return "◉  Connected · " + wireGuardConnectionTitle }
+        if wireGuardProbeBusy || wireGuardProbeTask != nil { return "◌  Connecting…" }
+        if ciscoSystemRouteVerified { return "◉  Connected · Cisco" }
+        if ciscoTunnelTask != nil { return "◌  Connecting…" }
+        if fullTunHTTPSConnected {
+            return "◉  Connected" + fullTunConnectedSuffix
+        }
+        if fullTunActive {
+            return "◌  Verifying internet" + fullTunConnectedSuffix
+        }
+        return "◌  Offline"
+    }
+
+    // A failed Connect action must not silently return to "Disconnected".
+    // Surface only redacted application error codes in the Network card,
+    // never raw configuration, URLs, credentials, or protocol payloads.
+    private var connectionAttemptNotice: String? {
+        if selectedWireGuardFamily && !wireGuardProbeBusy &&
+           wireGuardProbeTask == nil && wireGuardProbeStatus.hasPrefix("WG_") {
+            return wireGuardConnectionTitle + ": " + wireGuardProbeStatus
+        }
+        if status.hasPrefix("TUN connection failed: ") ||
+           status.hasPrefix("VPN profile request failed: ") ||
+           status.hasPrefix("Connection unavailable: ") ||
+           status.hasPrefix("TrustTunnel TUN helper not installed; ") ||
+           status.hasPrefix("TUN status could not be verified.") ||
+           status.hasPrefix("TUN stop unverified; ") {
+            return status
+        }
+        return nil
+    }
+
+    private var verifiedNetworkConnectionLabel: String {
+        if fullTunBusy && activeProtocol != "openvpn" {
+            return fullTunActive ? "Disconnecting…" : "Connecting…"
+        }
+        if fullTunStatusUncertain { return "Checking TUN…" }
+        if localProxyActive { return connectedProtocolTitle + " · Proxy" }
+        if openVPNSystemRouteVerified { return "Connected · OpenVPN" }
+        if l2tpSystemRouteVerified { return "Connected · L2TP" }
+        if activeProtocol == "l2tp" && (l2tpBusy || l2tpTask != nil) {
+            return "Connecting…"
+        }
+        if activeProtocol == "l2tp" && l2tpStatus.hasPrefix("L2TP_") &&
+           l2tpStatus != "L2TP_SYSTEM_DISCONNECTED" {
+            return "L2TP · Connection failed"
+        }
+        if activeProtocol == "openvpn" && fullTunBusy {
+            return openVPNAppSessionActive ? "Disconnecting…" : "Connecting…"
+        }
+        if openVPNAppSessionActive { return "OpenVPN · Tunnel only" }
+        if wireGuardSystemRouteVerified { return "Connected · " + wireGuardConnectionTitle }
+        if wireGuardProbeBusy || wireGuardProbeTask != nil { return "Connecting…" }
+        if ciscoSystemRouteVerified { return "Connected · Cisco" }
+        if ciscoTunnelTask != nil { return "Connecting…" }
+        if fullTunHTTPSConnected {
+            return "Connected" + fullTunConnectedSuffix
+        }
+        if fullTunActive {
+            return "Checking HTTPS" + fullTunConnectedSuffix
+        }
+        return "Disconnected"
+    }
+
+    private func connectPage() -> NSView {
+        let main = stack(spacing: 10)
+        main.alignment = .leading
+
+        let offlineRow = stack(.horizontal, spacing: 8)
+        let leadingSpace = NSView()
+        let trailingSpace = NSView()
+        offlineRow.addArrangedSubview(leadingSpace)
+        offlineRow.addArrangedSubview(pill(
+            verifiedHeroConnectionLabel,
+            color: (localProxyActive || openVPNSystemRouteVerified ||
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+                    l2tpSystemRouteVerified || fullTunBusy ||
+                    fullTunHTTPSConnected) ? sea : muted))
+        offlineRow.addArrangedSubview(trailingSpace)
+        leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
+            .isActive = true
+        main.addArrangedSubview(offlineRow)
+        offlineRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+
+        let fabric = TwinNativeNetworkFabric(frame:
+            NSRect(x: 0, y: 0, width: 330, height: 165))
+        fabric.translatesAutoresizingMaskIntoConstraints = false
+        fabric.proxyActive = localProxyActive || openVPNSystemRouteVerified ||
+            ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+            l2tpSystemRouteVerified || fullTunHTTPSConnected
+        fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
+        // The old backdrop was an empty rectangle. This status overlay is
+        // explicitly a selectable local proxy test, not a connected VPN.
+        // The vector illustration itself remains in the hero; the current
+        // selection appears below so no text obscures the network strands.
+        main.addArrangedSubview(fabric)
+        fabric.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // Windows places the selected location only in Network Status,
+        // not as a second caption underneath the hero illustration.
+
+        let buttonRow = stack(.horizontal, spacing: 0)
+        let leftGap = NSView()
+        let rightGap = NSView()
+        buttonRow.addArrangedSubview(leftGap)
+        // Preserve the Windows primary action label. Diagnostics belong only
+        // in Settings, and must never masquerade as a successful VPN connection.
+        let connect = button(fullTunStatusUncertain ? "Checking…" :
+                             fullTunBusy && activeProtocol != "openvpn" ?
+                             (fullTunActive ? "Disconnecting…" : "Connecting…") :
+                             activeProtocol == "l2tp" ?
+                             ((l2tpTask != nil || l2tpSystemRouteVerified) ?
+                              "Disconnect" : (l2tpBusy ? "Connecting…" : "Connect")) :
+                             selectedWireGuardFamily ?
+                             ((wireGuardProbeTask != nil || wireGuardSystemRouteVerified) ?
+                              "Disconnect" : (wireGuardProbeBusy ? "Connecting…" : "Connect")) :
+                             activeProtocol == "cisco" ?
+                             (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
+                             (localProxyActive || fullTunActive || openVPNAppSessionActive ?
+                               "Disconnect" : "Connect"),
+                             action: #selector(requestVPNConnection(_:)), primary: true)
+        // A stale busy flag from another transport must never leave a
+        // visually active "Connect" button silently disabled. The action
+        // handler reports a blocking operation explicitly and does not
+        // launch concurrent tunnels.
+        connect.isEnabled = accountSession != nil && !fullTunBusy &&
+            !fullTunStatusUncertain
+        let l2tpHasDiagnostic = activeProtocol == "l2tp" &&
+            !l2tpStatus.isEmpty
+        let openVPNHasDiagnostic = activeProtocol == "openvpn" &&
+            (status.contains("FAILED") || status.contains("REJECTED") ||
+             status.contains("UNAVAILABLE") || status.contains("NOT_INSTALLED") ||
+             status.contains("not verified"))
+        connect.toolTip = fullTunBusy ? "Waiting for the TUN controller; connection not yet verified." :
+            l2tpHasDiagnostic ? l2tpStatus :
+            activeProtocol == "l2tp" ?
+            "Review authorized L2TP settings and native macOS VPN service." :
+            selectedWireGuardFamily ?
+            (wireGuardProbeStatus.isEmpty ?
+             "Connect to the selected WireGuard server." : wireGuardProbeStatus) :
+            activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
+            "Verified OpenVPN system IPv4 routing. Disconnect restores network and DNS." :
+            activeProtocol == "openvpn" && openVPNAppSessionActive ?
+            "OpenVPN tunnel only; system routing not active." :
+            activeProtocol == "openvpn" && openVPNHasDiagnostic ? status :
+            activeProtocol == "openvpn" && !fullTunServicePresent() ?
+            "Start a bounded OpenVPN session; macOS system traffic is not routed through it." :
+            activeProtocol == "cisco" ?
+            "Connect to the selected Cisco server." :
+            (fullTunHTTPSConnected ? "HTTPS exit verified via TUN; ICMP and interface counters measured locally." :
+             fullTunActive ? "TUN engine started; checking network egress." :
+                (fullTunServicePresent() ? "Experimental local-console TUN service." :
+                    "Unsigned macOS: local SOCKS proxy only; no system VPN."))
+        connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
+        connect.layer?.cornerRadius = 17
+        if localProxyActive || openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+           wireGuardSystemRouteVerified || l2tpSystemRouteVerified || fullTunHTTPSConnected {
+            // More vivid green state like the shared Windows design, while
+            // still representing ONLY a verified SOCKS proxy.
+            let mint = NSColor(calibratedRed: 0.07, green: 0.82,
+                               blue: 0.63, alpha: 1)
+            connect.setAccentGradient(
+                mint.withAlphaComponent(0.94),
+                (mint.blended(withFraction: 0.32, of: .black) ?? mint)
+                    .withAlphaComponent(0.90))
+        }
+        connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
+        connect.layer?.shadowColor = sea.cgColor
+        connect.layer?.shadowOpacity = TwinNativeRenderBudget.lightweight ? 0 : 0.17
+        connect.layer?.shadowRadius = 10
+        connect.layer?.shadowOffset = CGSize(width: 0, height: -2)
+        connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
+        // On unsigned cloud Macs the system VPN remains disabled. Offer a
+        // separate, explicitly labelled, one-request local SOCKS egress test.
+        // Never label proxy egress as a connected system VPN.
+
+        buttonRow.addArrangedSubview(connect)
+        buttonRow.addArrangedSubview(rightGap)
+        leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
+        main.addArrangedSubview(buttonRow)
+        buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // Connected duration is shown once, in the Network panel only.
+        // Keep the home page quiet: connection type is already in the pill.
+        // Show only ongoing work or actionable errors beside Connect.
+        // Match Cisco's clean hero layout: no WireGuard diagnostic/status
+        // captions below Connect. Keep the verified duration row only.
+        // Detailed errors remain available as the Connect tooltip.
+         // Diagnostics, emergency shutdown and technical warnings belong
+        // in Settings. This visual dashboard has the same clean composition
+        // as Windows; no SOCKS process starts from Quick Connect.
+        // Errors and technical details belong in Settings and Diagnostics,
+        // not as a long line beneath the primary connection button.
+
+
+        // NSStackView with .leading alignment does not automatically
+        // stretch this nested account card. Pin it to the full hero width.
+        let subscription = homeSubscriptionSummary()
+        main.addArrangedSubview(subscription)
+        subscription.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+
+        let selectedServer = snapshot?.servers.first { $0.id == activeServer }
+        let location = selectedServer.map {
+            flag($0.country) + " " + countryName($0.country)
+        } ?? "Choose location"
+        let protocolName = snapshot?.protocols.first {
+            $0.code == activeProtocol
+        }?.name ?? "Choose protocol"
+
+        // The Windows Quick Connect layout has no redundant three-tile
+        // location/IP/protocol footer. Selection is available in the
+        // Network status location bar; keep this pane compact and unclipped.
+        return card([main], radius: 25, padding: 15, style: .panel)
+    }
+
+    private func networkMetric(_ title: String, value: String,
+                               subtitle: String = "",
+                               valueColor: NSColor? = nil) -> NSView {
+        let content = stack(spacing: 12)
+        content.alignment = .leading
+        let iconName: String
+        if title.contains("ping") { iconName = "ϟ" }
+        else if title.contains("IP") { iconName = "◎" }
+        else if title.contains("Download") { iconName = "↓" }
+        else { iconName = "↑" }
+        let heading = stack(.horizontal, spacing: 9)
+        let iconPlate = NSView()
+        iconPlate.wantsLayer = true
+        iconPlate.layer?.cornerRadius = 9
+        iconPlate.layer?.backgroundColor = sea.withAlphaComponent(0.19).cgColor
+        iconPlate.layer?.borderColor = sea.withAlphaComponent(0.34).cgColor
+        iconPlate.layer?.borderWidth = 1
+        iconPlate.translatesAutoresizingMaskIntoConstraints = false
+        iconPlate.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        iconPlate.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        let symbol = text(iconName, size: 19, weight: .semibold, color: sea)
+        symbol.translatesAutoresizingMaskIntoConstraints = false
+        iconPlate.addSubview(symbol)
+        NSLayoutConstraint.activate([
+            symbol.centerXAnchor.constraint(equalTo: iconPlate.centerXAnchor),
+            symbol.centerYAnchor.constraint(equalTo: iconPlate.centerYAnchor)
+        ])
+        heading.addArrangedSubview(iconPlate)
+        heading.addArrangedSubview(text(title, size: 12,
+                                       weight: .medium, color: muted))
+        content.addArrangedSubview(heading)
+        let number = text(value, size: 23, weight: .bold,
+                          color: valueColor ?? foreground)
+        number.lineBreakMode = .byTruncatingTail
+        number.maximumNumberOfLines = 1
+        number.toolTip = value
+        content.addArrangedSubview(number)
+        if title == "Download" { downloadSpeedText = number }
+        if title == "Ping" { openVPNPingText = number }
+        if title == "IP Address" { openVPNIPText = number }
+        if title == "Upload" { uploadSpeedText = number }
+        if !subtitle.isEmpty {
+            let subtitleText = text(subtitle, size: 10, color: muted)
+            subtitleText.lineBreakMode = .byTruncatingTail
+            subtitleText.maximumNumberOfLines = 2
+            subtitleText.toolTip = subtitle
+            content.addArrangedSubview(subtitleText)
+            if title == "Download" { downloadedTotalText = subtitleText }
+            if title == "Upload" { uploadedTotalText = subtitleText }
+        }
+        if title == "Download" || title == "Upload" {
+            let chart = TwinNativeTrafficSparkline()
+            chart.translatesAutoresizingMaskIntoConstraints = false
+            chart.accent = tint().blended(withFraction: 0.38, of: .green) ?? tint()
+            chart.samples = title == "Download" ? downloadHistory : uploadHistory
+            chart.heightAnchor.constraint(equalToConstant: 28).isActive = true
+            content.addArrangedSubview(chart)
+            chart.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            if title == "Download" { downloadChart = chart }
+            if title == "Upload" { uploadChart = chart }
+        }
+        let panel = card([content], radius: 17, padding: 14, style: .metric)
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 126)
+            .isActive = true
+        return panel
+    }
+
+    private func networkStatusPage() -> NSView {
+        let content = stack(spacing: 13)
+        content.alignment = .leading
+        let header = stack(.horizontal, spacing: 9)
+        header.addArrangedSubview(text("Network", size: 17,
+                                       weight: .semibold))
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        header.addArrangedSubview(spacer)
+        header.addArrangedSubview(pill(
+            verifiedNetworkConnectionLabel,
+            color: (localProxyActive || openVPNSystemRouteVerified ||
+                    ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+                    fullTunBusy || fullTunHTTPSConnected) ? sea : muted))
+        content.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        let selected = snapshot?.servers.first { $0.id == activeServer }
+        if localProxyActive || openVPNSystemRouteVerified ||
+           ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
+           l2tpSystemRouteVerified || fullTunActive {
+            // TUN route existence is not proof of a verified VPN egress.
+            let timing = stack(.horizontal, spacing: 8)
+            let uptime = text(fullTunActive ?
+                (fullTunStartedAt.map { "◷  " +
+                    (activeFullTunTitle ?? "TUN session") + "  " +
+                    elapsedConnectionTime($0) } ?? "◷  TUN session") :
+                verifiedConnectionStart.map { start in
+                "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
+                         (wireGuardSystemRouteVerified ? wireGuardConnectionTitle :
+                         (ciscoSystemRouteVerified ? "Cisco" :
+                        (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)))) +
+                "  " + elapsedConnectionTime(start)
+            } ?? "◷  Connected", size: 12, color: muted)
+            proxyUptimeText = uptime
+            timing.addArrangedSubview(uptime)
+            let timingSpace = NSView()
+            timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            timing.addArrangedSubview(timingSpace)
+            content.addArrangedSubview(timing)
+            timing.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            let network = stack(.horizontal, spacing: 10)
+            network.distribution = .fillEqually
+            network.addArrangedSubview(networkMetric("Ping",
+                value: fullTunActive ? (openVPNPing.map {
+                    String(format: "%.1f ms", $0)
+                } ?? "—") :
+                    ((openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                        wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
+                    (openVPNPing.map { String(format: "%.0f ms", $0) } ?? "—") :
+                    pingText(selected)),
+                valueColor: (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                             wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
+                    sea : pingColor(selected)))
+            network.addArrangedSubview(networkMetric("IP Address",
+                value: fullTunActive ? (fullTunObservedExitIP ?? "—") :
+                    ((openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                        wireGuardSystemRouteVerified || l2tpSystemRouteVerified) ?
+                    (openVPNExitIP ?? "—") :
+                    (localProxyExitIP ?? "—"))))
+            content.addArrangedSubview(network)
+            network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            let traffic = stack(.horizontal, spacing: 10)
+            traffic.distribution = .fillEqually
+            traffic.addArrangedSubview(networkMetric("Download",
+                value: downloadSpeed, subtitle: "Total: " + downloadedTotal))
+            traffic.addArrangedSubview(networkMetric("Upload",
+                value: uploadSpeed, subtitle: "Total: " + uploadedTotal))
+            content.addArrangedSubview(traffic)
+            traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        } else {
+            // Keep the full Network dashboard visible even before connection.
+            // Never imply an exit IP or throughput has been verified offline.
+            let network = stack(.horizontal, spacing: 10)
+            network.distribution = .fillEqually
+            network.addArrangedSubview(networkMetric("Ping",
+                value: pingText(selected), valueColor: pingColor(selected)))
+            network.addArrangedSubview(networkMetric("IP Address", value: "—"))
+            content.addArrangedSubview(network)
+            network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+            let traffic = stack(.horizontal, spacing: 10)
+            traffic.distribution = .fillEqually
+            traffic.addArrangedSubview(networkMetric("Download",
+                value: "—", subtitle: "Total: —"))
+            traffic.addArrangedSubview(networkMetric("Upload",
+                value: "—", subtitle: "Total: —"))
+            content.addArrangedSubview(traffic)
+            traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        }
+
+        let location = selected.map {
+            flag($0.country) + "  " + countryName($0.country)
+        } ?? "Select location"
+        let activeCode = snapshot?.protocols.first {
+            $0.code == activeProtocol
+        }?.name ?? (activeProtocol ?? "Choose protocol")
+        let locationRow = stack(.horizontal, spacing: 9)
+        locationRow.addArrangedSubview(text(
+            location + "  ·  " + activeCode,
+            size: 12, weight: .semibold))
+        let locationSpacer = NSView()
+        locationSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        locationRow.addArrangedSubview(locationSpacer)
+        let change = button("Locations  ›",
+            action: #selector(showLocations(_:)), mutedButton: true)
+        change.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        change.widthAnchor.constraint(equalToConstant: 118).isActive = true
+        locationRow.addArrangedSubview(change)
+        let locationCard = card([locationRow], radius: 13, padding: 8,
+                                style: .inset)
+        content.addArrangedSubview(locationCard)
+        locationCard.widthAnchor.constraint(equalTo: content.widthAnchor)
+            .isActive = true
+        // The previous equal-height dashboard stretched this single
+        // location row into a huge empty rectangle.
+        locationCard.heightAnchor.constraint(equalToConstant: 55).isActive = true
+        if let notice = connectionAttemptNotice {
+            let feedback = text(notice, size: 11, weight: .medium, color: amber)
+            feedback.lineBreakMode = .byWordWrapping
+            feedback.maximumNumberOfLines = 2
+            feedback.toolTip = notice
+            content.addArrangedSubview(feedback)
+            feedback.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
+        let flexibleBottom = NSView()
+        flexibleBottom.setContentHuggingPriority(.defaultLow, for: .vertical)
+        content.addArrangedSubview(flexibleBottom)
+
+        // Offline mode never fabricates session bytes, handshakes or an IP.
+        return card([content], radius: 25, padding: 20, style: .panel)
+    }
+
+    // Prefer a fresh local ICMP reply. A panel latency is identified as
+    // approximate and never presented as an on-device ping.
+    private func pingText(_ server: TwinMacNativeServer?) -> String {
+        guard let server = server else { return "— ms" }
+        if nodePingBusy.contains(server.id) { return "…" }
+        if let result = nodePingResults[server.id] {
+            if let rtt = result.measuredMs { return "\(rtt) ms" }
+            return result.errorCode == "NO_PROBE_ADDRESS" ? "No IP" : "— ms"
+        }
+        if let reported = server.latencyMs { return "≈\(reported) ms" }
+        return server.probeIP == nil ? "No IP" : "— ms"
+    }
+
+    private func pingColor(_ server: TwinMacNativeServer?) -> NSColor {
+        guard let server = server else { return muted }
+        let value: Int?
+        if let result = nodePingResults[server.id] {
+            value = result.measuredMs
+        } else {
+            value = server.latencyMs
+        }
+        guard let latency = value else { return muted }
+        if latency <= 300 {
+            return lightAppearance ? NSColor(calibratedRed: 0.04, green: 0.43, blue: 0.26, alpha: 1) :
+                NSColor(calibratedRed: 0.21, green: 0.85, blue: 0.65, alpha: 1)
+        }
+        if latency <= 700 { return amber }
+        return lightAppearance ? NSColor(calibratedRed: 0.70, green: 0.13, blue: 0.21, alpha: 1) :
+            NSColor(calibratedRed: 1.0, green: 0.41, blue: 0.48, alpha: 1)
+    }
+
+    private func pingDetails(_ server: TwinMacNativeServer?) -> String {
+        guard let server = server else { return "No location selected" }
+        if nodePingBusy.contains(server.id) { return "ICMP ping in progress" }
+        if let result = nodePingResults[server.id] {
+            if result.measuredMs != nil { return "ICMP round-trip time from this Mac" }
+            switch result.errorCode {
+            case "NO_PROBE_ADDRESS": return "Panel provided no public ping address"
+            case "ICMP_TIMEOUT_OR_BLOCKED": return "No ping reply (ICMP may be blocked)"
+            case "PING_PROGRAM_UNAVAILABLE": return "macOS ping executable unavailable"
+            default: return "ICMP reply could not be measured"
+            }
+        }
+        return server.latencyMs != nil ? "Approximate latency reported by panel" :
+            "ICMP has not been measured"
+    }
+
+    private func beginNodePing(_ server: TwinMacNativeServer) {
+        guard let current = accountSession,
+              !nodePingBusy.contains(server.id) else { return }
+        let generation = pingGeneration
+        let token = current.accessToken
+        nodePingBusy.insert(server.id)
+        TwinMacNativePing.probe(server.probeIP) { [weak self] result in
+            guard let self = self, self.pingGeneration == generation,
+                  self.accountSession?.accessToken == token else { return }
+            self.nodePingBusy.remove(server.id)
+            self.nodePingResults[server.id] = result
+            if self.pingAllBusy { self.startNextNodePings() }
+            self.schedulePingRedraw()
+        }
+    }
+
+    // Coalesce ping redraws to keep low-powered remote AppKit desktops responsive.
+    private func schedulePingRedraw() {
+        guard !pingRedrawScheduled else { return }
+        pingRedrawScheduled = true
+        let generation = pingGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            self.pingRedrawScheduled = false
+            guard self.pingGeneration == generation, self.accountSession != nil,
+                  self.tab == 0 || self.tab == 1 else { return }
+            self.view = self.build()
+        }
+    }
+
+    // At most four simultaneous ICMP processes, same concurrency as Windows.
+    private func startNextNodePings() {
+        while pingAllBusy && nodePingBusy.count < 4 && !nodePingQueue.isEmpty {
+            let server = nodePingQueue.removeFirst()
+            if !nodePingBusy.contains(server.id) {
+                beginNodePing(server)
+            }
+        }
+        if pingAllBusy && nodePingQueue.isEmpty && nodePingBusy.isEmpty {
+            pingAllBusy = false
+            if fastestAutoSelectPending { finishFastestICMPSelection() }
+        }
+    }
+
+    private func pingNodes(_ nodes: [TwinMacNativeServer]) {
+        guard accountSession != nil, !pingAllBusy, !nodes.isEmpty else { return }
+        pingAllBusy = true
+        nodePingQueue = nodes
+        startNextNodePings()
+        view = build()
+    }
+
+    private func visibleLocationServers() -> [TwinMacNativeServer] {
+        let all = snapshot?.servers ?? []
+        let needle = locationSearch.trimmingCharacters(
+            in: .whitespacesAndNewlines).localizedLowercase
+        let scoped = activeProtocol == "v2ray" && xrayIndexLoaded ?
+            all.filter { !(xrayInboundIndex[$0.id] ?? []).isEmpty } : all
+        guard !needle.isEmpty else { return scoped }
+        return scoped.filter { server in
+            server.name.localizedLowercase.contains(needle) ||
+                countryName(server.country).localizedLowercase.contains(needle) ||
+                server.country.localizedLowercase.contains(needle)
+        }
+    }
+
+    private func applyFastestNode(_ server: TwinMacNativeServer) {
+        activeServer = server.id
+        expandedCountries.insert(server.country.uppercased())
+        persistCurrentSelection()
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+        } else {
+            view = build()
+        }
+    }
+
+    private func finishFastestICMPSelection() {
+        guard fastestAutoSelectPending else { return }
+        fastestAutoSelectPending = false
+        fastestBusy = false
+        let eligible = visibleLocationServers().filter {
+            $0.online && nodePingResults[$0.id]?.measuredMs != nil
+        }
+        guard let best = eligible.min(by: {
+            (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
+                (nodePingResults[$1.id]?.measuredMs ?? Int.max)
+        }) else {
+            fastestStatus = "No reachable server replied to ICMP."
+            view = build()
+            return
+        }
+        let ms = nodePingResults[best.id]?.measuredMs ?? 0
+        fastestStatus = "Fastest ICMP: " + countryName(best.country) +
+            " · " + String(ms) + " ms · selected"
+        applyFastestNode(best)
+    }
+
+    private func measuredXrayTCPHandshake(_ inbound: TwinMacNativeXrayInbound) -> Int? {
+        // Reachability latency, NOT a VPN bandwidth test. Only ever runs on
+        // the background worker queue; no process or DNS on AppKit main.
+        let started = ProcessInfo.processInfo.systemUptime
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        task.arguments = ["-G", "2", "-w", "3", "-z", inbound.host,
+                          String(inbound.port)]
+        task.standardInput = FileHandle.nullDevice
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            return max(1, Int((ProcessInfo.processInfo.systemUptime -
+                                started) * 1000))
+        } catch { return nil }
+    }
+
+    private func measureAndSelectFastestV2Ray() {
+        guard let session = accountSession, xrayIndexLoaded else {
+            fastestStatus = "V2Ray profiles are not loaded. Refresh server locations."
+            view = build()
+            return
+        }
+        let validServers = visibleLocationServers().filter { $0.online }
+        let choices: [(server: TwinMacNativeServer, inbound: TwinMacNativeXrayInbound)] =
+            validServers.flatMap { server in
+                (xrayInboundIndex[server.id] ?? [])
+                    .filter { v2rayTunInboundSupported($0.id) }
+                    .map { (server: server, inbound: $0) }
+            }
+        guard !choices.isEmpty else {
+            fastestStatus = "No supported V2Ray inbound is available."
+            view = build()
+            return
+        }
+        fastestBusy = true
+        fastestStatus = "Measuring supported V2Ray inbounds…"
+        fastestGeneration += 1
+        let generation = fastestGeneration
+        let profileGeneration = xrayIndexGeneration
+        let token = session.accessToken
+        view = build()
+        let queue = DispatchQueue.global(qos: .utility)
+        let group = DispatchGroup()
+        let limit = DispatchSemaphore(value: 4)
+        let lock = NSLock()
+        var measured = [(index: Int, ms: Int)]()
+        for (index, choice) in choices.enumerated() {
+            group.enter()
+            queue.async { [weak self] in
+                limit.wait()
+                defer { limit.signal(); group.leave() }
+                guard let self = self,
+                      let ms = self.measuredXrayTCPHandshake(choice.inbound)
+                else { return }
+                lock.lock()
+                measured.append((index: index, ms: ms))
+                lock.unlock()
+            }
+        }
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self,
+                  self.fastestGeneration == generation else { return }
+            self.fastestBusy = false
+            guard self.accountSession?.accessToken == token,
+                  self.xrayIndexGeneration == profileGeneration,
+                  self.activeProtocol == "v2ray",
+                  !self.fullTunActive, !self.fullTunBusy else { return }
+            for result in measured {
+                let choice = choices[result.index]
+                self.xrayInboundRtts[
+                    self.xrayPingKey(choice.server.id, choice.inbound.id)
+                ] = result.ms
+            }
+            guard let fastest = measured.min(by: { $0.ms < $1.ms }) else {
+                self.fastestStatus = "No supported V2Ray inbound responded."
+                self.view = self.build()
+                return
+            }
+            let choice = choices[fastest.index]
+            self.activeV2RayInbound = choice.inbound.id
+            self.fastestStatus = "Fastest TCP: " +
+                self.countryName(choice.server.country) + " · " +
+                self.v2rayInboundLabel(choice.inbound.id) + " · " +
+                String(fastest.ms) + " ms · selected"
+            self.applyFastestNode(choice.server)
+        }
+    }
+
+    @objc private func selectFastestMeasuredServer(_ sender: NSButton) {
+        guard !fastestBusy, !localProxyBusy, !fullTunBusy, !fullTunActive,
+              !ciscoTunnelBusy, ciscoTunnelTask == nil else { return }
+        if activeProtocol == "v2ray" {
+            measureAndSelectFastestV2Ray()
+            return
+        }
+        if pingAllBusy {
+            // A previously requested Ping all is still running. Finish it
+            // and choose from its fresh measurements without a second scan.
+            fastestAutoSelectPending = true
+            fastestBusy = true
+            fastestStatus = "Measuring server ICMP latency…"
+            view = build()
+            return
+        }
+        let candidates = visibleLocationServers().filter {
+            $0.online && $0.probeIP != nil
+        }
+        guard !candidates.isEmpty else {
+            fastestStatus = "No server has a usable public ICMP probe address."
+            view = build()
+            return
+        }
+        fastestAutoSelectPending = true
+        fastestBusy = true
+        fastestStatus = "Measuring server ICMP latency…"
+        // Discard stale latency readings; Fastest is based on this click.
+        for server in candidates { nodePingResults.removeValue(forKey: server.id) }
+        pingNodes(candidates)
+    }
+
+    @objc private func pingAllServers(_ sender: NSButton) {
+        guard let nodes = snapshot?.servers, !nodes.isEmpty else { return }
+        pingNodes(nodes)
+    }
+
+    @objc private func pingOneServer(_ sender: NSButton) {
+        guard !pingAllBusy,
+              locationRowIDs.indices.contains(sender.tag),
+              let server = snapshot?.servers.first(where: {
+                  $0.id == locationRowIDs[sender.tag]
+              }), !nodePingBusy.contains(server.id) else { return }
+        beginNodePing(server)
+        view = build()
+    }
+
+    private func selectionPreferenceKey(_ session: TwinMacNativeSession) -> String {
+        // Tenant-scoped and account-scoped; never place credentials or
+        // usernames in UserDefaults keys.
+        let identity = session.namespace + ":" + session.username.lowercased()
+        let digest = SHA256.hash(data: Data(identity.utf8))
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        return "twinconnect.macos.selection.v1." + hex
+    }
+
+    private func persistCurrentSelection() {
+        guard let session = accountSession else { return }
+        let key = selectionPreferenceKey(session)
+        UserDefaults.standard.set([
+            "server": activeServer ?? "",
+            "protocol": activeProtocol ?? "",
+            "v2ray_inbound": activeV2RayInbound
+        ], forKey: key)
+    }
+
+    private func restoreCurrentSelection(_ session: TwinMacNativeSession) {
+        guard let record = UserDefaults.standard.dictionary(
+            forKey: selectionPreferenceKey(session)) else {
+            activeServer = nil
+            activeProtocol = nil
+            return
+        }
+        let savedServer = record["server"] as? String ?? ""
+        let savedProtocol = record["protocol"] as? String ?? ""
+        activeServer = savedServer.isEmpty ? nil : savedServer
+        activeProtocol = savedProtocol.isEmpty ? nil : savedProtocol
+        let savedInbound = record["v2ray_inbound"] as? String ?? "websocket_tls"
+        activeV2RayInbound = v2rayInboundIDs.contains(savedInbound) ?
+            savedInbound : "websocket_tls"
+    }
+
+    private func countryName(_ code: String) -> String {
+        Locale(identifier: "en_US").localizedString(forRegionCode: code.uppercased())
+            ?? code.uppercased()
+    }
+
+    private func friendlyServerName(_ server: TwinMacNativeServer,
+                                    index: Int) -> String {
+        let trimmed = server.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let plain = trimmed.lowercased()
+        let code = server.country.lowercased()
+        let aliases: [String: Set<String>] = [
+            "fi": ["fin", "finland", "fi", "fin1", "fin-1"],
+            "de": ["des", "ger", "germany", "de", "de1", "de-1"],
+            "ca": ["can", "canada", "ca"],
+            "tr": ["tur", "turkey", "turkiye", "tr"],
+            "us": ["usa", "united states", "us"],
+            "gb": ["uk", "eng", "england", "united kingdom", "gb"],
+            "fr": ["fra", "france", "fr"],
+            "hk": ["hongkong", "hong kong", "hk"],
+            "ir": ["iran", "ir"],
+            "nl": ["netherlands", "nld", "nl"]
+        ]
+        // Only change the PRESENTATION. The real node ID and server config
+        // still come from the authorized panel record.
+        if plain == code || plain == countryName(code).lowercased() ||
+           plain == "server" || plain.isEmpty ||
+           (aliases[code]?.contains(plain) ?? false) {
+            return countryName(code) + "  ·  Server " + String(index + 1)
+        }
+        return trimmed
+    }
+
+    private func protocolChips() -> NSView {
+        let list = snapshot?.protocols ?? []
+        let favorites = Set(["hysteria2", "v2ray", "wireguard", "openvpn"])
+        let options = [("All", Optional<String>.none)] +
+            list.filter { showAllProtocolChips || favorites.contains($0.code) ||
+                          $0.code == activeProtocol }
+                .map { ($0.name, Optional($0.code)) }
+        protocolChipCodes = options.map { $0.1 }
+        let group = stack(spacing: 7)
+        group.alignment = .leading
+        // Use the same horizontal, wrapping protocol pills as Flutter.
+        // Fit by actual label width, not arbitrary protocol counts per row.
+        let width = max(430, nativeContentWidth - 258 - 102)
+        var row = stack(.horizontal, spacing: 7)
+        row.alignment = .centerY
+        var used: CGFloat = 0
+        for (index, option) in options.enumerated() {
+            let size = (option.0 as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .semibold)
+            ]).width
+            let chipWidth = min(185, max(58, ceil(size) + 27))
+            if used + chipWidth > width && used > 0 {
+                group.addArrangedSubview(row)
+                row.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+                row = stack(.horizontal, spacing: 7)
+                row.alignment = .centerY
+                used = 0
+            }
+            let selected = activeProtocol == option.1
+            let chip = button(option.0, action: #selector(selectProtocolChip(_:)),
+                              tag: index, primary: selected, mutedButton: !selected)
+            chip.font = .systemFont(ofSize: 11, weight: .medium)
+            chip.layer?.cornerRadius = 15
+            chip.heightAnchor.constraint(equalToConstant: 31).isActive = true
+            chip.widthAnchor.constraint(equalToConstant: chipWidth).isActive = true
+            row.addArrangedSubview(chip)
+            used += chipWidth + 7
+        }
+        group.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+        if list.count > options.count - 1 || showAllProtocolChips {
+            let more = button(showAllProtocolChips ? "Show fewer protocols  ⌃" :
+                              "All protocols (" + String(list.count) + ")  ⌄",
+                              action: #selector(toggleAllProtocolChips(_:)),
+                              mutedButton: true)
+            more.heightAnchor.constraint(equalToConstant: 33).isActive = true
+            group.addArrangedSubview(more)
+        }
+        return group
+    }
+
+    // A server's V2Ray routes are separate rows within that server card.
+    // No globally selectable inlet or Quick Connect transport selector.
+    // Match Windows' per-inbound cards; each action is keyed by its real
+    // node ID + inbound ID, not by a fabricated 3-per-node index.
+    @objc private func selectServerV2RayInbound(_ sender: NSButton) {
+        guard xrayInboundChoices.indices.contains(sender.tag),
+              !localProxyBusy, !fullTunBusy, !fullTunActive,
+              !ciscoTunnelBusy else { return }
+        let (nodeID, inboundID) = xrayInboundChoices[sender.tag]
+        guard v2rayTunInboundSupported(inboundID),
+              xrayInboundIndex[nodeID]?.contains(where: { $0.id == inboundID })
+                == true else { return }
+        if localProxyActive { stopVerifiedLocalProxy() }
+        activeServer = nodeID
+        activeV2RayInbound = inboundID
+        activeProtocol = "v2ray"
+        persistCurrentSelection()
+        // Keep Locations visible; selection is not navigation.
+        status = "V2Ray " + (v2rayInboundLabel(inboundID)) + " selected."
+        view = build()
+    }
+
+    private func v2rayTunInboundSupported(_ id: String) -> Bool {
+        // The installed sing-box TUN converter supports TCP TLS and WS TLS.
+        // XHTTP Reality requires a separately integrated Xray engine; it must
+        // remain visible as a panel profile, but not as a Connect action.
+        return id == "websocket_tls" || id == "tcp_tls"
+    }
+
+    private func v2rayInboundLabel(_ id: String) -> String {
+        switch id {
+        case "websocket_tls": return "WS TLS"
+        case "xhttp_reality": return "XHTTP Reality"
+        case "tcp_tls": return "TCP TLS"
+        default: return id
+        }
+    }
+
+    private func xrayPingKey(_ node: String, _ inbound: String) -> String {
+        node + ":" + inbound
+    }
+
+    @objc private func probeXrayInbound(_ sender: NSButton) {
+        guard xrayInboundChoices.indices.contains(sender.tag) else { return }
+        let (node, id) = xrayInboundChoices[sender.tag]
+        guard let inbound = xrayInboundIndex[node]?.first(where: { $0.id == id })
+        else { return }
+        let key = xrayPingKey(node, id)
+        guard !xrayInboundProbing.contains(key) else { return }
+        xrayInboundProbing.insert(key)
+        view = build()
+        let generation = xrayIndexGeneration
+        let token = accountSession?.accessToken
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let start = ProcessInfo.processInfo.systemUptime
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+            task.arguments = ["-G", "2", "-z", inbound.host, String(inbound.port)]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            var elapsed: Int?
+            do {
+                try task.run()
+                DispatchQueue.global(qos: .utility).asyncAfter(
+                    deadline: .now() + 4) {
+                    if task.isRunning { task.terminate() }
+                }
+                task.waitUntilExit()
+                if task.terminationStatus == 0 {
+                    elapsed = max(1, Int((ProcessInfo.processInfo.systemUptime
+                                         - start) * 1000))
+                }
+            } catch { }
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.xrayIndexGeneration == generation,
+                      self.accountSession?.accessToken == token else { return }
+                self.xrayInboundProbing.remove(key)
+                if let elapsed = elapsed {
+                    self.xrayInboundRtts[key] = elapsed
+                } else {
+                    self.xrayInboundRtts.removeValue(forKey: key)
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func loadXrayInbounds() {
+        guard let session = accountSession, activeProtocol == "v2ray",
+              let servers = snapshot?.servers, !xrayIndexLoading else { return }
+        xrayIndexLoading = true
+        xrayIndexGeneration += 1
+        let generation = xrayIndexGeneration
+        let allowed = Set(servers.map { $0.id })
+        directory.loadXrayInboundIndex(session, allowedServerIDs: allowed) {
+            [weak self] result in
+            guard let self = self, self.xrayIndexGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            self.xrayIndexLoading = false
+            switch result {
+            case .success(let found):
+                self.xrayInboundIndex = found
+                self.xrayIndexLoaded = true
+                self.xrayIndexError = nil
+                // A previous app version allowed selecting XHTTP and used
+                // TCP TLS by default even when the panel had no TCP inbound.
+                // For the SAME chosen server, migrate only an unavailable
+                // choice to an actually delivered and TUN-supported inbound.
+                if let serverID = self.activeServer,
+                   let available = found[serverID],
+                   !available.contains(where: {
+                       $0.id == self.activeV2RayInbound &&
+                       self.v2rayTunInboundSupported($0.id)
+                   }),
+                   let usable = available.first(where: {
+                       self.v2rayTunInboundSupported($0.id)
+                   }) {
+                    self.activeV2RayInbound = usable.id
+                    self.persistCurrentSelection()
+                    self.status = "Selected " + self.v2rayInboundLabel(usable.id) +
+                        " for this server; XHTTP is not supported by this Mac TUN."
+                }
+            case .failure:
+                self.xrayInboundIndex = [:]
+                self.xrayIndexLoaded = false
+                self.xrayIndexError = "XRAY_SERVER_PROFILES_UNAVAILABLE"
+            }
+            self.view = self.build()
+        }
+    }
+
+    // Locations follow Flutter's Search -> protocol chips -> country accordion.
+    // All data is scoped to the authenticated panel session. Node inventory
+    // alone never guarantees a protocol-specific connection profile.
+    // The country accordion is the real interactive server directory.
+    // Compact, clearly selected rows; latency means ICMP only, not VPN health.
+    private func locationsPage() -> NSView {
+        let wrapper = stack(spacing: 16)
+        wrapper.alignment = .leading
+
+        let heading = stack(.horizontal, spacing: 12)
+        heading.addArrangedSubview(text("Server locations", size: 23, weight: .bold))
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        heading.addArrangedSubview(spacer)
+        let refresh = button("↻  Refresh", action: #selector(refresh(_:)),
+                             mutedButton: true)
+        refresh.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        heading.addArrangedSubview(refresh)
+        wrapper.addArrangedSubview(heading)
+        heading.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        wrapper.addArrangedSubview(text(
+            "Choose a location and protocol. Ping is measured from this Mac.",
+            size: 12, color: muted))
+
+        let searchRow = stack(.horizontal, spacing: 10)
+        searchRow.alignment = .centerY
+        let search = NSSearchField()
+        search.placeholderString = "Search by server or country"
+        search.stringValue = locationSearch
+        search.sendsWholeSearchString = true
+        search.sendsSearchStringImmediately = false
+        search.toolTip = "Press Return to filter available locations"
+        search.target = self
+        search.action = #selector(searchLocations(_:))
+        search.translatesAutoresizingMaskIntoConstraints = false
+        search.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        searchRow.addArrangedSubview(search)
+        let pingAll = button(pingAllBusy ? "Measuring…" : "↻  Ping all",
+                             action: #selector(pingAllServers(_:)),
+                             mutedButton: true)
+        pingAll.isEnabled = !pingAllBusy && !(snapshot?.servers.isEmpty ?? true)
+        pingAll.toolTip = "Measure real ICMP latency to authorized public probe addresses"
+        pingAll.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        searchRow.addArrangedSubview(pingAll)
+        wrapper.addArrangedSubview(searchRow)
+        searchRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+
+        let protocolsTitle = text("PROTOCOLS", size: 11, weight: .bold, color: muted)
+        wrapper.addArrangedSubview(protocolsTitle)
+        let chips = protocolChips()
+        wrapper.addArrangedSubview(chips)
+        chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        // Click starts its own measured scan. Never require a manual Ping all,
+        // and never rank unmeasured nodes by panel-estimated latency.
+        let availableForFastest = activeProtocol == "v2ray" ?
+            (xrayIndexLoaded &&
+             visibleLocationServers().contains { server in
+                 server.online &&
+                 (xrayInboundIndex[server.id] ?? []).contains {
+                     v2rayTunInboundSupported($0.id)
+                 }
+             }) :
+            visibleLocationServers().contains {
+                $0.online && $0.probeIP != nil
+            }
+        let fastestButton = button(
+            fastestBusy ? "◷  Finding fastest server…" : "✦  Fastest server",
+            action: #selector(selectFastestMeasuredServer(_:)),
+            mutedButton: true)
+        fastestButton.isEnabled = availableForFastest && !fastestBusy &&
+            !localProxyBusy && !fullTunActive && !fullTunBusy &&
+            !ciscoTunnelBusy && ciscoTunnelTask == nil
+        fastestButton.heightAnchor.constraint(equalToConstant: 39).isActive = true
+        fastestButton.toolTip = fullTunActive ?
+            "Disconnect before selecting another VPN server" :
+            "Automatically measure reachable inbounds and select the fastest"
+        wrapper.addArrangedSubview(fastestButton)
+        if !fastestStatus.isEmpty {
+            wrapper.addArrangedSubview(text(fastestStatus, size: 11, color: muted))
+        }
+
+        let visible = visibleLocationServers()
+        let grouped = Dictionary(grouping: visible) { $0.country.uppercased() }
+        let codes = grouped.keys.sorted {
+            countryName($0).localizedStandardCompare(countryName($1)) == .orderedAscending
+        }
+        locationCountryIDs = codes
+        locationRowIDs = visible.map { $0.id }
+        xrayInboundChoices = activeProtocol == "v2ray" ? visible.flatMap { server in
+            (xrayInboundIndex[server.id] ?? []).map { (server.id, $0.id) }
+        } : []
+
+        let count = activeProtocol == "v2ray" && xrayIndexLoaded ?
+            xrayInboundChoices.count : visible.count
+        wrapper.addArrangedSubview(text(
+            String(codes.count) + " COUNTRIES  ·  " + String(count) +
+                (activeProtocol == "v2ray" ? " INBOUNDS" : " SERVERS"),
+            size: 11, weight: .semibold, color: sea))
+        if activeProtocol == "v2ray" && !xrayIndexLoaded {
+            wrapper.addArrangedSubview(text(
+                xrayIndexLoading ? "Loading V2Ray profiles from the panel…" :
+                    (xrayIndexError ?? "No verified V2Ray profiles loaded."),
+                size: 11, color: muted))
+        }
+        if codes.isEmpty {
+            let message: String
+            if let issue = snapshot?.errors["servers"] {
+                message = "Server list unavailable: " + issue
+            } else if snapshot?.sectionsLoaded.contains("servers") == true {
+                message = locationSearch.isEmpty ?
+                    "No servers assigned to this account." : "No matching locations."
+            } else {
+                message = "Loading assigned locations…"
+            }
+            let placeholder = card([text(message, color: muted)],
+                                   radius: 17, padding: 19)
+            wrapper.addArrangedSubview(placeholder)
+            placeholder.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        }
+
+        for (countryIndex, code) in codes.enumerated() {
+            let items = (grouped[code] ?? []).sorted {
+                $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
+            let expanded = expandedCountries.contains(code)
+            let selectedHere = items.contains { $0.id == activeServer }
+            let inboundCount = activeProtocol == "v2ray" && xrayIndexLoaded ?
+                items.reduce(0) { $0 + (xrayInboundIndex[$1.id]?.count ?? 0) } :
+                items.count
+            let group = stack(spacing: 12)
+            group.alignment = .leading
+
+            let countryHeader = stack(.horizontal, spacing: 10)
+            countryHeader.alignment = .centerY
+            let countryFlag = text(flag(code), size: 22, weight: .medium)
+            countryHeader.addArrangedSubview(countryFlag)
+            let countryInfo = stack(spacing: 4)
+            countryInfo.alignment = .leading
+            countryInfo.addArrangedSubview(text(countryName(code), size: 14,
+                                                weight: .semibold))
+            countryInfo.addArrangedSubview(text(
+                String(inboundCount) + (activeProtocol == "v2ray" ?
+                    (inboundCount == 1 ? " inbound" : " inbounds") :
+                    (inboundCount == 1 ? " server" : " servers")) +
+                (selectedHere ? "    ·    Selected" : ""),
+                size: 10, color: selectedHere ? sea : muted))
+            countryHeader.addArrangedSubview(countryInfo)
+            let headerSpacer = NSView()
+            headerSpacer.setContentHuggingPriority(.defaultLow,
+                                                   for: .horizontal)
+            countryHeader.addArrangedSubview(headerSpacer)
+            let expand = button(expanded ? "⌃" : "⌄",
+                                action: #selector(toggleLocationCountry(_:)),
+                                tag: countryIndex, mutedButton: true)
+            expand.widthAnchor.constraint(equalToConstant: 40).isActive = true
+            expand.heightAnchor.constraint(equalToConstant: 34).isActive = true
+            expand.toolTip = (expanded ? "Collapse " : "Expand ") + countryName(code)
+            countryHeader.addArrangedSubview(expand)
+            let headerCard = card([countryHeader], radius: 15, padding: 12)
+            headerCard.layer?.borderColor = (selectedHere ? sea : tint())
+                .withAlphaComponent(selectedHere ? 0.67 : 0.22).cgColor
+            group.addArrangedSubview(headerCard)
+            headerCard.widthAnchor.constraint(equalTo: group.widthAnchor)
+                .isActive = true
+            if expanded && activeProtocol == "v2ray" {
+                // Windows Locations: direct sibling glass cards, one for each
+                // validated inbound delivered by the panel for this node.
+                for server in items {
+                    for inbound in xrayInboundIndex[server.id] ?? [] {
+                        let key = xrayPingKey(server.id, inbound.id)
+                        let tunSupported = v2rayTunInboundSupported(inbound.id)
+                        let selected = tunSupported &&
+                            activeServer == server.id &&
+                            activeV2RayInbound == inbound.id
+                        let row = stack(.horizontal, spacing: 10)
+                        row.alignment = .centerY
+                        row.addArrangedSubview(text(flag(code), size: 24,
+                                                      weight: .medium))
+                        let detail = stack(spacing: 3)
+                        detail.alignment = .leading
+                        detail.addArrangedSubview(text(
+                            countryName(code) + " · " +
+                                v2rayInboundLabel(inbound.id) +
+                                (tunSupported ? "" : " · Unsupported in TUN"),
+                            size: 13, weight: .semibold))
+                        detail.addArrangedSubview(text("V2Ray / Xray",
+                                                       size: 10, color: muted))
+                        row.addArrangedSubview(detail)
+                        let spacer = NSView()
+                        spacer.setContentHuggingPriority(.defaultLow,
+                                                         for: .horizontal)
+                        row.addArrangedSubview(spacer)
+                        let pingValue = xrayInboundRtts[key].map {
+                            String($0) + " ms"
+                        } ?? (xrayInboundProbing.contains(key) ? "…" : "— ms")
+                        let ping = text(pingValue, size: 11, weight: .semibold,
+                                        color: xrayInboundRtts[key].map { milliseconds in
+                                            milliseconds <= 300 ? NSColor.systemGreen :
+                                                (milliseconds <= 700 ? NSColor.systemYellow :
+                                                    NSColor.systemRed)
+                                        } ?? muted)
+                        row.addArrangedSubview(ping)
+                        let index = xrayInboundChoices.firstIndex {
+                            $0.0 == server.id && $0.1 == inbound.id
+                        } ?? -1
+                        let probe = button("ϟ", action: #selector(probeXrayInbound(_:)),
+                                           tag: index, mutedButton: true)
+                        probe.widthAnchor.constraint(equalToConstant: 32).isActive = true
+                        probe.heightAnchor.constraint(equalToConstant: 32).isActive = true
+                        probe.toolTip = "Test inbound TCP handshake latency"
+                        probe.isEnabled = index >= 0 &&
+                            !xrayInboundProbing.contains(key)
+                        row.addArrangedSubview(probe)
+                        let choose = button(selected ? "✓" : "⏻",
+                            action: #selector(selectServerV2RayInbound(_:)),
+                            tag: index, primary: selected, mutedButton: !selected)
+                        choose.widthAnchor.constraint(equalToConstant: 39).isActive = true
+                        choose.heightAnchor.constraint(equalToConstant: 34).isActive = true
+                        choose.toolTip = tunSupported ?
+                            ("Select " + countryName(code) + " " +
+                             v2rayInboundLabel(inbound.id) + " for Quick Connect") :
+                            "XHTTP Reality requires a compatible Xray TUN engine."
+                        choose.isEnabled = index >= 0 && tunSupported
+                        row.addArrangedSubview(choose)
+                        let tile = card([row], radius: 16, padding: 13)
+                        tile.layer?.borderColor = (selected ? sea : tint())
+                            .withAlphaComponent(selected ? 0.70 : 0.20).cgColor
+                        group.addArrangedSubview(tile)
+                        tile.widthAnchor.constraint(equalTo: group.widthAnchor)
+                            .isActive = true
+                    }
+                }
+                if !xrayIndexLoaded {
+                    group.addArrangedSubview(text(
+                        xrayIndexLoading ? "Loading actual V2Ray inbounds…" :
+                            (xrayIndexError ?? "No verified inbounds loaded."),
+                        size: 11, color: muted))
+                }
+            } else if expanded {
+                for (position, server) in items.enumerated() {
+                    let serverIndex = locationRowIDs.firstIndex(of: server.id) ?? -1
+                    let selected = activeServer == server.id
+                    let stateColor = server.online ? sea : muted
+
+                    let info = stack(spacing: 4)
+                    info.alignment = .leading
+                    let rowTitle = stack(.horizontal, spacing: 7)
+                    rowTitle.addArrangedSubview(
+                        text(flag(code), size: 18, weight: .medium))
+                    let name = text(friendlyServerName(server, index: position),
+                                    size: 13, weight: .semibold)
+                    name.lineBreakMode = .byTruncatingTail
+                    name.maximumNumberOfLines = 1
+                    name.toolTip = server.name
+                    rowTitle.addArrangedSubview(name)
+                    info.addArrangedSubview(rowTitle)
+                    info.addArrangedSubview(text(
+                        (server.online ? "● Online node" : "○ Offline node") +
+                        (selected ? "    ·    Selected" : ""),
+                        size: 10, weight: .medium, color: stateColor))
+
+                    let stats = stack(spacing: 4)
+                    stats.alignment = .trailing
+                    let ping = text(pingText(server), size: 12,
+                                    weight: .bold, color: pingColor(server))
+                    ping.alignment = .right
+                    ping.toolTip = pingDetails(server)
+                    stats.addArrangedSubview(ping)
+
+                    let probe = button(nodePingBusy.contains(server.id) ? "…" : "ϟ",
+                                       action: #selector(pingOneServer(_:)),
+                                       tag: serverIndex, mutedButton: true)
+                    probe.widthAnchor.constraint(equalToConstant: 31).isActive = true
+                    probe.heightAnchor.constraint(equalToConstant: 31).isActive = true
+                    probe.toolTip = server.probeIP == nil ?
+                        "No public probe address supplied by the panel" :
+                        "Measure this server's ICMP latency"
+                    probe.isEnabled = !pingAllBusy &&
+                        !nodePingBusy.contains(server.id) && server.probeIP != nil
+
+                    let select = button(selected ? "✓" : "›",
+                        action: #selector(selectLocationServer(_:)),
+                        tag: serverIndex, primary: selected,
+                        mutedButton: !selected)
+                    select.widthAnchor.constraint(equalToConstant: 39).isActive = true
+                    select.heightAnchor.constraint(equalToConstant: 34).isActive = true
+                    select.toolTip = selected ? "Selected server" :
+                        "Select " + server.name
+
+                    let row = stack(.horizontal, spacing: 11)
+                    row.alignment = .centerY
+                    row.addArrangedSubview(info)
+                    info.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                    let filler = NSView()
+                    filler.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                    row.addArrangedSubview(filler)
+                    row.addArrangedSubview(stats)
+                    row.addArrangedSubview(probe)
+                    row.addArrangedSubview(select)
+
+                    let tileContent = stack(spacing: 8)
+                    tileContent.alignment = .leading
+                    tileContent.addArrangedSubview(row)
+                    row.widthAnchor.constraint(equalTo: tileContent.widthAnchor)
+                        .isActive = true
+                    let tile = card([tileContent], radius: 15, padding: 13)
+                    tile.wantsLayer = true
+                    tile.layer?.backgroundColor = (selected ?
+                        tint().withAlphaComponent(0.25) :
+                        (lightAppearance ? panelColor :
+                         NSColor(calibratedRed: 0.10, green: 0.18,
+                                 blue: 0.22, alpha: 0.89))).cgColor
+                    tile.layer?.borderColor = (selected ? sea : tint())
+                        .withAlphaComponent(selected ? 0.77 : 0.23).cgColor
+                    tile.layer?.borderWidth = selected ? 1.5 : 1
+                    group.addArrangedSubview(tile)
+                    tile.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+                }
+            }
+
+            let section = card([group], radius: 19, padding: 12)
+            wrapper.addArrangedSubview(section)
+            section.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        }
+        return card([wrapper], radius: 23, padding: 20)
+    }
+
+    private func createTable() -> NSView {
+        let table = NSTableView(frame: .zero)
+        table.rowHeight = 39
+        table.usesAlternatingRowBackgroundColors = true
+        table.backgroundColor = panelColor
+        for (id, label, width) in [
+            ("name", "Server", CGFloat(235)),
+            ("country", "Country", CGFloat(135)),
+            ("network", "Status / latency", CGFloat(200))
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
+            column.title = label
+            column.minWidth = 85
+            column.width = width
+            table.addTableColumn(column)
+        }
+        table.delegate = self
+        table.dataSource = self
+        table.target = self
+        table.action = #selector(selectRow(_:))
+        let scroller = NSScrollView()
+        scroller.documentView = table
+        scroller.hasVerticalScroller = true
+        scroller.translatesAutoresizingMaskIntoConstraints = false
+        scroller.heightAnchor.constraint(equalToConstant: 330).isActive = true
+        scroller.widthAnchor.constraint(greaterThanOrEqualToConstant: 390)
+            .isActive = true
+        return scroller
+    }
+
+    private func preferenceRow(_ title: String, subtitle: String,
+                               control: NSView) -> NSView {
+        let row = stack(.horizontal, spacing: 16)
+        let info = stack(spacing: 5)
+        info.addArrangedSubview(text(title, size: 14, weight: .semibold))
+        info.addArrangedSubview(text(subtitle, size: 12, color: muted))
+        row.addArrangedSubview(info)
+        let space = NSView()
+        space.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(space)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        control.setContentCompressionResistancePriority(.required, for: .horizontal)
+        row.addArrangedSubview(control)
+        return card([row], radius: 16, padding: 17)
+    }
+
+    private func settingsPage() -> NSView {
+        let section = stack(spacing: 14)
+        section.alignment = .leading
+        func add(_ row: NSView) {
+            section.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        }
+        section.addArrangedSubview(text("Appearance", size: 18, weight: .semibold))
+        let theme = NSSegmentedControl(labels: ["Light", "Dark"],
+                                      trackingMode: .selectOne,
+                                      target: self, action: #selector(changeNativeAppearance(_:)))
+        theme.selectedSegment = lightAppearance ? 0 : 1
+        theme.segmentStyle = .rounded
+        theme.controlSize = .large
+        theme.setAccessibilityLabel("App appearance")
+        add(preferenceRow("Theme", subtitle: "Choose the look of TwinConnect.",
+                          control: theme))
+        let motion = NSSwitch()
+        motion.target = self
+        motion.action = #selector(changeNativeMotion(_:))
+        motion.state = TwinNativePreferences.reducedMotion ? .on : .off
+        motion.isEnabled = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        motion.setAccessibilityLabel("Reduce motion")
+        add(preferenceRow("Reduce motion",
+                          subtitle: "Limit decorative connection animations.",
+                          control: motion))
+
+        if nativeKillSwitchControlStatus() != nil {
+            section.addArrangedSubview(text("Security", size: 18, weight: .semibold))
+            let toggle = NSSwitch()
+            toggle.target = self
+            toggle.action = #selector(changeNativeKillSwitch(_:))
+            toggle.setAccessibilityLabel("Kill Switch")
+            nativeKillSwitchToggle = toggle
+            let indicator = text("Checking", size: 12, weight: .semibold, color: muted)
+            nativeKillSwitchStatusLabel = indicator
+            let controls = stack(.vertical, spacing: 5)
+            controls.alignment = .trailing
+            controls.addArrangedSubview(toggle)
+            controls.addArrangedSubview(indicator)
+            add(preferenceRow("Kill Switch",
+                              subtitle: "Block internet when VPN disconnects.",
+                              control: controls))
+            let reset = button("Reset Internet", action: #selector(resetNativeKillSwitch(_:)))
+            nativeKillSwitchResetButton = reset
+            add(preferenceRow("Internet recovery",
+                              subtitle: "Turn off Kill Switch and restore internet.",
+                              control: reset))
+            updateNativeKillSwitchControls()
+        }
+        section.addArrangedSubview(text("Connection", size: 18, weight: .semibold))
+        let refreshButton = button("Refresh", action: #selector(refresh(_:)))
+        refreshButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
+        add(preferenceRow("Servers & subscription",
+                          subtitle: "Update your available locations and account.",
+                          control: refreshButton))
+        // Emergency controls appear only for a live worker. Never offer a
+        // diagnostic connection or an inactive placeholder in Settings.
+        if ciscoTunnelTask != nil {
+            add(preferenceRow("Cisco connection", subtitle: "Stop the active Cisco worker.",
+                              control: button("Disconnect", action: #selector(requestCiscoTunnel(_:)))))
+        }
+        if localProxyActive {
+            add(preferenceRow("Local proxy", subtitle: "Stop the active local proxy.",
+                              control: button("Disconnect", action: #selector(stopLocalProxyNow(_:)))))
+        }
+
+        section.addArrangedSubview(text("Support", size: 18, weight: .semibold))
+        let copy = button("Copy report", action: #selector(copyDiagnostics(_:)))
+        copy.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
+        add(preferenceRow("Connection report",
+                          subtitle: "Copy technical status for troubleshooting.",
+                          control: copy))
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        add(preferenceRow("App version", subtitle: "TwinConnect for macOS",
+                          control: text(version + " (" + buildNumber + ")", size: 12,
+                                        weight: .semibold, color: muted)))
+        return section
+    }
+
+    private func nativeKillSwitchControlStatus() -> [String: Any]? {
+        let manager = FileManager.default
+        let root = nativeKillSwitchControlRoot
+        let helper = root + "/unsigned_killswitch_console_control.py"
+        let path = root + "/status.json"
+        func trusted(_ filename: String, type: FileAttributeType) -> Bool {
+            guard let attributes = try? manager.attributesOfItem(atPath: filename),
+                  attributes[.type] as? FileAttributeType == type,
+                  (attributes[.ownerAccountID] as? NSNumber)?.intValue == 0,
+                  let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue,
+                  mode & 0o022 == 0 else { return false }
+            return true
+        }
+        guard trusted(root, type: .typeDirectory),
+              trusted(helper, type: .typeRegular),
+              trusted(path, type: .typeRegular),
+              let attrs = try? manager.attributesOfItem(atPath: path),
+              let size = (attrs[.size] as? NSNumber)?.intValue,
+              (1...4096).contains(size),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              data.count <= 4096,
+              let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              row["version"] as? Int == 1,
+              row["persistent"] as? Bool == false,
+              row["mode"] as? String == "until_reset",
+              row["session_limit"] as? Int == 0,
+              row["expires_at"] as? Int == 0,
+              let state = row["state"] as? String,
+              ["off", "arming", "active", "locked", "fault"].contains(state),
+              let timestamp = row["timestamp"] as? TimeInterval else { return nil }
+        if state == "active" || state == "locked" || state == "arming" {
+            let now = Date().timeIntervalSince1970
+            if abs(now - timestamp) > 12 {
+                return ["state": "fault"]
+            }
+        }
+        return row
+    }
+
+    private func updateNativeKillSwitchControls() {
+        guard tab == 2, let toggle = nativeKillSwitchToggle else { return }
+        let row = nativeKillSwitchControlStatus()
+        let state = row?["state"] as? String ?? "fault"
+        let on = state == "active" || state == "locked"
+        toggle.state = on ? .on : .off
+        let protectedConnectionReady = (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
+            l2tpSystemRouteVerified || ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
+            (wireGuardSystemRouteVerified &&
+             ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol))
+        toggle.isEnabled = !nativeKillSwitchActionBusy &&
+            (on || (state == "off" && protectedConnectionReady))
+        nativeKillSwitchResetButton?.isEnabled = !nativeKillSwitchActionBusy && state != "off"
+        let caption: String
+        if nativeKillSwitchActionBusy {
+            caption = "Authorizing…"
+        } else if on {
+            let reason = row?["reason"] as? String
+            caption = state == "locked" ?
+                (reason == "KS_RECONNECTING" ? "Reconnecting…" :
+                 (reason == "KS_DNS_RECONNECT_REQUIRED" ? "Reconnect VPN" : "Internet blocked")) :
+                "Active"
+        } else if state == "off" {
+            caption = protectedConnectionReady ? "Off" :
+                (fullTunHTTPSConnected ? "Protection unavailable for this connection" : "Connect VPN")
+        } else if state == "arming" {
+            caption = "Starting…"
+        } else {
+            caption = "Check recovery"
+        }
+        nativeKillSwitchStatusLabel?.stringValue = caption
+        nativeKillSwitchStatusLabel?.textColor = state == "fault" ? amber : muted
+    }
+
+    @objc private func changeNativeKillSwitch(_ sender: NSSwitch) {
+        let enable = sender.state == .on
+        if enable {
+            guard (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
+                  l2tpSystemRouteVerified || ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
+                  (wireGuardSystemRouteVerified &&
+                   ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)) else {
+                updateNativeKillSwitchControls()
+                return
+            }
+            let alert = NSAlert()
+            alert.messageText = "Enable Kill Switch?"
+            alert.informativeText = "Keep your provider console open. Internet and remote management can be blocked until you reconnect the same VPN or manually turn off Kill Switch. Protection stays on for this macOS boot; restart protection is not supported."
+            alert.addButton(withTitle: "Enable")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                updateNativeKillSwitchControls()
+                return
+            }
+        }
+        performNativeKillSwitchAction(enable: enable)
+    }
+
+    @objc private func resetNativeKillSwitch(_ sender: NSButton) {
+        performNativeKillSwitchAction(enable: false)
+    }
+
+    private func performNativeKillSwitchAction(enable: Bool) {
+        guard !nativeKillSwitchActionBusy else { return }
+        nativeKillSwitchActionBusy = true
+        updateNativeKillSwitchControls()
+        // Standard macOS administrator authorization; no stored password,
+        // new sudo permission, or arbitrary shell command from the app.
+        let action = enable ? "--enable" : "--reset"
+        let command = "/usr/bin/python3 -I /Library/PrivilegedHelperTools/TwinConnectKillSwitchControl/unsigned_killswitch_console_control.py " + action
+        let script = "do shell script \"" + command + "\" with administrator privileges"
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            task.arguments = ["-e", script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            var success = false
+            do {
+                try task.run()
+                task.waitUntilExit()
+                success = task.terminationStatus == 0
+            } catch {}
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.nativeKillSwitchActionBusy = false
+                self.updateNativeKillSwitchControls()
+                if !success {
+                    let alert = NSAlert()
+                    alert.messageText = enable ? "Kill Switch not enabled" : "Internet reset not confirmed"
+                    alert.informativeText = "Authorization was cancelled or the local safety check failed. Use the provider console if recovery is needed."
+                    alert.runModal()
+                }
+            }
+        }
+    }
+
+    @objc private func changeNativeAppearance(_ sender: NSSegmentedControl) {
+        UserDefaults.standard.set(sender.selectedSegment == 0 ? "light" : "dark",
+                                  forKey: TwinNativePreferences.appearanceKey)
+        view = build()
+    }
+
+    @objc private func changeNativeMotion(_ sender: NSSwitch) {
+        UserDefaults.standard.set(sender.state == .on,
+                                  forKey: TwinNativePreferences.motionKey)
+        view = build()
+    }
+
+    private func expiryText(_ account: TwinMacNativeAccount?) -> String {
+        guard let account = account else { return "—" }
+        if let expiry = account.expiresAt {
+            return DateFormatter.localizedString(from: expiry, dateStyle: .medium,
+                                                 timeStyle: .none)
+        }
+        return (account.activationDurationDays ?? 0) > 0 ?
+            "After first connection" : "Unlimited"
+    }
+
+    private func reservedRenewalCard(_ renewal: TwinMacReservedRenewal,
+                                     compact: Bool) -> NSView {
+        let fields = stack(spacing: 7)
+        fields.alignment = .leading
+        fields.addArrangedSubview(text(
+            renewal.needsReview ? "◷  Renewal needs review" :
+                                  "▣  Reserved renewal",
+            size: compact ? 12 : 15, weight: .bold,
+            color: renewal.needsReview ? amber : sea))
+        fields.addArrangedSubview(text(renewal.planName,
+                                      size: compact ? 11 : 13, weight: .semibold))
+        let capacity = ByteCountFormatter.string(fromByteCount:
+            renewal.trafficBytes, countStyle: .file)
+        fields.addArrangedSubview(text(
+            capacity + "  •  " + String(renewal.durationDays) + " days",
+            size: compact ? 11 : 12))
+        fields.addArrangedSubview(text(
+            renewal.needsReview ?
+                "Pending review. The next period has not been applied." :
+                "Next period activates after current quota or expiry ends.",
+            size: 10, color: muted))
+        if !compact {
+            let recorded = DateFormatter.localizedString(
+                from: renewal.reservedAt, dateStyle: .medium, timeStyle: .none)
+            fields.addArrangedSubview(text("Reserved on: " + recorded,
+                                          size: 10, color: muted))
+        }
+        return card([fields], radius: 16, padding: compact ? 12 : 17)
+    }
+
+    private func accountPage() -> NSView {
+        let content = stack(spacing: 14)
+        content.alignment = .leading
+        let account = snapshot?.account
+
+        let hero = stack(.horizontal, spacing: 15)
+        hero.alignment = .centerY
+        let emblem = NSView()
+        emblem.wantsLayer = true
+        emblem.layer?.cornerRadius = 18
+        emblem.layer?.backgroundColor = tint().withAlphaComponent(0.60).cgColor
+        emblem.translatesAutoresizingMaskIntoConstraints = false
+        emblem.widthAnchor.constraint(equalToConstant: 62).isActive = true
+        emblem.heightAnchor.constraint(equalToConstant: 62).isActive = true
+        let shield = text("◇", size: 34, weight: .bold)
+        shield.translatesAutoresizingMaskIntoConstraints = false
+        emblem.addSubview(shield)
+        NSLayoutConstraint.activate([
+            shield.centerXAnchor.constraint(equalTo: emblem.centerXAnchor),
+            shield.centerYAnchor.constraint(equalTo: emblem.centerYAnchor)
+        ])
+        hero.addArrangedSubview(emblem)
+        let identity = stack(spacing: 7)
+        identity.alignment = .leading
+        let username = text(accountSession?.username ?? "—", size: 16,
+                            weight: .semibold)
+        username.lineBreakMode = .byTruncatingMiddle
+        username.maximumNumberOfLines = 1
+        identity.addArrangedSubview(username)
+        let accountState = account?.status.lowercased() == "active" ?
+            "◆  Active subscription" : (account?.status ?? "Loading account…")
+        identity.addArrangedSubview(text(accountState, size: 12, color: sea))
+        hero.addArrangedSubview(identity)
+        let heroCard = card([hero], radius: 23, padding: 19)
+        content.addArrangedSubview(heroCard)
+        heroCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        if let reserved = account?.reservedRenewal {
+            content.addArrangedSubview(text("Reserved renewal list",
+                                          size: 13, weight: .bold))
+            let reservedCard = reservedRenewalCard(reserved, compact: false)
+            content.addArrangedSubview(reservedCard)
+            reservedCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
+
+        let usage = stack(spacing: 14)
+        usage.alignment = .leading
+        let head = stack(.horizontal, spacing: 8)
+        head.addArrangedSubview(text("◉  Data usage", size: 15, weight: .semibold))
+        let gap = NSView()
+        gap.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        head.addArrangedSubview(gap)
+        if let account = account, account.limitBytes == 0 {
+            head.addArrangedSubview(pill("Unlimited", color: sea))
+        }
+        usage.addArrangedSubview(head)
+        head.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+
+        let used = account.map {
+            ByteCountFormatter.string(fromByteCount: $0.usedBytes,
+                                      countStyle: .file)
+        } ?? "—"
+        let limit = account.map {
+            $0.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: $0.limitBytes,
+                                          countStyle: .file)
+        } ?? "—"
+        let totals = stack(.horizontal, spacing: 9)
+        totals.addArrangedSubview(text(used, size: 31, weight: .bold))
+        totals.addArrangedSubview(text("/ " + limit, size: 17,
+                                      weight: .semibold,
+                                      color: account?.limitBytes == 0 ? sea : muted))
+        usage.addArrangedSubview(totals)
+        let remaining: String
+        if let account = account {
+            remaining = account.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: max(0,
+                    account.limitBytes - account.usedBytes), countStyle: .file)
+        } else {
+            remaining = "—"
+        }
+        usage.addArrangedSubview(text("Remaining: " + remaining, color: muted))
+        let meter = NSProgressIndicator()
+        meter.style = .bar
+        meter.isIndeterminate = false
+        meter.minValue = 0
+        meter.maxValue = 100
+        if let account = account, account.limitBytes > 0 {
+            meter.doubleValue = min(100,
+                Double(account.usedBytes) / Double(account.limitBytes) * 100)
+        }
+        meter.translatesAutoresizingMaskIntoConstraints = false
+        usage.addArrangedSubview(meter)
+        meter.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+        usage.addArrangedSubview(text(
+            account == nil ? "Fetching current usage from your panel" :
+            account!.limitBytes == 0 ? "No traffic cap" :
+                String(format: "%.1f%% used", meter.doubleValue),
+            size: 11, color: muted))
+        let usageCard = card([usage], radius: 23, padding: 20)
+        content.addArrangedSubview(usageCard)
+        usageCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        let metrics = stack(.horizontal, spacing: 12)
+        metrics.distribution = .fillEqually
+        metrics.addArrangedSubview(networkMetric("▣  Expires on",
+            value: expiryText(account)))
+        let devices = snapshot?.deviceLimit.map {
+            $0 == 0 ? "Unlimited" : String($0)
+        } ?? "—"
+        metrics.addArrangedSubview(networkMetric("▣  Device limit", value: devices))
+        content.addArrangedSubview(metrics)
+        metrics.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        if let details = snapshot?.errors["account"] {
+            content.addArrangedSubview(text("Account unavailable: " + details,
+                                          size: 12, color: amber))
+        }
+        let refreshButton = button("↻  Refresh account",
+                                    action: #selector(refresh(_:)))
+        content.addArrangedSubview(refreshButton)
+        refreshButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let signOutButton = button("Sign out", action: #selector(signOut(_:)),
+                                   mutedButton: true)
+        signOutButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        content.addArrangedSubview(signOutButton)
+        signOutButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        return content
+    }
+
+    private func compactMetric(_ title: String, value: String) -> NSView {
+        let metric = stack(spacing: 5)
+        metric.addArrangedSubview(text(title, size: 10, color: muted))
+        metric.addArrangedSubview(text(value, size: 12, weight: .bold))
+        return card([metric], radius: 13, padding: 10)
+    }
+
+    private func homeSubscriptionSummary() -> NSView {
+        let items = stack(spacing: 8)
+        items.alignment = .leading
+        let header = stack(.horizontal, spacing: 9)
+        header.addArrangedSubview(text("◈  Subscription details",
+                                       size: 13, weight: .semibold))
+        let space = NSView()
+        space.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        header.addArrangedSubview(space)
+        let limitLabel = snapshot?.account.map {
+            $0.limitBytes == 0 ? "Unlimited" : "Limited"
+        } ?? "—"
+        header.addArrangedSubview(text(limitLabel, size: 10, color: sea))
+        let reload = button("↻", action: #selector(refresh(_:)),
+                            mutedButton: true)
+        reload.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        reload.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        header.addArrangedSubview(reload)
+        items.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+
+        let account = snapshot?.account
+        let used = account.map {
+            ByteCountFormatter.string(fromByteCount: $0.usedBytes, countStyle: .file)
+        } ?? "—"
+        let quota = account.map {
+            $0.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: $0.limitBytes,
+                                          countStyle: .file)
+        } ?? "—"
+        let usage = stack(spacing: 7)
+        usage.alignment = .leading
+        let usageHeading = stack(.horizontal, spacing: 8)
+        usageHeading.addArrangedSubview(text("◌  Data usage", size: 11,
+                                             color: muted))
+        let usageFiller = NSView()
+        usageFiller.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        usageHeading.addArrangedSubview(usageFiller)
+        usageHeading.addArrangedSubview(text(used + " / " + quota,
+                                            size: 12, weight: .semibold))
+        usage.addArrangedSubview(usageHeading)
+        usageHeading.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+        // Thin custom usage rail matches Windows. Values still come
+        // exclusively from the panel; unlimited never implies a full bar.
+        let track = NSView()
+        track.translatesAutoresizingMaskIntoConstraints = false
+        track.wantsLayer = true
+        track.layer?.cornerRadius = 3
+        track.layer?.backgroundColor = sea.withAlphaComponent(0.20).cgColor
+        track.heightAnchor.constraint(equalToConstant: 5).isActive = true
+        usage.addArrangedSubview(track)
+        track.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+        if let account = account, account.limitBytes > 0 {
+            let fraction = max(0, min(1,
+                CGFloat(account.usedBytes) / CGFloat(account.limitBytes)))
+            if fraction > 0 {
+                let filled = NSView()
+                filled.translatesAutoresizingMaskIntoConstraints = false
+                filled.wantsLayer = true
+                filled.layer?.cornerRadius = 3
+                filled.layer?.backgroundColor = sea.withAlphaComponent(0.88).cgColor
+                track.addSubview(filled)
+                NSLayoutConstraint.activate([
+                    filled.leadingAnchor.constraint(equalTo: track.leadingAnchor),
+                    filled.topAnchor.constraint(equalTo: track.topAnchor),
+                    filled.bottomAnchor.constraint(equalTo: track.bottomAnchor),
+                    filled.widthAnchor.constraint(equalTo: track.widthAnchor,
+                                                 multiplier: fraction)
+                ])
+            }
+        }
+        let remaining: String
+        if let account = account {
+            remaining = account.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: max(0,
+                    account.limitBytes - account.usedBytes), countStyle: .file)
+        } else {
+            remaining = "—"
+        }
+        usage.addArrangedSubview(text("Remaining: " + remaining,
+                                      size: 10, color: sea))
+        let usageCard = card([usage], radius: 13, padding: 10, style: .inset)
+        items.addArrangedSubview(usageCard)
+        usageCard.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+
+        let expiry = account?.expiresAt.map {
+            DateFormatter.localizedString(from: $0, dateStyle: .medium,
+                                          timeStyle: .none)
+        } ?? "—"
+        let days: String
+        if let date = account?.expiresAt {
+            let remaining = date.timeIntervalSinceNow
+            days = remaining < 0 ? "Expired" :
+                String(Int(ceil(remaining / 86400))) + " days"
+        } else if account != nil {
+            days = "Unlimited / not started"
+        } else {
+            days = "—"
+        }
+        let chips = stack(.horizontal, spacing: 8)
+        chips.distribution = .fillEqually
+        chips.addArrangedSubview(compactMetric("Expiry date", value: expiry))
+        chips.addArrangedSubview(compactMetric("Time remaining", value: days))
+        items.addArrangedSubview(chips)
+        chips.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+        if let reserved = account?.reservedRenewal {
+            let reservedCard = reservedRenewalCard(reserved, compact: true)
+            items.addArrangedSubview(reservedCard)
+            reservedCard.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+        }
+
+        if let error = snapshot?.errors["account"] {
+            items.addArrangedSubview(text("Account: " + error,
+                                          size: 10, color: amber))
+        }
+        return card([items], radius: 20, padding: 14, style: .inset)
+    }
+
+    private func filteredServers() -> [TwinMacNativeServer] {
+        guard let servers = snapshot?.servers else { return [] }
+        return country == "All countries"
+            ? servers : servers.filter { $0.country == country }
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        return filteredServers().count
+    }
+
+    private func flag(_ country: String) -> String {
+        let chars = country.uppercased().unicodeScalars
+        guard chars.count == 2, chars.allSatisfy({
+            $0.value >= 65 && $0.value <= 90
+        }) else { return "◎" }
+        let scalars = chars.compactMap {
+            UnicodeScalar(127397 + $0.value)
+        }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
+                   row: Int) -> NSView? {
+        let entries = filteredServers()
+        guard let key = tableColumn?.identifier.rawValue,
+              entries.indices.contains(row) else { return nil }
+        let item = entries[row]
+        let value: String
+        switch key {
+        case "name": value = item.name
+        case "country": value = flag(item.country) + "  " + item.country.uppercased()
+        default:
+            value = (item.online ? "● Online (panel)" : "○ Offline (panel)") +
+                (item.latencyMs.map { " • \($0) ms" } ?? "")
+        }
+        let cell = NSTableCellView()
+        let label = text(value, size: 12,
+                         color: key == "name" ? .white : muted)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        cell.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(lessThanOrEqualTo:
+                cell.trailingAnchor, constant: -8),
+            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+        ])
+        return cell
+    }
+
+    @objc private func signIn(_ sender: NSButton) {
+        guard !busy, let username = usernameField?.stringValue,
+              let password = passwordField?.stringValue else { return }
+        busy = true
+        sender.isEnabled = false
+        status = "Signing in securely…"
+        passwordField?.stringValue = ""
+        directory.login(username: username, password: password) { [weak self] result in
+            guard let self = self else { return }
+            self.busy = false
+            switch result {
+            case .failure(let error):
+                self.status = "Sign-in failed: " + error.localizedDescription
+            case .success(let session):
+                self.showAuthenticatedSession(session)
+                return
+            }
+            self.view = self.build()
+        }
+    }
+
+    private func showAuthenticatedSession(_ session: TwinMacNativeSession) {
+            self.accountSession = session
+            self.restoreCurrentSelection(session)
+            self.snapshot = nil
+            self.xrayIndexGeneration += 1
+            self.xrayInboundIndex.removeAll()
+            self.xrayIndexLoaded = false
+            self.xrayIndexLoading = false
+            self.xrayIndexError = nil
+            self.xrayInboundChoices.removeAll()
+            self.xrayInboundRtts.removeAll()
+            self.xrayInboundProbing.removeAll()
+            self.pingGeneration += 1
+            self.nodePingResults.removeAll()
+            self.nodePingBusy.removeAll()
+            self.nodePingQueue.removeAll()
+            self.pingAllBusy = false
+            self.didAutoPing = false
+            self.tenantLogo = nil
+            self.logoGeneration += 1
+            let logoVersion = self.logoGeneration
+            self.directory.loadBrandLogo(session) { [weak self] data in
+                guard let self = self,
+                      self.logoGeneration == logoVersion,
+                      self.accountSession?.accessToken == session.accessToken
+                else { return }
+                if let bytes = data, let image = NSImage(data: bytes) {
+                    self.tenantLogo = image
+                    self.view = self.build()
+                }
+            }
+            self.tab = 0
+            self.status = "Retrieving live subscription data…"
+            NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
+            // Match Flutter desktop's two equal cards on large displays
+            // without clipping them on smaller remote Mac desktops.
+            if let window = self.view.window {
+                if let visible = (window.screen ?? NSScreen.main)?.visibleFrame,
+                   visible.width >= 1120 {
+                    window.setContentSize(NSSize(
+                        width: min(1240, visible.width - 32),
+                        height: min(800, visible.height - 32)
+                    ))
+                    window.center()
+                }
+                self.nativeContentWidth = window.contentView?.bounds.width
+                    ?? window.frame.width
+            }
+            // Present the dashboard first. Panel fetch must never gate
+            // rendering the tabs or make the content disappear.
+            self.view = self.build()
+            self.refreshData()
+        
+    }
+
+    private func refreshData() {
+        guard let current = accountSession, !busy else { return }
+        busy = true
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        status = "Retrieving panel data…"
+        directory.loadSnapshot(current) { [weak self] data in
+            guard let self = self else { return }
+            guard self.refreshGeneration == generation,
+                  self.accountSession?.accessToken == current.accessToken else {
+                return
+            }
+            self.snapshot = data
+            if data.sectionsLoaded.contains("servers") &&
+               data.sectionsLoaded.contains("protocols") &&
+               self.activeProtocol == "v2ray" &&
+               !self.xrayIndexLoaded && !self.xrayIndexLoading {
+                self.loadXrayInbounds()
+            }
+            if data.sectionsLoaded.contains("servers") {
+                let validIDs = Set(data.servers.map { $0.id })
+                self.nodePingResults = self.nodePingResults.filter {
+                    validIDs.contains($0.key)
+                }
+                // Avoid automatic ICMP subprocess bursts while signing in.
+                // Users can explicitly request Ping all on the Locations tab.
+            }
+            if data.sectionsLoaded.contains("protocols"),
+               let selected = self.activeProtocol,
+               !data.protocols.contains(where: { $0.code == selected }) {
+                self.activeProtocol = nil
+                self.persistCurrentSelection()
+            }
+            if data.sectionsLoaded.contains("servers"),
+               let selected = self.activeServer,
+               !data.servers.contains(where: { $0.id == selected }) {
+                self.activeServer = nil
+                self.persistCurrentSelection()
+            }
+            self.busy = !data.isComplete
+            let count = data.sectionsLoaded.count
+            if data.isComplete {
+                if data.errors.isEmpty {
+                    self.status = "Panel synchronized: 4 of 4 sections."
+                } else {
+                    let details = data.errors.keys.sorted().map { name in
+                        name + ": " + (data.errors[name] ?? "unavailable")
+                    }.joined(separator: " · ")
+                    self.status = "Panel: \(count)/4 sections loaded. " + details
+                }
+            } else {
+                self.status = "Panel: \(count)/4 sections loaded…"
+            }
+            self.view = self.build()
+            NSLog("TwinConnect AppKit: panel sections loaded %d/4; completed: %@",
+                  count, data.isComplete ? "YES" : "NO")
+        }
+    }
+
+    @objc private func refresh(_ sender: NSButton) {
+        status = "Refreshing subscription data…"
+        if activeProtocol == "v2ray" {
+            xrayIndexGeneration += 1
+            xrayInboundIndex.removeAll()
+            xrayIndexLoaded = false
+            xrayIndexLoading = false
+            xrayInboundRtts.removeAll()
+            loadXrayInbounds()
+        }
+        refreshData()
+        view = build()
+    }
+
+    @objc private func signOut(_ sender: NSButton) {
+        // Never keep a privileged Cisco session after account logout.
+        l2tpGeneration += 1
+        if l2tpTask != nil {
+            DispatchQueue.global(qos: .utility).async {
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                if (try? stop.run()) != nil { stop.waitUntilExit() }
+            }
+        }
+        l2tpTask?.terminate()
+        l2tpTask = nil
+        l2tpBusy = false
+        l2tpSystemRouteVerified = false
+        l2tpConnectedAt = nil
+        l2tpReconnectProfile = nil
+        l2tpReconnectAccount = nil
+        l2tpReconnectOrigin = nil
+        l2tpReconnectServer = nil
+        ciscoReconnectProfile = nil
+        ciscoReconnectAccount = nil
+        ciscoReconnectOrigin = nil
+        ciscoReconnectServer = nil
+        fullTunReconnectProfile = nil
+        fullTunReconnectProtocol = nil
+        fullTunReconnectAccount = nil
+        fullTunReconnectOrigin = nil
+        fullTunReconnectServer = nil
+        fullTunKillSwitchCandidate = false
+        openVPNReconnectProfile = nil
+        openVPNReconnectAccount = nil
+        openVPNReconnectOrigin = nil
+        openVPNReconnectServer = nil
+        wireGuardReconnectProfile = nil
+        wireGuardReconnectProtocol = nil
+        wireGuardReconnectAccount = nil
+        wireGuardReconnectServer = nil
+        wireGuardReconnectOrigin = nil
+        wireGuardProbeGeneration += 1
+        wireGuardProbeTask?.terminate()
+        wireGuardProbeTask = nil
+        wireGuardProbeBusy = false
+        wireGuardProbeStatus = ""
+        wireGuardSystemRouteVerified = false
+        wireGuardConnectedAt = nil
+        ciscoTunnelGeneration += 1
+        if ciscoTunnelTask != nil {
+            DispatchQueue.global(qos: .utility).async {
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                if (try? stop.run()) != nil { stop.waitUntilExit() }
+            }
+        }
+        ciscoTunnelTask?.terminate()
+        ciscoTunnelTask = nil
+        ciscoTunnelBusy = false
+        ciscoSystemRouteVerified = false
+        ciscoConnectedAt = nil
+        openVPNConnectedAt = nil
+        ciscoTunnelStatus = ""
+        directory.clearSavedSession()
+        refreshGeneration += 1
+        pingGeneration += 1
+        nodePingResults.removeAll()
+        nodePingBusy.removeAll()
+        nodePingQueue.removeAll()
+        pingAllBusy = false
+        didAutoPing = false
+        logoGeneration += 1
+        tenantLogo = nil
+        accountSession = nil
+        localProxyGeneration += 1
+        localProxyActive = false
+        verifiedProxyProtocol = nil
+        localProxyExitIP = nil
+        resetTrafficMetrics()
+        // Always request removal of both connection modes on logout.
+        // The root daemon independently enforces TUN ownership.
+        fullTunActive = false
+        fullTunConnectedProtocol = nil
+        openVPNAppSessionActive = false
+        openVPNSystemRouteVerified = false
+        fullTunBusy = false
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            _ = self.runLocalManager(
+                ["stop"], root: self.localRuntimeRoot())
+            if self.openVPNAppSessionInstalled() {
+                _ = self.runOpenVPNAppSession("stop")
+            }
+            if self.fullTunServicePresent() {
+                _ = self.runFullTunClient("stop")
+            }
+        }
+        localProxyStatus = ""
+        snapshot = nil
+        activeProtocol = nil
+        activeServer = nil
+        xrayIndexGeneration += 1
+        xrayInboundIndex.removeAll()
+        xrayIndexLoaded = false
+        xrayIndexLoading = false
+        xrayIndexError = nil
+        xrayInboundChoices.removeAll()
+        xrayInboundRtts.removeAll()
+        xrayInboundProbing.removeAll()
+        country = "All countries"
+        expandedCountries.removeAll()
+        locationCountryIDs.removeAll()
+        locationRowIDs.removeAll()
+        protocolChipCodes.removeAll()
+        locationSearch = ""
+        busy = false
+        tab = 0
+        status = ""
+        view = build()
+    }
+
+    @objc private func showLocations(_ sender: NSButton) {
+        if tab != 1 { locationsScrollOffset = 0 }
+        tab = 1
+        view = build()
+    }
+
+    @objc private func openLanguageSettings(_ sender: NSButton) {
+        tab = 2
+        view = build()
+    }
+
+    @objc private func changeTab(_ sender: NSButton) {
+        if tab != 1 && sender.tag == 1 { locationsScrollOffset = 0 }
+        tab = sender.tag
+        view = build()
+    }
+
+    @objc private func searchLocations(_ sender: NSSearchField) {
+        locationSearch = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        view = build()
+    }
+
+    @objc private func toggleAllProtocolChips(_ sender: NSButton) {
+        showAllProtocolChips.toggle()
+        view = build()
+    }
+
+    @objc private func selectProtocolChip(_ sender: NSButton) {
+        guard protocolChipCodes.indices.contains(sender.tag),
+              !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
+        let chosen = protocolChipCodes[sender.tag]
+        if activeProtocol != chosen && localProxyActive {
+            activeProtocol = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        if activeProtocol != chosen {
+            fastestGeneration += 1
+            fastestBusy = false
+            fastestAutoSelectPending = false
+            fastestStatus = ""
+        }
+        activeProtocol = chosen
+        persistCurrentSelection()
+        if chosen == "v2ray" && !xrayIndexLoaded { loadXrayInbounds() }
+        view = build()
+    }
+
+    @objc private func toggleLocationCountry(_ sender: NSButton) {
+        guard locationCountryIDs.indices.contains(sender.tag) else { return }
+        let code = locationCountryIDs[sender.tag]
+        if !expandedCountries.insert(code).inserted {
+            expandedCountries.remove(code)
+        }
+        view = build()
+    }
+
+    @objc private func selectLocationServer(_ sender: NSButton) {
+        guard locationRowIDs.indices.contains(sender.tag),
+              !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
+        let chosen = locationRowIDs[sender.tag]
+        if activeServer != chosen && localProxyActive {
+            activeServer = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeServer = chosen
+        persistCurrentSelection()
+        status = "Location selected."
+        view = build()
+    }
+
+    @objc private func changeQuickServer(_ sender: NSPopUpButton) {
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
+        let chosen = sender.selectedItem?.representedObject as? String
+        if activeServer != chosen && localProxyActive {
+            activeServer = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeServer = chosen
+        persistCurrentSelection()
+        status = "Location selected."
+        view = build()
+    }
+
+    @objc private func changeQuickProtocol(_ sender: NSPopUpButton) {
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
+        let chosen = sender.selectedItem?.representedObject as? String
+        if activeProtocol != chosen && localProxyActive {
+            activeProtocol = chosen
+            persistCurrentSelection()
+            stopVerifiedLocalProxy()
+            return
+        }
+        activeProtocol = chosen
+        persistCurrentSelection()
+        status = "Protocol selected."
+        view = build()
+    }
+
+    @objc private func changeCountry(_ sender: NSPopUpButton) {
+        country = sender.titleOfSelectedItem ?? "All countries"
+        view = build()
+    }
+
+    @objc private func selectRow(_ sender: NSTableView) {
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
+        let row = sender.selectedRow
+        let list = filteredServers()
+        guard list.indices.contains(row) else { return }
+        let chosen = list[row].id
+        if chosen == activeServer { return }
+        activeServer = chosen
+        persistCurrentSelection()
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+            return
+        }
+        view = build()
+    }
+
+
+    @objc private func stopLocalProxyNow(_ sender: NSButton) {
+        stopVerifiedLocalProxy()
+    }
+
+    private func stopVerifiedLocalProxy() {
+        guard !localProxyBusy else { return }
+        localProxyBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        let root = localRuntimeRoot()
+        status = "Stopping local proxy…"
+        view = build()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runLocalManager(["stop"], root: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.localProxyGeneration == generation else { return }
+                self.localProxyBusy = false
+                if result.0 == 0 {
+                    self.localProxyActive = false
+                    self.verifiedProxyProtocol = nil
+                    self.localProxyExitIP = nil
+                    self.resetTrafficMetrics()
+                    self.localProxyStatus = "Disconnected."
+                    self.status = self.localProxyStatus
+                } else {
+                    self.localProxyStatus = "Local proxy stop failed: " +
+                        self.safeManagerReason(result.2)
+                    self.status = self.localProxyStatus
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    // The root-owned launcher must be installed separately by an administrator.
+    // Do not elevate a writable script from the user's checkout.
+    private func ciscoInstalledHelper() -> String? {
+        let path = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_tunnel.py"
+        let companion = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_auth.py"
+        for candidate in [path, companion] {
+            guard let attr = try? FileManager.default.attributesOfItem(atPath: candidate),
+                  let owner = attr[.ownerAccountID] as? NSNumber,
+                  owner.intValue == 0,
+                  let permissions = attr[.posixPermissions] as? NSNumber,
+                  (permissions.intValue & 0o022) == 0 else { return nil }
+        }
+        return path
+    }
+
+    @objc private func requestCiscoTunnel(_ sender: NSButton) {
+        if let existing = ciscoTunnelTask {
+            ciscoTunnelStatus = "Stopping Cisco tunnel…"
+            ciscoTunnelBusy = true
+            // Terminating sudo is not sufficient proof that its privileged
+            // child exited. Use a fixed root-owned stop command to restore
+            // DNS/routes and signal only our verified Cisco worker.
+            DispatchQueue.global(qos: .utility).async {
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                let output = Pipe()
+                stop.standardOutput = output
+                stop.standardError = FileHandle.nullDevice
+                let started = (try? stop.run()) != nil
+                let data = started ? output.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: data, encoding: .utf8) ?? "").contains("CISCO_SYSTEM_DISCONNECTED")
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if stopped {
+                        if existing.isRunning { existing.terminate() }
+                    } else {
+                        self.ciscoTunnelBusy = false
+                        self.ciscoTunnelStatus = "CISCO_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                    }
+                }
+            }
+            view = build()
+            return
+        }
+        // The full system route is enabled only after actual Cisco HTTPS
+        // egress verification by the privileged independent watchdog.
+        guard !ciscoTunnelBusy, let session = accountSession,
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "cisco" && $0.configured
+              }) == true else {
+            ciscoTunnelStatus = "Choose a configured Cisco location."
+            view = build()
+            return
+        }
+        guard let helper = ciscoInstalledHelper() else {
+            ciscoTunnelStatus = "CISCO_PRIVILEGED_HELPER_NOT_INSTALLED"
+            view = build()
+            return
+        }
+        // Read the exact IP provisioned by the administrator for the sudoers
+        // rule. Never rely on an app-controlled environment override.
+        let configured = try? String(contentsOfFile:
+            "/Library/PrivilegedHelperTools/TwinConnectCisco/management_ipv4",
+            encoding: .utf8)
+        let mgmt = ciscoSafetyHold ? "unrouted-probe" :
+            (configured?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        guard mgmt == "unrouted-probe" || mgmt == "desktop" ||
+              mgmt == "console-test" || mgmt.range(of:
+            "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+            options: .regularExpression) != nil else {
+            ciscoTunnelStatus = "CISCO_MANAGEMENT_ROUTE_NOT_CONFIGURED"
+            view = build()
+            return
+        }
+        ciscoTunnelBusy = true
+        ciscoTunnelStatus = "Checking Cisco profile and permissions…"
+        ciscoTunnelGeneration += 1
+        let generation = ciscoTunnelGeneration
+        view = build()
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
+            guard let self = self else { return }
+            guard self.ciscoTunnelGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else {
+                return
+            }
+            switch result {
+            case .failure(let error):
+                self.ciscoTunnelBusy = false
+                self.ciscoTunnelStatus = "CISCO_PROFILE_UNAVAILABLE: " +
+                    (error.localizedDescription.range(
+                        of: "^[A-Z0-9_]{3,64}$",
+                        options: .regularExpression) != nil ?
+                     error.localizedDescription : "PROFILE_ERROR")
+                self.view = self.build()
+            case .success(let profile):
+                self.ciscoReconnectProfile = profile
+                self.ciscoReconnectAccount = session.namespace
+                self.ciscoReconnectOrigin = session.apiOrigin
+                self.ciscoReconnectServer = serverID
+                DispatchQueue.global(qos: .userInitiated).async {
+                    self.launchCiscoTunnel(profile, helper: helper,
+                                           managementIP: mgmt,
+                                           generation: generation)
+                }
+            }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard mgmt == "unrouted-probe",
+                  ciscoReconnectAccount == session.namespace,
+                  ciscoReconnectOrigin == session.apiOrigin,
+                  ciscoReconnectServer == serverID,
+                  let cached = ciscoReconnectProfile else {
+                ciscoTunnelBusy = false
+                ciscoTunnelStatus = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            ciscoTunnelBusy = false
+            ciscoTunnelStatus = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareCiscoAuthentication(session, serverID: serverID,
+                                                 completion: complete)
+        }
+    }
+
+    private func launchCiscoTunnel(_ profile: Data, helper: String,
+                                   managementIP: String, generation: Int) {
+        // No sudo password prompt or automated sudoers changes.
+        // An administrator must explicitly authorize this fixed root-owned command.
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = managementIP == "unrouted-probe" ?
+            ["-n", "/usr/bin/python3", helper, "system"] :
+            ["-n", "/usr/bin/python3", helper, "connect", managementIP]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { task.terminate(); return }
+                if self.ciscoTunnelGeneration == generation {
+                    self.ciscoTunnelTask = task
+                    self.ciscoTunnelBusy = false
+                    self.ciscoTunnelStatus = managementIP == "unrouted-probe" ?
+                        "Connecting…" :
+                        (managementIP == "console-test" ?
+                         "Connecting…" : "Connecting…")
+                    self.view = self.build()
+                } else { task.terminate() }
+            }
+            // Consume all bounded output only as sanitized state codes.
+            // Never show cookies, credentials, raw stderr or process messages.
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            let lines = String(data: data.prefix(16384), encoding: .utf8) ?? ""
+            let states = lines.split(separator: "\n").compactMap { line -> String? in
+                guard let obj = try? JSONSerialization.jsonObject(
+                    with: Data(line.utf8)) as? [String: Any] else { return nil }
+                return obj["reason"] as? String
+            }
+            let reason = states.last ?? (
+                managementIP == "unrouted-probe" ?
+                (task.terminationStatus == 0 ?
+                 "CISCO_UNROUTED_TEST_FINISHED" :
+                 "CISCO_UNROUTED_TEST_FAILED") :
+                "CISCO_TUNNEL_STOPPED")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.ciscoTunnelGeneration == generation else { return }
+                self.ciscoTunnelTask = nil
+                self.ciscoTunnelBusy = false
+                self.ciscoSystemRouteVerified = false
+                self.ciscoConnectedAt = nil
+                self.resetTrafficMetrics()
+                self.ciscoTunnelStatus = reason.range(
+                    of: "^CISCO_[A-Z0-9_]{3,64}$",
+                    options: .regularExpression) != nil ?
+                    reason : "CISCO_TUNNEL_STOPPED"
+                self.view = self.build()
+            }
+        } catch {
+            input.fileHandleForWriting.closeFile()
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.ciscoTunnelGeneration == generation else { return }
+                self.ciscoTunnelBusy = false
+                self.ciscoTunnelTask = nil
+                self.ciscoTunnelStatus = "CISCO_PRIVILEGED_LAUNCH_FAILED"
+                self.view = self.build()
+            }
+        }
+    }
+
+    @objc private func testCiscoAuthentication(_ sender: NSButton) {
+        guard !ciscoAuthBusy,
+              let session = accountSession,
+              activeProtocol == "cisco",
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "cisco" && $0.configured
+              }) == true else {
+            ciscoAuthStatus = "Select a configured Cisco server in Locations."
+            view = build()
+            return
+        }
+        ciscoAuthBusy = true
+        ciscoAuthStatus = "Checking authorized Cisco profile…"
+        view = build()
+        directory.prepareCiscoAuthentication(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            guard self.accountSession?.accessToken == session.accessToken else {
+                self.ciscoAuthBusy = false
+                return
+            }
+            switch result {
+            case .failure(let error):
+                self.ciscoAuthBusy = false
+                let reason = error.localizedDescription
+                self.ciscoAuthStatus =
+                    "Cisco authentication blocked: " +
+                    (reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                  options: .regularExpression) != nil ?
+                        reason : "CISCO_PROFILE_UNAVAILABLE")
+                self.view = self.build()
+            case .success(let profile):
+                self.ciscoAuthStatus = "Testing Cisco login only (no tunnel)…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = self.runCiscoAuthenticationOnly(profile)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.ciscoAuthBusy = false
+                        guard self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.ciscoAuthStatus = result
+                        // Authentication is intentionally never a VPN connect
+                        // success, and must not flip localProxyActive.
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func runCiscoAuthenticationOnly(_ profile: Data) -> String {
+        let root = localRuntimeRoot()
+        let script = root + "/macos_native/cisco_openconnect_auth.py"
+        guard profile.count > 0, profile.count <= 16384,
+              FileManager.default.isReadableFile(atPath: script) else {
+            return "Cisco authentication blocked: CISCO_PREFLIGHT_UNAVAILABLE"
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "authenticate"]
+        let input = Pipe()
+        let output = Pipe()
+        let errors = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = errors
+        do {
+            try task.run()
+            // Pass the in-memory authorized profile through stdin, never
+            // command-line arguments, environment variables or temp files.
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            task.waitUntilExit()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard let obj = try? JSONSerialization.jsonObject(with: data)
+                    as? [String: Any] else {
+                return "Cisco authentication blocked: CISCO_PREFLIGHT_FAILED"
+            }
+            if task.terminationStatus == 0 &&
+               obj["state"] as? String == "cisco_authentication_verified" &&
+               obj["vpn_connected"] as? Bool == false {
+                return "Cisco authentication verified — VPN offline; no tunnel."
+            }
+            let reason = obj["reason"] as? String ?? "CISCO_PREFLIGHT_FAILED"
+            let code = reason.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                    options: .regularExpression) != nil ?
+                reason : "CISCO_PREFLIGHT_FAILED"
+            return "Cisco authentication failed: " + code
+        } catch {
+            input.fileHandleForWriting.closeFile()
+            return "Cisco authentication blocked: OPENCONNECT_EXECUTION_FAILED"
+        }
+    }
+
+    @objc private func primaryProxyAction(_ sender: NSButton) {
+        guard accountSession != nil, !localProxyBusy else { return }
+        guard let selected = activeProtocol,
+              ["hysteria2", "tuic", "anytls", "socks5",
+               "snell", "naive", "shadowtls", "v2ray"]
+                .contains(selected) else {
+            localProxyStatus = "Select a supported proxy protocol in Locations."
+            tab = 1
+            view = build()
+            return
+        }
+        guard activeServer != nil else {
+            localProxyStatus = "Choose a subscription server in Locations first."
+            tab = 1
+            view = build()
+            return
+        }
+        guard snapshot?.protocols.contains(where: {
+            $0.code == selected && $0.configured
+        }) == true else {
+            localProxyStatus = "The selected proxy is unavailable for this subscription."
+            view = build()
+            return
+        }
+        testNativeLocalProxy(sender)
+    }
+
+    @objc private func testNativeLocalProxy(_ sender: NSButton) {
+        guard !localProxyBusy,
+              let session = accountSession,
+              let serverID = activeServer,
+              let selected = activeProtocol,
+              ["hysteria2", "tuic", "anytls", "socks5",
+               "snell", "naive", "shadowtls", "v2ray"]
+                .contains(selected),
+              snapshot?.protocols.contains(where: {
+                  $0.code == selected && $0.configured
+              }) == true else { return }
+        localProxyBusy = true
+        localProxyStatus = "Checking current panel permissions…"
+        view = build()
+        directory.prepareLocalSingBox(
+            session, serverID: serverID, protocolCode: selected) {
+            [weak self] response in
+            guard let self = self else { return }
+            guard self.accountSession?.accessToken == session.accessToken else {
+                self.localProxyBusy = false
+                return
+            }
+            switch response {
+            case .failure(let error):
+                self.localProxyBusy = false
+                self.localProxyStatus = "Proxy test blocked: " + error.localizedDescription
+                self.view = self.build()
+            case .success(let bytes):
+                self.localProxyStatus = "Testing " + selected + " connection…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = self.oneShotLocalProxyProbe(bytes, protocolCode: selected)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.localProxyBusy = false
+                        guard self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.localProxyStatus = result
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Never changes a system route. Reuses the standalone manager's verified
+    /// local SOCKS process and cleans up test credentials even on failure.
+    private func oneShotLocalProxyProbe(_ config: Data,
+                                        protocolCode: String) -> String {
+        let root = localRuntimeRoot()
+        let manager = root + "/macos_native/standalone_connection_manager.py"
+        #if arch(arm64)
+        let archName = "arm64"
+        #else
+        let archName = "amd64"
+        #endif
+        let executable = root + "/macos_native/build/singbox/" +
+            archName + "/sing-box"
+        guard FileManager.default.isExecutableFile(atPath: executable),
+              FileManager.default.fileExists(atPath: manager) else {
+            return "Proxy engine not installed on this Mac"
+        }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-local-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: folder, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            return "Could not prepare private proxy test directory"
+        }
+        let file = folder.appendingPathComponent("client.json")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let created = FileManager.default.createFile(
+            atPath: file.path, contents: config,
+            attributes: [.posixPermissions: 0o600])
+        guard created else { return "Could not write private proxy test profile" }
+        // Only a single managed engine is permitted; don't interrupt existing
+        // user-owned processes. Manager start refuses an existing instance.
+        let started = runLocalManager([
+            "start", protocolCode, file.path, "--owner-pid",
+            String(ProcessInfo.processInfo.processIdentifier)
+        ], root: root)
+        guard started.0 == 0 else {
+            let diagnosis = runLocalManager(["diagnose"], root: root)
+            let cause = safeManagerReason(diagnosis.1)
+            return "Proxy startup failed: " + (
+                cause == "UNKNOWN_PROXY_FAILURE" ? safeManagerReason(started.2) : cause
+            )
+        }
+        let response = runLocalManager(["probe"], root: root)
+        // Never report successful proxy egress as completed until the
+        // temporary engine is actually stopped and verified by the manager.
+        let stopped = runLocalManager(["stop"], root: root)
+        guard stopped.0 == 0 else {
+            return "Proxy stop failed: " + safeManagerReason(stopped.2) +
+                " — use Stop local proxy before retrying"
+        }
+        guard response.0 == 0,
+              let data = response.1.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any],
+              json["state"] as? String == "proxy_egress_reachable",
+              let address = json["egress_ip"] as? String
+        else {
+            let curlReason = safeManagerReason(response.2)
+            let engineReason = safeManagerReason(
+                runLocalManager(["diagnose"], root: root).1
+            )
+            // SOCKS error 97 often means the outgoing Hysteria2 stream was
+            // rejected, NOT that the local SOCKS handshake is malformed.
+            // Expose both independent, redacted findings.
+            let detail = engineReason == "ENGINE_FAILURE_NOT_CLASSIFIED" ||
+                         engineReason == "UNKNOWN_PROXY_FAILURE" ||
+                         engineReason == "ENGINE_LOG_UNAVAILABLE" ?
+                curlReason : curlReason + " · " + engineReason
+            return protocolCode.uppercased() + " test failed: " + detail
+        }
+        return "Proxied HTTPS exit: " + address + " (not a system VPN)"
+    }
+
+    private func safeManagerReason(_ output: String) -> String {
+        guard let data = output.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any],
+              let reason = json["reason"] as? String,
+              reason.range(of: "^[A-Z][A-Z0-9_]{2,79}$",
+                           options: .regularExpression) != nil else {
+            return "UNKNOWN_PROXY_FAILURE"
+        }
+        return reason
+    }
+
+    private func resetTrafficMetrics() {
+        openVPNExitIP = nil
+        openVPNPing = nil
+        openVPNLastTraffic = nil
+        openVPNTelemetryAt = .distantPast
+        localProxyStartedAt = nil
+        lastTraffic = nil
+        recentTraffic.removeAll()
+        downloadSpeed = "—"
+        uploadSpeed = "—"
+        downloadedTotal = "—"
+        uploadedTotal = "—"
+        downloadHistory.removeAll()
+        uploadHistory.removeAll()
+        downloadChart?.samples = []
+        uploadChart?.samples = []
+        downloadSpeedText?.stringValue = "—"
+        uploadSpeedText?.stringValue = "—"
+        downloadedTotalText?.stringValue = ""
+        uploadedTotalText?.stringValue = ""
+    }
+
+    private func transferRate(_ bytes: Double) -> String {
+        guard bytes.isFinite, bytes >= 0 else { return "—" }
+        if bytes >= 1_000_000_000 {
+            return String(format: "%.1f GB/s", bytes / 1_000_000_000)
+        }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB/s", bytes / 1_000_000)
+        }
+        if bytes >= 1_000 {
+            return String(format: "%.1f KB/s", bytes / 1_000)
+        }
+        return String(format: "%.0f B/s", bytes)
+    }
+
+    private func transferTotal(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    @objc private func refreshTrafficMetrics() {
+        updateNativeKillSwitchControls()
+        updateConnectionDuration()
+        refreshFullTunStatus()
+        refreshOpenVPNAppSession()
+        refreshCiscoRouteStatus()
+        refreshWireGuardRouteStatus()
+        refreshL2TPRouteStatus()
+        refreshOpenVPNTelemetry()
+        if fullTunActive {
+            refreshFullTunEgress()
+            if tab == 0 { refreshFullTunTelemetry() }
+            return
+        }
+        guard tab == 0, localProxyActive, !trafficPollBusy else { return }
+        trafficPollBusy = true
+        let generation = localProxyGeneration
+        let root = localRuntimeRoot()
+        // Query is a local, authenticated sing-box counter, not a network
+        // speed test. Keep subprocess and JSON parsing off AppKit's main UI.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runLocalManager(["traffic"], root: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.trafficPollBusy = false
+                guard self.localProxyActive,
+                      self.localProxyGeneration == generation else { return }
+                guard response.0 == 0,
+                      let data = response.1.data(using: .utf8),
+                      let result = (try? JSONSerialization.jsonObject(with: data))
+                          as? [String: Any],
+                      result["state"] as? String == "measured",
+                      result["mode"] as? String == "local_proxy_only",
+                      let downNumber = result["download_bytes"] as? NSNumber,
+                      let upNumber = result["upload_bytes"] as? NSNumber else {
+                    // Old instances without telemetry show dashes, not
+                    // synthetic rates or total Mac interface traffic.
+                    self.lastTraffic = nil
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                    self.downloadSpeedText?.stringValue = "—"
+                    self.uploadSpeedText?.stringValue = "—"
+                    return
+                }
+                let down = downNumber.int64Value
+                let up = upNumber.int64Value
+                guard down >= 0, up >= 0 else { return }
+                let now = Date()
+                // Counter reset (e.g. engine restarted) starts a new baseline.
+                if let previous = self.lastTraffic,
+                   down < previous.download || up < previous.upload {
+                    self.recentTraffic.removeAll()
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.recentTraffic.append((down, up, now))
+                self.recentTraffic.removeAll {
+                    now.timeIntervalSince($0.at) > 3.0
+                }
+                if let baseline = self.recentTraffic.first,
+                   now.timeIntervalSince(baseline.at) > 0.2,
+                   down >= baseline.download, up >= baseline.upload {
+                    let seconds = now.timeIntervalSince(baseline.at)
+                    let downRate = Double(down - baseline.download) / seconds
+                    let upRate = Double(up - baseline.upload) / seconds
+                    self.downloadSpeed = self.transferRate(downRate)
+                    self.uploadSpeed = self.transferRate(upRate)
+                    self.downloadHistory.append(downRate)
+                    self.uploadHistory.append(upRate)
+                    if self.downloadHistory.count > 36 {
+                        self.downloadHistory.removeFirst()
+                    }
+                    if self.uploadHistory.count > 36 {
+                        self.uploadHistory.removeFirst()
+                    }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
+                } else {
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                }
+                self.lastTraffic = (down, up, now)
+                self.downloadedTotal = self.transferTotal(down)
+                self.uploadedTotal = self.transferTotal(up)
+                // Update only four labels; rebuilding the entire AppKit tree
+                // every two seconds caused heavy WindowServer usage on VMware.
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " +
+                    self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " +
+                    self.uploadedTotal
+            }
+        }
+    }
+
+    private func refreshCiscoRouteStatus() {
+        guard (ciscoTunnelTask != nil || ciscoSystemRouteVerified),
+              !ciscoRoutePollBusy,
+              Date().timeIntervalSince(ciscoRouteLastPoll) >= 3 else { return }
+        ciscoRoutePollBusy = true
+        ciscoRouteLastPoll = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/python3",
+                "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py",
+                "status-uptime"]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var response = ""
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                response = String(data: data.prefix(256), encoding: .utf8) ?? ""
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.ciscoRoutePollBusy = false
+                let status = (try? JSONSerialization.jsonObject(
+                    with: Data(response.utf8))) as? [String: Any]
+                let verified = self.ciscoTunnelTask != nil &&
+                    status?["state"] as? String == "connected"
+                let newStart: Date? = verified ?
+                    (status?["connected_at"] as? NSNumber).map {
+                        Date(timeIntervalSince1970: $0.doubleValue)
+                    } : nil
+                let changed = verified != self.ciscoSystemRouteVerified
+                let changedStart = newStart != self.ciscoConnectedAt
+                guard changed || changedStart else { return }
+                self.ciscoSystemRouteVerified = verified
+                self.ciscoConnectedAt = newStart
+                if changed { self.resetTrafficMetrics() }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func refreshL2TPRouteStatus() {
+        guard (l2tpTask != nil || l2tpSystemRouteVerified),
+              !l2tpRoutePollBusy,
+              Date().timeIntervalSince(l2tpRouteLastPoll) >= 3 else { return }
+        l2tpRoutePollBusy = true
+        l2tpRouteLastPoll = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/python3",
+                "/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_management_route_guard.py",
+                "status-uptime"]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var bytes = Data()
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                bytes = pipe.fileHandleForReading.readDataToEndOfFile()
+            }
+            let status = (try? JSONSerialization.jsonObject(
+                with: Data(bytes.prefix(512)))) as? [String: Any]
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.l2tpRoutePollBusy = false
+                let verified = self.l2tpTask != nil &&
+                    status?["state"] as? String == "connected"
+                let start: Date? = verified ?
+                    (status?["connected_at"] as? NSNumber).map {
+                        Date(timeIntervalSince1970: $0.doubleValue)
+                    } : nil
+                let changed = verified != self.l2tpSystemRouteVerified
+                let startChanged = start != self.l2tpConnectedAt
+                guard changed || startChanged else { return }
+                self.l2tpSystemRouteVerified = verified
+                self.l2tpConnectedAt = start
+                if changed { self.resetTrafficMetrics() }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func refreshWireGuardRouteStatus() {
+        guard (wireGuardProbeTask != nil || wireGuardSystemRouteVerified),
+              !wireGuardRoutePollBusy,
+              Date().timeIntervalSince(wireGuardRouteLastPoll) >= 3 else { return }
+        wireGuardRoutePollBusy = true
+        wireGuardRouteLastPoll = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            task.arguments = ["-n", "/usr/bin/python3",
+                "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py",
+                "status-uptime"]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let output = Pipe()
+            task.standardOutput = output
+            var result = Data()
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                result = output.fileHandleForReading.readDataToEndOfFile()
+            }
+            let status = (try? JSONSerialization.jsonObject(
+                with: Data(result.prefix(512)))) as? [String: Any]
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.wireGuardRoutePollBusy = false
+                let attestedProtocol = status?["protocol_code"] as? String ?? "wireguard"
+                let verified = self.wireGuardProbeTask != nil &&
+                    status?["state"] as? String == "connected" &&
+                    attestedProtocol == self.wireGuardConnectionProtocol
+                let start = verified ? (status?["connected_at"] as? NSNumber).map {
+                    Date(timeIntervalSince1970: $0.doubleValue)
+                } : nil
+                let changed = verified != self.wireGuardSystemRouteVerified
+                let startChanged = start != self.wireGuardConnectedAt
+                if !changed && !startChanged { return }
+                self.wireGuardSystemRouteVerified = verified
+                self.wireGuardConnectedAt = start
+                self.wireGuardProbeStatus = verified ? "" : self.wireGuardConnectionTitle + " disconnected"
+                if changed { self.resetTrafficMetrics() }
+                self.view = self.build()
+            }
+        }
+    }
+
+    // Real network metrics: read utun interface counters, actual IPv4 exit,
+    // and a real ICMP latency probe. Never synthesize readings.
+    private func refreshOpenVPNTelemetry() {
+        guard tab == 0, (openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+                         wireGuardSystemRouteVerified || l2tpSystemRouteVerified),
+              !openVPNTelemetryBusy,
+              Date().timeIntervalSince(openVPNTelemetryAt) >= 5 else { return }
+        openVPNTelemetryBusy = true
+        openVPNTelemetryAt = Date()
+        let generation = localProxyGeneration
+        let script = localRuntimeRoot() +
+            "/macos_native/openvpn_traffic_telemetry.py"
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            task.arguments = [script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var data = Data()
+            if (try? task.run()) != nil {
+                task.waitUntilExit()
+                data = pipe.fileHandleForReading.readDataToEndOfFile()
+            }
+            let metrics = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any]
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.openVPNTelemetryBusy = false
+                guard (self.openVPNSystemRouteVerified ||
+                       self.ciscoSystemRouteVerified ||
+                       self.wireGuardSystemRouteVerified ||
+                       self.l2tpSystemRouteVerified),
+                      self.localProxyGeneration == generation else { return }
+                guard metrics?["state"] as? String == "measured",
+                      let down = (metrics?["download_bytes"] as? NSNumber)?.int64Value,
+                      let up = (metrics?["upload_bytes"] as? NSNumber)?.int64Value,
+                      down >= 0, up >= 0 else { return }
+                let now = Date()
+                if let previous = self.openVPNLastTraffic,
+                   now.timeIntervalSince(previous.at) > 0.1,
+                   down >= previous.download, up >= previous.upload {
+                    let seconds = now.timeIntervalSince(previous.at)
+                    let downRate = Double(down - previous.download) / seconds
+                    let upRate = Double(up - previous.upload) / seconds
+                    self.downloadSpeed = self.transferRate(downRate)
+                    self.uploadSpeed = self.transferRate(upRate)
+                    self.downloadHistory.append(downRate)
+                    self.uploadHistory.append(upRate)
+                    if self.downloadHistory.count > 36 { self.downloadHistory.removeFirst() }
+                    if self.uploadHistory.count > 36 { self.uploadHistory.removeFirst() }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
+                } else {
+                    self.downloadSpeed = "0 B/s"
+                    self.uploadSpeed = "0 B/s"
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.openVPNLastTraffic = (down, up, now)
+                self.downloadedTotal = self.transferTotal(down)
+                self.uploadedTotal = self.transferTotal(up)
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " + self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " + self.uploadedTotal
+                self.openVPNExitIP = metrics?["ip"] as? String
+                self.openVPNPing = (metrics?["ping_ms"] as? NSNumber)?.doubleValue
+                self.openVPNIPText?.stringValue = self.openVPNExitIP ?? "—"
+                self.openVPNPingText?.stringValue = self.openVPNPing.map {
+                    String(format: "%.0f ms", $0)
+                } ?? "—"
+            }
+        }
+    }
+
+    // Only fixed diagnostic identifiers are persisted; never credentials,
+    // profile content, hostnames or network endpoints.
+    private func recordProxyAttempt(_ protocolCode: String, _ reason: String) {
+        let allowed: Set<String> = [
+            "hysteria2", "tuic", "anytls", "socks5",
+            "snell", "naive", "shadowtls", "v2ray", "mieru",
+            "trusttunnel", "sudoku"
+        ]
+        guard allowed.contains(protocolCode) else { return }
+        let safeCode = reason.range(
+            of: "^[A-Z][A-Z0-9_]{2,63}$",
+            options: .regularExpression) != nil ?
+            reason : "PROFILE_REQUEST_FAILED"
+        let root = localRuntimeRoot()
+        proxyAttemptQueue.async { [weak self] in
+            guard let self = self else { return }
+            _ = self.runLocalManager(
+                ["record-attempt", protocolCode, safeCode], root: root)
+        }
+    }
+
+    // Prefer a packaged runtime in a distributable app. Source checkout
+    // fallback exists only for developer builds, not as a release contract.
+    private func localRuntimeRoot() -> String {
+        if let resources = Bundle.main.resourceURL {
+            let packaged = resources.appendingPathComponent(
+                "twinconnect-runtime", isDirectory: true)
+            let manager = packaged.appendingPathComponent(
+                "macos_native/standalone_connection_manager.py")
+            if FileManager.default.isReadableFile(atPath: manager.path) {
+                return packaged.path
+            }
+        }
+        return NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+    }
+
+    // This is a socket presence check only. The daemon performs peer-UID
+    // authorization and root-owned profile checks independently.
+    private func fullTunServicePresent() -> Bool {
+        let socket = "/var/run/twinconnect-tun.sock"
+        guard let attributes = try? FileManager.default.attributesOfItem(
+            atPath: socket) else { return false }
+        return attributes[.type] as? FileAttributeType == .typeSocket
+    }
+
+    private func runFullTunClient(_ action: String, profile: Data? = nil)
+        -> (Int32, String) {
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_tun_client.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (1, "")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, action]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = Pipe()
+        if let profile = profile {
+            let input = Pipe()
+            task.standardInput = input
+            do {
+                try task.run()
+                input.fileHandleForWriting.write(profile)
+                input.fileHandleForWriting.closeFile()
+            } catch { return (1, "") }
+        } else {
+            task.standardInput = FileHandle.nullDevice
+            do { try task.run() } catch { return (1, "") }
+        }
+        task.waitUntilExit()
+        let output = out.fileHandleForReading.readDataToEndOfFile()
+        return (task.terminationStatus,
+                String(data: output, encoding: .utf8) ?? "")
+    }
+
+    // Converts an entitled Xray profile to a reviewed unsigned sing-box TUN
+    // profile. Credentials travel over stdin/stdout, never argv or a log.
+    // Conversion does not start a VPN or change system routes.
+    private func reviewedV2RayTunCandidate(_ profile: Data) -> (Data?, String) {
+        guard profile.count > 0 && profile.count <= 262144 else {
+            return (nil, "VLESS_PROFILE_INVALID")
+        }
+        let root = localRuntimeRoot()
+        let script = root + "/macos_native/xray_unsigned_tun_candidate.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (nil, "VLESS_CONVERTER_MISSING")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "--stdin"]
+        let errors = Pipe()
+        task.standardError = errors
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            let converted = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            if task.terminationStatus != 0 {
+                let details = errors.fileHandleForReading.readDataToEndOfFile()
+                let reason = String(decoding: details, as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let safe = reason.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                        options: .regularExpression) != nil ?
+                    reason : "VLESS_CONVERSION_FAILED"
+                return (nil, safe)
+            }
+            guard converted.count > 0, converted.count <= 262144,
+                  let obj = try? JSONSerialization.jsonObject(with: converted)
+                    as? [String: Any],
+                  let inbound = obj["inbounds"] as? [[String: Any]],
+                  inbound.count == 1,
+                  inbound[0]["type"] as? String == "tun" else {
+                return (nil, "VLESS_CANDIDATE_INVALID")
+            }
+            return (converted, "")
+        } catch { return (nil, "VLESS_CONVERTER_EXEC_FAILED") }
+    }
+
+    private func reviewedMieruTunCandidate(_ raw: Data) -> (Data?, String) {
+        guard raw.count > 0 && raw.count <= 131072 else {
+            return (nil, "MIERU_PROFILE_INVALID")
+        }
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_mieru_profile.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (nil, "MIERU_CONVERTER_NOT_PACKAGED")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, "--candidate"]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(raw)
+            input.fileHandleForWriting.closeFile()
+            let converted = output.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
+            guard converted.count <= 262144,
+                  let obj = try? JSONSerialization.jsonObject(with: converted)
+                    as? [String: Any] else {
+                return (nil, "MIERU_CANDIDATE_INVALID")
+            }
+            if task.terminationStatus != 0 {
+                let reason = obj["reason"] as? String ?? "MIERU_PROFILE_INVALID"
+                let valid = reason.range(of: "^MIERU_[A-Z0-9_]{2,63}$",
+                                         options: .regularExpression) != nil
+                return (nil, valid ? reason : "MIERU_PROFILE_INVALID")
+            }
+            guard let inbound = obj["inbounds"] as? [[String: Any]],
+                  inbound.count == 1,
+                  inbound[0]["type"] as? String == "tun",
+                  let outbounds = obj["outbounds"] as? [[String: Any]],
+                  outbounds.count == 1,
+                  outbounds[0]["type"] as? String == "mieru",
+                  outbounds[0]["tag"] as? String == "proxy" else {
+                return (nil, "MIERU_CANDIDATE_INVALID")
+            }
+            return (converted, "")
+        } catch {
+            return (nil, "MIERU_CONVERTER_EXEC_FAILED")
+        }
+    }
+
+    private func readActiveFullTunProtocol() -> String? {
+        // The limited-sudo status operation is read-only; the root-owned
+        // helper looks at the actual running sing-box process and its active
+        // 0600 config. It outputs only a fixed protocol code, not credentials.
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n",
+            "/Library/PrivilegedHelperTools/TwinConnectOps/tun-admin", "status"]
+        task.standardInput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        let output = Pipe()
+        task.standardOutput = output
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard data.count < 8192,
+                  let content = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            let prefix = "TUN_PROTOCOL="
+            let codes = content.split(separator: "\n")
+                .compactMap { line -> String? in
+                    let value = String(line).trimmingCharacters(in:
+                        .whitespacesAndNewlines)
+                    return value.hasPrefix(prefix) ?
+                        String(value.dropFirst(prefix.count)) : nil
+                }
+            let allowed: Set<String> = [
+                "v2ray", "hysteria2", "tuic", "anytls",
+                "socks5", "snell", "naive", "shadowtls", "mieru"
+            ]
+            guard codes.count == 1, allowed.contains(codes[0]) else {
+                return nil
+            }
+            return codes[0]
+        } catch {
+            return nil
+        }
+    }
+
+    private func attestedFullTunProtocol(_ raw: String) -> String? {
+        // A trusted root daemon identifies its two-process transport.
+        // Never infer TrustTunnel from a generic SOCKS outbound or picker.
+        guard tunRouteIsRunning(raw),
+              let data = raw.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any] else { return nil }
+        if object["protocol_code"] as? String == "trusttunnel" {
+            return "trusttunnel"
+        }
+        if object["protocol_code"] as? String == "sudoku" {
+            return "sudoku"
+        }
+        if object["killswitch_candidate"] as? Bool == true,
+           let code = object["protocol_code"] as? String,
+           ["v2ray", "hysteria2", "tuic", "anytls", "socks5", "snell",
+            "naive", "shadowtls", "mieru"].contains(code) {
+            return code
+        }
+        return readActiveFullTunProtocol()
+    }
+
+    private func tunKillSwitchCandidate(_ raw: String) -> Bool {
+        guard tunRouteIsRunning(raw), let data = raw.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return false
+        }
+        return object["killswitch_candidate"] as? Bool == true
+    }
+
+    private func tunRouteIsRunning(_ raw: String) -> Bool {
+        guard tunResponseIs(raw, state: "engine_running_unverified"),
+              let data = raw.data(using: .utf8),
+              let payload = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+        return payload["owner_present"] as? Bool == true &&
+               payload["route_state"] as? String == "utun_route_observed_unverified"
+    }
+
+    private func tunResponseIs(_ raw: String, state: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let response = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any] else { return false }
+        return response["state"] as? String == state &&
+               response["system_vpn_verified"] as? Bool == false
+    }
+
+    private func reviewOpenVPNProfile(_ profile: Data) -> Bool {
+        guard profile.count > 0, profile.count <= 65536 else { return false }
+        let script = localRuntimeRoot() + "/macos_native/openvpn_profile_review.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return false
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script]
+        let input = Pipe()
+        let output = Pipe()
+        task.standardInput = input
+        task.standardOutput = output
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            input.fileHandleForWriting.write(profile)
+            input.fileHandleForWriting.closeFile()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return false }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            guard let result = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+            return result["state"] as? String == "reviewed_unrouted_candidate" &&
+                   result["connected"] as? Bool == false
+        } catch { return false }
+    }
+
+    // Root-owned OpenVPN session controller. Each entry point is individually
+    // allowlisted by the existing opt-in sudoers rule (no shell involved).
+    private func openVPNAppSessionInstalled() -> Bool {
+        FileManager.default.isReadableFile(atPath:
+            "/Library/PrivilegedHelperTools/TwinConnectOpenVPN/" +
+            "macos_native/openvpn_app_session.py")
+    }
+
+    private func runOpenVPNAppSession(_ action: String, profile: Data? = nil)
+        -> (Int32, String) {
+        guard ["start", "connect", "stop", "status"].contains(action) else {
+            return (1, "OPENVPN_INVALID_ACTION")
+        }
+        let script = "/Library/PrivilegedHelperTools/TwinConnectOpenVPN/" +
+            "macos_native/openvpn_app_session.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (1, "OPENVPN_SESSION_NOT_INSTALLED")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n", "/usr/bin/python3", script, action]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = FileHandle.nullDevice
+        if let profile = profile {
+            let input = Pipe()
+            task.standardInput = input
+            do {
+                try task.run()
+                input.fileHandleForWriting.write(profile)
+                input.fileHandleForWriting.closeFile()
+            } catch {
+                return (1, "OPENVPN_SESSION_LAUNCH_FAILED")
+            }
+        } else {
+            task.standardInput = FileHandle.nullDevice
+            do { try task.run() } catch {
+                return (1, "OPENVPN_SESSION_LAUNCH_FAILED")
+            }
+        }
+        task.waitUntilExit()
+        let output = out.fileHandleForReading.readDataToEndOfFile()
+        let state = ((try? JSONSerialization.jsonObject(with: output))
+            as? [String: Any])?["state"] as? String ??
+            "OPENVPN_SESSION_COMMAND_FAILED"
+        return (task.terminationStatus, state)
+    }
+
+    private func startPersistentOpenVPN(_ session: TwinMacNativeSession,
+                                        serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "OpenVPN: fetching authorized profile…"
+        view = build()
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure:
+                self.fullTunBusy = false
+                self.status = "OpenVPN: PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let profile):
+                self.openVPNReconnectProfile = profile
+                self.openVPNReconnectAccount = session.namespace
+                self.openVPNReconnectOrigin = session.apiOrigin
+                self.openVPNReconnectServer = serverID
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let valid = self.reviewOpenVPNProfile(profile)
+                    let started = valid ?
+                        self.runOpenVPNAppSession("start", profile: profile) :
+                        (1, "OPENVPN_PROFILE_REJECTED")
+                    let result: (Int32, String)
+                    if started.0 == 0 {
+                        result = self.runOpenVPNAppSession("connect")
+                        if result.0 != 0 {
+                            // Never leave an orphaned unrouted tunnel after a
+                            // failed attempt to activate verified system VPN.
+                            _ = self.runOpenVPNAppSession("stop")
+                        }
+                    } else {
+                        result = started
+                    }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken ==
+                                  session.accessToken else {
+                            if result.0 == 0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runOpenVPNAppSession("stop")
+                                }
+                            }
+                            return
+                        }
+                        self.openVPNSystemRouteVerified =
+                            result.0 == 0 && result.1 == "connected"
+                        self.openVPNConnectedAt = self.openVPNSystemRouteVerified ?
+                            Date() : nil
+                        self.openVPNAppSessionActive = self.openVPNSystemRouteVerified
+                        self.resetTrafficMetrics()
+                        self.status = self.openVPNSystemRouteVerified ?
+                            "Connected · OpenVPN" : "OpenVPN: " + result.1
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard openVPNReconnectAccount == session.namespace,
+                  openVPNReconnectOrigin == session.apiOrigin,
+                  openVPNReconnectServer == serverID,
+                  let cached = openVPNReconnectProfile else {
+                fullTunBusy = false
+                status = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            fullTunBusy = false
+            status = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareOpenVPNProfile(session, serverID: serverID,
+                                              completion: complete)
+        }
+    }
+
+    private func stopPersistentOpenVPN() {
+        guard !fullTunBusy else { return }
+        fullTunBusy = true
+        status = "OpenVPN: stopping tunnel…"
+        view = build()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runOpenVPNAppSession("stop")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunBusy = false
+                if result.0 == 0 && result.1 == "stopped" {
+                    self.openVPNAppSessionActive = false
+                    self.openVPNSystemRouteVerified = false
+                    self.openVPNConnectedAt = nil
+                    self.resetTrafficMetrics()
+                    self.status = "OpenVPN: disconnected."
+                } else {
+                    self.status = "OpenVPN: " + result.1
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func refreshOpenVPNAppSession() {
+        guard accountSession != nil,
+              openVPNAppSessionInstalled(), !fullTunBusy,
+              Date().timeIntervalSince(openVPNAppStatusPollAt) >= 5
+        else { return }
+        openVPNAppStatusPollAt = Date()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runOpenVPNAppSession("status")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, !self.fullTunBusy else { return }
+                let active = result.0 == 0 &&
+                    (result.1 == "connected" ||
+                     result.1 == "tunnel_established_unrouted" ||
+                     result.1 == "tunnel_egress_verified_unrouted")
+                let routed = result.0 == 0 && result.1 == "connected"
+                let nextStatus = routed ? "Connected · OpenVPN" :
+                    (active ? "OpenVPN tunnel only · not system VPN" :
+                     "OpenVPN: " + result.1)
+                if active != self.openVPNAppSessionActive ||
+                   routed != self.openVPNSystemRouteVerified ||
+                   self.status != nextStatus {
+                    if self.openVPNSystemRouteVerified && !routed {
+                        self.resetTrafficMetrics()
+                    }
+                    self.openVPNAppSessionActive = active
+                    self.openVPNSystemRouteVerified = routed
+                    if routed && self.openVPNConnectedAt == nil {
+                        self.openVPNConnectedAt = Date()
+                    } else if !routed {
+                        self.openVPNConnectedAt = nil
+                    }
+                    self.status = nextStatus
+                    self.view = self.build()
+                }
+            }
+        }
+    }
+
+    // A bounded end-to-end diagnostic initiated by the app's actual Connect
+    // button. Never claim this temporary handshake is a system-wide VPN.
+    // A separately installed root-owned, narrow sudo rule is mandatory.
+    private func startOpenVPNAppProbe(_ session: TwinMacNativeSession,
+                                     serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "OpenVPN app test: fetching your authorized profile…"
+        view = build()
+        directory.prepareOpenVPNProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                self.fullTunBusy = false
+                let reason = error.localizedDescription
+                self.status = "OpenVPN app test: " + (
+                    reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    reason : "PROFILE_UNAVAILABLE")
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let reviewed = self.reviewOpenVPNProfile(profile)
+                    var code: Int32 = 1
+                    var summary = "OPENVPN_PROFILE_REJECTED"
+                    if reviewed {
+                        let helper = "/Library/PrivilegedHelperTools/" +
+                            "TwinConnectOpenVPN/tool/test_macos_openvpn_handshake.py"
+                        if FileManager.default.isReadableFile(atPath: helper) {
+                            let task = Process()
+                            task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                            task.arguments = ["-n", "/usr/bin/python3",
+                                              helper, "--stdin"]
+                            let input = Pipe()
+                            let output = Pipe()
+                            task.standardInput = input
+                            task.standardOutput = output
+                            task.standardError = FileHandle.nullDevice
+                            do {
+                                try task.run()
+                                input.fileHandleForWriting.write(profile)
+                                input.fileHandleForWriting.closeFile()
+                                task.waitUntilExit()
+                                code = task.terminationStatus
+                                let data = output.fileHandleForReading
+                                    .readDataToEndOfFile()
+                                let publicOutput = String(data: data,
+                                                          encoding: .utf8) ?? ""
+                                let resultCodes = publicOutput
+                                    .components(separatedBy: .newlines)
+                                    .filter { $0.range(
+                                        of: "^[A-Z0-9_]{4,80}$",
+                                        options: .regularExpression) != nil }
+                                // OPENVPN_TEST_STOPPED is lifecycle information,
+                                // not an outcome. Prefer the actual handshake
+                                // verdict, then an explicit failure reason.
+                                // The runner emits STOPPED before its verdict.
+                                let outcomes = resultCodes.filter {
+                                    $0.hasPrefix("OPENVPN_") &&
+                                    $0 != "OPENVPN_TEST_STOPPED" &&
+                                    $0 != "OPENVPN_START_FAILED"
+                                }
+                                summary = outcomes.first(where: {
+                                    $0 == "OPENVPN_HANDSHAKE_VERIFIED"
+                                }) ?? outcomes.first ??
+                                    (resultCodes.contains("OPENVPN_START_FAILED") ?
+                                     "OPENVPN_START_FAILED" : "OPENVPN_TEST_FAILED")
+                            } catch {
+                                summary = "OPENVPN_APP_PROBE_LAUNCH_FAILED"
+                            }
+                        } else {
+                            summary = "OPENVPN_APP_PROBE_NOT_INSTALLED"
+                        }
+                    }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self,
+                              self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.fullTunBusy = false
+                        self.fullTunActive = false
+                        if code == 0 &&
+                           summary == "OPENVPN_HANDSHAKE_VERIFIED" {
+                            self.status = "OpenVPN handshake verified in app; " +
+                                "test stopped. System VPN not connected."
+                        } else {
+                            self.status = "OpenVPN app test: " + summary
+                        }
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func startOpenVPN(_ session: TwinMacNativeSession,
+                              serverID: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Retrieving authenticated OpenVPN profile…"
+        view = build()
+        directory.prepareOpenVPNProfile(session, serverID: serverID) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure:
+                self.fullTunBusy = false
+                self.status = "OpenVPN profile unavailable for selected account."
+                self.view = self.build()
+            case .success(let profile):
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let valid = self.reviewOpenVPNProfile(profile)
+                    let service = self.fullTunServicePresent()
+                    var response: (Int32, String) = (1, "")
+                    if valid && service,
+                       let text = String(data: profile, encoding: .utf8),
+                       let envelope = try? JSONSerialization.data(
+                        withJSONObject: ["mode": "openvpn", "profile": text]) {
+                        response = self.runFullTunClient("start", profile: envelope)
+                    }
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard generation == self.localProxyGeneration,
+                              self.accountSession?.accessToken == session.accessToken else {
+                            if response.0 == 0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runFullTunClient("stop")
+                                }
+                            }
+                            return
+                        }
+                        self.fullTunActive = response.0 == 0 &&
+                            self.tunResponseIs(response.1,
+                                               state: "engine_running_unverified")
+                        if self.fullTunActive {
+                            self.status = "OpenVPN engine running; VPN egress not verified."
+                        } else if !valid {
+                            self.status = "OpenVPN profile rejected; no connection started."
+                        } else if !service {
+                            self.status = "OpenVPN reviewed; privileged local helper not installed."
+                        } else {
+                            self.status = "OpenVPN start rejected; no connection confirmed."
+                        }
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func startFullTun(_ session: TwinMacNativeSession,
+                              serverID: String, protocolCode: String) {
+        let protectedReconnect = nativeKillSwitchControlStatus()?["state"] as? String == "locked"
+        fullTunKillSwitchCandidate = false
+        fullTunObservedExitIP = nil
+        fullTunEgressConfirmedAt = nil
+        fullTunTrafficInterface = nil
+        fullTunStartedAt = nil
+        // Do not issue a doomed privileged start for an unsupported transport.
+        if !protectedReconnect && protocolCode == "v2ray" &&
+           !v2rayTunInboundSupported(activeV2RayInbound) {
+            status = "Choose WebSocket TLS in Locations; XHTTP Reality is not supported."
+            recordProxyAttempt(protocolCode, "VLESS_TRANSPORT_UNSUPPORTED")
+            view = build()
+            return
+        }
+        // Record a reason-only attempt before the profile fetch or root
+        // helper runs. For Mieru this also makes clock/auth failures
+        // diagnosable, without retaining user credentials.
+        recordProxyAttempt(protocolCode, "CONNECT_REQUESTED")
+        if protocolCode == "trusttunnel" {
+            NSLog("TwinConnect AppKit: TrustTunnel Connect received; profile lookup started")
+        }
+        fullTunStatusUncertain = false
+        fullTunStatusMisses = 0
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Authorizing local TUN profile…"
+        view = build()
+        let completion: (Result<Data, Error>) -> Void = { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                self.fullTunBusy = false
+                let message = String(describing: error)
+                let safeCode = message.range(
+                    of: "[A-Z][A-Z0-9_]{2,63}",
+                    options: .regularExpression).map {
+                        String(message[$0])
+                    } ?? "PROFILE_FETCH_FAILED"
+                self.status = "VPN profile request failed: " + safeCode
+                self.recordProxyAttempt(protocolCode, safeCode)
+                self.view = self.build()
+            case .success(let profile):
+                self.status = "Starting local-console TUN engine…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let conversion: (Data?, String)
+                    if protectedReconnect {
+                        conversion = (profile, "")
+                    } else if protocolCode == "v2ray" {
+                        conversion = self.reviewedV2RayTunCandidate(profile)
+                    } else if protocolCode == "mieru" {
+                        conversion = self.reviewedMieruTunCandidate(profile)
+                    } else {
+                        conversion = (profile, "")
+                    }
+                    let reviewed = conversion.0
+                    let conversionReason = conversion.1
+                    let response: (Int32, String) = reviewed.map {
+                        self.runFullTunClient("start", profile: $0)
+                    } ?? (1, "")
+                    // If the controller accepted the first request but the
+                    // next start reports ALREADY_RUNNING, reconcile against
+                    // the actual kernel route rather than showing Offline.
+                    // This status query never changes routes or starts VPNs.
+                    let observed: (Int32, String) =
+                        reviewed != nil && !self.tunRouteIsRunning(response.1) ?
+                            self.runFullTunClient("status") : response
+                    let realProtocol = self.tunRouteIsRunning(observed.1) ?
+                        self.attestedFullTunProtocol(observed.1) : nil
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard generation == self.localProxyGeneration,
+                              self.accountSession?.accessToken == session.accessToken else {
+                            DispatchQueue.global(qos: .utility).async {
+                                _ = self.runFullTunClient("stop")
+                            }
+                            return
+                        }
+                        self.fullTunActive = reviewed != nil &&
+                            self.tunRouteIsRunning(observed.1)
+                        self.fullTunConnectedProtocol = self.fullTunActive ?
+                            realProtocol : nil
+                        self.fullTunKillSwitchCandidate = self.fullTunActive &&
+                            self.tunKillSwitchCandidate(observed.1)
+                        if self.fullTunActive && response.0 == 0 && realProtocol == protocolCode {
+                            self.fullTunReconnectProfile = reviewed
+                            self.fullTunReconnectProtocol = protocolCode
+                            self.fullTunReconnectAccount = session.namespace
+                            self.fullTunReconnectOrigin = session.apiOrigin
+                            self.fullTunReconnectServer = self.activeServer
+                        }
+                        if self.fullTunActive {
+                            self.fullTunStartedAt = Date()
+                            self.fullTunProbeLastAt = .distantPast
+                            self.status = "TUN route running; checking HTTPS."
+                        } else if reviewed == nil {
+                            self.status = protocolCode.uppercased() +
+                                " TUN: " + conversionReason
+                            self.recordProxyAttempt(protocolCode, conversionReason)
+                        } else {
+                            let reason: String
+                            if let data = response.1.data(using: .utf8),
+                               let object = try? JSONSerialization.jsonObject(with: data)
+                                    as? [String: Any],
+                               let code = object["reason"] as? String,
+                               code.range(of: "^[A-Z][A-Z0-9_]{2,63}$",
+                                          options: .regularExpression) != nil {
+                                reason = code
+                            } else {
+                                reason = "TUN_START_REJECTED"
+                            }
+                            self.status = "TUN connection failed: " + reason
+                            self.recordProxyAttempt(protocolCode, reason)
+                            NSLog("TwinConnect AppKit: TUN start rejected with code %@", reason)
+                        }
+                        self.view = self.build()
+                        if self.fullTunActive {
+                            self.refreshFullTunEgress()
+                        }
+                    }
+                }
+            }
+        }
+        if protectedReconnect {
+            guard fullTunReconnectAccount == session.namespace,
+                  fullTunReconnectOrigin == session.apiOrigin,
+                  fullTunReconnectProtocol == protocolCode,
+                  fullTunReconnectServer == serverID,
+                  let cached = fullTunReconnectProfile else {
+                fullTunBusy = false
+                status = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            completion(.success(cached))
+        } else if protocolCode == "trusttunnel" {
+            directory.prepareTrustTunnelDeeplink(session, serverID: serverID,
+                                                 completion: completion)
+        } else if protocolCode == "sudoku" {
+            directory.prepareSudokuProfile(session, serverID: serverID,
+                resolvedServer: { [weak self] actualID in
+                    guard let self = self,
+                          self.localProxyGeneration == generation,
+                          self.accountSession?.accessToken == session.accessToken else { return }
+                    self.activeServer = actualID
+                    self.persistCurrentSelection()
+                }, completion: completion)
+        } else if protocolCode == "mieru" {
+            directory.prepareLocalSingBox(session, serverID: serverID,
+                                          protocolCode: "mieru",
+                                          completion: completion)
+        } else if protocolCode == "v2ray" {
+            directory.prepareLocalSingBox(session, serverID: serverID,
+                                          protocolCode: "v2ray",
+                                          v2rayInboundID: activeV2RayInbound,
+                                          completion: completion)
+        } else {
+            directory.prepareFullTUNCandidate(session, serverID: serverID,
+                                              protocolCode: protocolCode,
+                                              completion: completion)
+        }
+    }
+
+    private func refreshFullTunEgress() {
+        // Only a live system HTTPS request through the currently observed
+        // utun route can promote the UI from TUN running to Connected.
+        let recentStart = fullTunStartedAt.map {
+            Date().timeIntervalSince($0) < 45
+        } == true
+        // Newly started unsigned TUNs often need several seconds to settle
+        // DNS and HTTPS. Retry quickly during initial verification instead
+        // of waiting 15 seconds with no IP or actionable progress.
+        let probeInterval: TimeInterval =
+            (!fullTunHTTPSConnected && recentStart) ? 4 : 15
+        guard fullTunActive, !fullTunBusy, !fullTunProbeBusy,
+              Date().timeIntervalSince(fullTunProbeLastAt) >= probeInterval
+        else { return }
+        fullTunProbeBusy = true
+        fullTunProbeLastAt = Date()
+        let generation = localProxyGeneration
+        let token = accountSession?.accessToken
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runFullTunClient("probe")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunProbeBusy = false
+                guard self.fullTunActive && !self.fullTunBusy,
+                      self.localProxyGeneration == generation &&
+                      self.accountSession?.accessToken == token else { return }
+                let wasConnected = self.fullTunHTTPSConnected
+                let oldIP = self.fullTunObservedExitIP
+                if response.0 == 0,
+                   let data = response.1.data(using: .utf8),
+                   let payload = (try? JSONSerialization.jsonObject(with: data))
+                       as? [String: Any],
+                   self.tunRouteIsRunning(response.1),
+                   payload["https_state"] as? String == "system_https_reachable",
+                   let address = payload["observed_exit_ip"] as? String,
+                   address.range(
+                     of: #"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"#,
+                     options: .regularExpression) != nil {
+                    self.fullTunObservedExitIP = address
+                    self.fullTunEgressConfirmedAt = Date()
+                    self.status = "Connected · HTTPS exit checked via TUN."
+                } else {
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
+                    self.status = "TUN route active; checking HTTPS connectivity."
+                }
+                if wasConnected != self.fullTunHTTPSConnected ||
+                   oldIP != self.fullTunObservedExitIP {
+                    self.view = self.build()
+                } else {
+                    self.openVPNIPText?.stringValue =
+                        self.fullTunObservedExitIP ?? "—"
+                }
+            }
+        }
+    }
+
+    private func refreshFullTunTelemetry() {
+        guard fullTunActive, !fullTunBusy, !fullTunTrafficBusy,
+              Date().timeIntervalSince(fullTunTrafficLastAt) >= 3 else { return }
+        fullTunTrafficBusy = true
+        fullTunTrafficLastAt = Date()
+        let generation = localProxyGeneration
+        let token = accountSession?.accessToken
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_tun_telemetry.py"
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            task.arguments = [script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            var raw = Data()
+            var ok = false
+            if (try? task.run()) != nil {
+                raw = pipe.fileHandleForReading.readDataToEndOfFile()
+                task.waitUntilExit()
+                ok = task.terminationStatus == 0 && raw.count < 8192
+            }
+            let result = ok ?
+                (try? JSONSerialization.jsonObject(with: raw))
+                    as? [String: Any] : nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunTrafficBusy = false
+                guard self.fullTunActive && self.tab == 0 &&
+                    self.localProxyGeneration == generation &&
+                    self.accountSession?.accessToken == token else { return }
+                guard result?["state"] as? String == "measured",
+                      result?["mode"] as? String == "system_tun_interface",
+                      let iface = result?["interface"] as? String,
+                      iface.range(of: "^utun[0-9]{1,4}$",
+                                  options: .regularExpression) != nil,
+                      let down = result?["download_bytes"] as? NSNumber,
+                      let up = result?["upload_bytes"] as? NSNumber,
+                      down.int64Value >= 0, up.int64Value >= 0 else {
+                    // Never fabricate counters from local ethernet traffic.
+                    self.lastTraffic = nil
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                    self.downloadSpeedText?.stringValue = "—"
+                    self.uploadSpeedText?.stringValue = "—"
+                    return
+                }
+                if self.fullTunTrafficInterface != iface ||
+                   self.lastTraffic.map({
+                     down.int64Value < $0.download || up.int64Value < $0.upload
+                   }) == true {
+                    self.recentTraffic.removeAll()
+                    self.downloadHistory.removeAll()
+                    self.uploadHistory.removeAll()
+                }
+                self.fullTunTrafficInterface = iface
+                let now = Date()
+                self.recentTraffic.append((down.int64Value, up.int64Value, now))
+                self.recentTraffic.removeAll {
+                    now.timeIntervalSince($0.at) > 7.0
+                }
+                if let baseline = self.recentTraffic.first,
+                   now.timeIntervalSince(baseline.at) > 0.4 {
+                    let elapsed = now.timeIntervalSince(baseline.at)
+                    let d = Double(down.int64Value - baseline.download) / elapsed
+                    let u = Double(up.int64Value - baseline.upload) / elapsed
+                    self.downloadSpeed = self.transferRate(d)
+                    self.uploadSpeed = self.transferRate(u)
+                    self.downloadHistory.append(max(0, d))
+                    self.uploadHistory.append(max(0, u))
+                    if self.downloadHistory.count > 36 {
+                        self.downloadHistory.removeFirst()
+                    }
+                    if self.uploadHistory.count > 36 {
+                        self.uploadHistory.removeFirst()
+                    }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
+                } else {
+                    self.downloadSpeed = "—"
+                    self.uploadSpeed = "—"
+                }
+                self.lastTraffic = (down.int64Value, up.int64Value, now)
+                self.downloadedTotal = self.transferTotal(down.int64Value)
+                self.uploadedTotal = self.transferTotal(up.int64Value)
+                if self.fullTunHTTPSConnected,
+                   let ping = result?["ping_ms"] as? NSNumber,
+                   ping.doubleValue > 0 && ping.doubleValue < 10000 {
+                    self.openVPNPing = ping.doubleValue
+                    self.openVPNPingText?.stringValue =
+                        String(format: "%.1f ms", ping.doubleValue)
+                } else {
+                    self.openVPNPing = nil
+                    self.openVPNPingText?.stringValue = "—"
+                }
+                self.downloadSpeedText?.stringValue = self.downloadSpeed
+                self.uploadSpeedText?.stringValue = self.uploadSpeed
+                self.downloadedTotalText?.stringValue = "Total: " +
+                    self.downloadedTotal
+                self.uploadedTotalText?.stringValue = "Total: " +
+                    self.uploadedTotal
+            }
+        }
+    }
+
+    private func refreshFullTunStatus() {
+        // Reconcile TUN sessions surviving an AppKit restart. This is a
+        // read-only status query, not an automatic connect or route change.
+        // Never assign an already-running session to another selected protocol.
+        guard accountSession != nil, !fullTunBusy, !localProxyBusy,
+              !fullTunStatusPollBusy,
+              // Discover an existing TUN even if the user changed the picker
+              // or reopened the app while TUIC/Hysteria2/V2Ray was running.
+              (fullTunActive || fullTunServicePresent()),
+              Date().timeIntervalSince(fullTunStatusLastPoll) >= 5 else { return }
+        fullTunStatusLastPoll = Date()
+        fullTunStatusPollBusy = true
+        let generation = localProxyGeneration
+        let token = accountSession?.accessToken
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runFullTunClient("status")
+            let observedRoute = result.0 == 0 &&
+                self.tunRouteIsRunning(result.1)
+            let realProtocol = observedRoute ?
+                self.attestedFullTunProtocol(result.1) : nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunStatusPollBusy = false
+                guard self.localProxyGeneration == generation,
+                      self.accountSession?.accessToken == token else { return }
+                let observed = observedRoute
+                let confirmedStopped = result.0 == 0 &&
+                    self.tunResponseIs(result.1, state: "stopped")
+                self.fullTunKillSwitchCandidate = observed &&
+                    self.tunKillSwitchCandidate(result.1)
+                if observed {
+                    let wasUncertain = self.fullTunStatusUncertain
+                    let protocolChanged =
+                        self.fullTunConnectedProtocol != realProtocol
+                    self.fullTunConnectedProtocol = realProtocol
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    if !self.fullTunActive {
+                        self.fullTunActive = true
+                        self.fullTunStartedAt = Date()
+                        // The kernel confirms a TUN route; identity of the
+                        // previously selected server is NOT established.
+                        self.status = "TUN route detected; verifying HTTPS."
+                        self.fullTunProbeLastAt = .distantPast
+                        self.view = self.build()
+                        self.refreshFullTunEgress()
+                    } else if wasUncertain || protocolChanged {
+                        self.status = "TUN route active; system VPN unverified."
+                        self.view = self.build()
+                    }
+                } else if confirmedStopped {
+                    self.fullTunConnectedProtocol = nil
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    if self.fullTunActive {
+                        self.fullTunActive = false
+                        self.fullTunObservedExitIP = nil
+                        self.fullTunEgressConfirmedAt = nil
+                        self.fullTunTrafficInterface = nil
+                        self.fullTunStartedAt = nil
+                        self.resetTrafficMetrics()
+                        self.status = "TUN session stopped or engine exited."
+                        self.view = self.build()
+                    }
+                } else if self.fullTunActive {
+                    // One rejected or timed-out status request is ambiguous.
+                    // Never show Offline or continue claiming a running route.
+                    self.fullTunStatusMisses += 1
+                    self.fullTunStatusUncertain = true
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
+                    self.status = "TUN status temporarily unavailable; rechecking."
+                    if self.fullTunStatusMisses >= 3 {
+                        self.fullTunActive = false
+                        self.fullTunConnectedProtocol = nil
+                        self.fullTunStatusUncertain = false
+                        self.fullTunStartedAt = nil
+                        self.status = "TUN status could not be verified."
+                    }
+                    self.view = self.build()
+                }
+            }
+        }
+    }
+
+    private func stopFullTun() {
+        guard !fullTunBusy else { return }
+        fullTunBusy = true
+        status = "Stopping local TUN engine…"
+        view = build()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runFullTunClient("stop")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunBusy = false
+                if response.0 == 0 &&
+                   self.tunResponseIs(response.1, state: "stopped") {
+                    self.fullTunActive = false
+                    self.fullTunConnectedProtocol = nil
+                    self.fullTunStatusUncertain = false
+                    self.fullTunStatusMisses = 0
+                    self.fullTunObservedExitIP = nil
+                    self.fullTunEgressConfirmedAt = nil
+                    self.fullTunTrafficInterface = nil
+                    self.fullTunStartedAt = nil
+                    self.resetTrafficMetrics()
+                    self.status = "TUN stopped."
+                } else {
+                    self.status = "TUN stop unverified; check local service."
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
+    private func runLocalManager(_ args: [String], root: String)
+        -> (Int32, String, String) {
+        let program = Process()
+        program.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        program.arguments = [
+            root + "/macos_native/standalone_connection_manager.py"
+        ] + args
+        let output = Pipe()
+        let errors = Pipe()
+        program.standardOutput = output
+        program.standardError = errors
+        do {
+            try program.run()
+            program.waitUntilExit()
+            let stdout = output.fileHandleForReading.readDataToEndOfFile()
+            let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+            return (program.terminationStatus,
+                    String(data: stdout, encoding: .utf8) ?? "",
+                    String(data: stderr, encoding: .utf8) ?? "")
+        } catch {
+            return (-1, "", "")
+        }
+    }
+
+    // Unsigned macOS cannot start the Network Extension. The primary button
+    // may start a real, verified sing-box SOCKS listener on loopback only.
+    // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
+    // Do not label a SOCKS listener as a connected system VPN.
+    private func requestWireGuardProbe() {
+        if wireGuardProbeTask != nil || wireGuardSystemRouteVerified {
+            wireGuardProbeGeneration += 1
+            wireGuardProbeBusy = true
+            wireGuardProbeStatus = "Disconnecting " + wireGuardConnectionTitle + "…"
+            view = build()
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                stop.standardOutput = FileHandle.nullDevice
+                stop.standardError = FileHandle.nullDevice
+                let reply = Pipe()
+                stop.standardOutput = reply
+                let started = (try? stop.run()) != nil
+                let result = started ? reply.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: result, encoding: .utf8) ?? "").contains("WG_SYSTEM_DISCONNECTED")
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if !stopped {
+                        self.wireGuardProbeBusy = false
+                        self.wireGuardProbeStatus = "WG_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                        return
+                    }
+                    self.wireGuardProbeTask?.terminate()
+                    self.wireGuardProbeTask = nil
+                    self.wireGuardProbeBusy = false
+                    self.wireGuardSystemRouteVerified = false
+                    self.wireGuardConnectedAt = nil
+                    self.wireGuardProbeStatus = self.wireGuardConnectionTitle + " disconnected"
+                    self.resetTrafficMetrics()
+                    self.view = self.build()
+                }
+            }
+            return
+        }
+        guard !wireGuardProbeBusy,
+              ciscoTunnelTask == nil, !ciscoSystemRouteVerified,
+              !openVPNAppSessionActive, !localProxyActive,
+              !fullTunActive, !fullTunBusy, !l2tpSystemRouteVerified,
+              l2tpTask == nil,
+              let session = accountSession,
+              let serverID = activeServer,
+              let code = activeProtocol,
+              ["wireguard", "amneziawg"].contains(code),
+              snapshot?.protocols.contains(where: {
+                  $0.code == code && $0.configured
+              }) == true else {
+            wireGuardProbeStatus = "Disconnect the current VPN and select a WireGuard server."
+            view = build()
+            return
+        }
+        let helper = "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_unsigned_tunnel.py"
+        guard FileManager.default.fileExists(atPath: helper) else {
+            wireGuardProbeStatus = "WG_UNSIGNED_HELPER_NOT_INSTALLED"
+            view = build()
+            return
+        }
+        wireGuardProbeBusy = true
+        wireGuardProbeGeneration += 1
+        let generation = wireGuardProbeGeneration
+        wireGuardConnectionProtocol = code
+        wireGuardProbeStatus = "Checking " + wireGuardConnectionTitle + " peer…"
+        status = wireGuardProbeStatus
+        view = build()
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
+            guard let self = self,
+                  self.wireGuardProbeGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            switch result {
+            case .failure(let error):
+                self.wireGuardProbeBusy = false
+                let detail = error.localizedDescription
+                self.wireGuardProbeStatus =
+                    detail.range(of: "^WG_[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    detail : "WG_PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let payload):
+                if ["wireguard", "amneziawg"].contains(code) {
+                    self.wireGuardReconnectProtocol = code
+                    self.wireGuardReconnectProfile = payload
+                    self.wireGuardReconnectAccount = session.namespace
+                    self.wireGuardReconnectServer = self.activeServer
+                    self.wireGuardReconnectOrigin = session.apiOrigin
+                }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                    task.arguments = ["-n", "/usr/bin/python3", helper, "system"]
+                    let input = Pipe()
+                    let output = Pipe()
+                    task.standardInput = input
+                    task.standardOutput = output
+                    task.standardError = FileHandle.nullDevice
+                    do {
+                        try task.run()
+                        DispatchQueue.main.async {
+                            if self.wireGuardProbeGeneration == generation {
+                                self.wireGuardProbeTask = task
+                                self.wireGuardProbeBusy = false
+                                self.wireGuardProbeStatus = "Connecting " + self.wireGuardConnectionTitle + "…"
+                                self.view = self.build()
+                            } else {
+                                task.terminate()
+                            }
+                        }
+                        input.fileHandleForWriting.write(payload)
+                        input.fileHandleForWriting.closeFile()
+                        let data = output.fileHandleForReading.readDataToEndOfFile()
+                        task.waitUntilExit()
+                        let resultLines = (String(data: Data(data.prefix(16384)),
+                                                  encoding: .utf8) ?? "")
+                            .split(separator: "\n")
+                        let codes = resultLines.compactMap { line -> String? in
+                            guard let json = try? JSONSerialization.jsonObject(
+                                with: Data(line.utf8)) as? [String: Any] else { return nil }
+                            return json["reason"] as? String
+                        }
+                        let code = codes.last ?? "WG_ENGINE_EXITED"
+                        DispatchQueue.main.async {
+                            guard self.wireGuardProbeGeneration == generation else { return }
+                            self.wireGuardProbeBusy = false
+                            self.wireGuardProbeTask = nil
+                            self.wireGuardSystemRouteVerified = false
+                            self.wireGuardConnectedAt = nil
+                            self.wireGuardProbeStatus =
+                                code == "WG_SYSTEM_DISCONNECTED" ? self.wireGuardConnectionTitle + " disconnected" :
+                                (code.range(of: "^WG_[A-Z0-9_]{3,120}$",
+                                            options: .regularExpression) != nil ?
+                                 code : "WG_ENGINE_EXITED")
+                            self.view = self.build()
+                        }
+                    } catch {
+                        input.fileHandleForWriting.closeFile()
+                        DispatchQueue.main.async {
+                            guard self.wireGuardProbeGeneration == generation else { return }
+                            self.wireGuardProbeBusy = false
+                            self.wireGuardProbeTask = nil
+                            self.wireGuardProbeStatus = "WG_PROBE_LAUNCH_FAILED"
+                            self.view = self.build()
+                        }
+                    }
+                }
+            }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard ["wireguard", "amneziawg"].contains(code),
+                  wireGuardReconnectProtocol == code,
+                  wireGuardReconnectAccount == session.namespace,
+                  wireGuardReconnectOrigin == session.apiOrigin,
+                  wireGuardReconnectServer == serverID,
+                  let cached = wireGuardReconnectProfile else {
+                wireGuardProbeBusy = false
+                wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            wireGuardProbeBusy = false
+            wireGuardProbeStatus = "WG_KS_STATE_NOT_READY"
+            view = build()
+        } else {
+            directory.prepareWireGuardProfile(session, serverID: serverID,
+                                              protocolCode: code,
+                                              resolvedServer: { [weak self] actualID in
+                guard let self = self,
+                      self.wireGuardProbeGeneration == generation,
+                      self.accountSession?.accessToken == session.accessToken else { return }
+                self.activeServer = actualID
+                self.persistCurrentSelection()
+            }, completion: complete)
+        }
+    }
+
+    // L2TP runs in a root-owned unsigned native service with an independent
+    // network recovery watchdog. The UI only trusts verified status-uptime.
+    private func requestL2TPPreflight() {
+        if l2tpTask != nil || l2tpSystemRouteVerified {
+            l2tpBusy = true
+            view = build()
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let stop = Process()
+                stop.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                stop.arguments = ["-n", "/usr/bin/python3",
+                    "/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_management_route_guard.py",
+                    "stop"]
+                stop.standardInput = FileHandle.nullDevice
+                let output = Pipe()
+                stop.standardOutput = output
+                stop.standardError = FileHandle.nullDevice
+                let started = (try? stop.run()) != nil
+                let data = started ? output.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: data, encoding: .utf8) ?? "").contains("L2TP_SYSTEM_DISCONNECTED")
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    guard stopped else {
+                        self.l2tpBusy = false
+                        self.l2tpStatus = "L2TP_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                        return
+                    }
+                    self.l2tpGeneration += 1
+                    if self.l2tpTask?.isRunning == true { self.l2tpTask?.terminate() }
+                    self.l2tpTask = nil
+                    self.l2tpBusy = false
+                    self.l2tpSystemRouteVerified = false
+                    self.l2tpConnectedAt = nil
+                    self.l2tpStatus = "L2TP_SYSTEM_DISCONNECTED"
+                    self.resetTrafficMetrics()
+                    self.view = self.build()
+                }
+            }
+            return
+        }
+        guard !l2tpBusy, let session = accountSession,
+              let serverID = activeServer,
+              !ciscoSystemRouteVerified && ciscoTunnelTask == nil &&
+              !openVPNSystemRouteVerified && !openVPNAppSessionActive &&
+              !wireGuardSystemRouteVerified && wireGuardProbeTask == nil &&
+              !localProxyActive && !fullTunActive,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "l2tp" && $0.configured
+              }) == true else {
+            l2tpStatus = "L2TP_SELECT_SERVER_OR_DISCONNECT_VPN"
+            view = build()
+            return
+        }
+        let helper = "/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_native_system.py"
+        guard FileManager.default.fileExists(atPath: helper) else {
+            l2tpStatus = "L2TP_NATIVE_HELPER_NOT_INSTALLED"
+            view = build()
+            return
+        }
+        l2tpBusy = true
+        l2tpGeneration += 1
+        let generation = l2tpGeneration
+        l2tpStatus = ""
+        view = build()
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
+            guard let self = self, self.l2tpGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            switch result {
+            case .failure(let error):
+                self.l2tpBusy = false
+                let reason = error.localizedDescription
+                self.l2tpStatus = reason.range(of: "^L2TP_[A-Z0-9_]{3,80}$",
+                                               options: .regularExpression) != nil ?
+                    reason : "L2TP_PROFILE_UNAVAILABLE"
+                self.view = self.build()
+            case .success(let profile):
+                self.l2tpReconnectProfile = profile
+                self.l2tpReconnectAccount = session.namespace
+                self.l2tpReconnectOrigin = session.apiOrigin
+                self.l2tpReconnectServer = serverID
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let task = Process()
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                    task.arguments = ["-n", "/usr/bin/python3", helper, "system"]
+                    let input = Pipe(), output = Pipe()
+                    task.standardInput = input
+                    task.standardOutput = output
+                    task.standardError = FileHandle.nullDevice
+                    do {
+                        try task.run()
+                        DispatchQueue.main.async {
+                            if self.l2tpGeneration == generation {
+                                self.l2tpTask = task
+                                self.l2tpBusy = false
+                                self.view = self.build()
+                            } else { task.terminate() }
+                        }
+                        input.fileHandleForWriting.write(profile)
+                        input.fileHandleForWriting.closeFile()
+                        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+                        task.waitUntilExit()
+                        let lines = (String(data: Data(bytes.prefix(16384)),
+                                            encoding: .utf8) ?? "")
+                            .split(separator: "\n")
+                        let reasons = lines.compactMap { line -> String? in
+                            guard let obj = try? JSONSerialization.jsonObject(
+                                with: Data(line.utf8)) as? [String: Any] else {
+                                return nil
+                            }
+                            return obj["reason"] as? String
+                        }
+                        let reason = reasons.last ?? "L2TP_NATIVE_ENGINE_EXITED"
+                        DispatchQueue.main.async {
+                            guard self.l2tpGeneration == generation else { return }
+                            self.l2tpTask = nil
+                            self.l2tpBusy = false
+                            self.l2tpSystemRouteVerified = false
+                            self.l2tpConnectedAt = nil
+                            self.l2tpStatus = reason
+                            self.resetTrafficMetrics()
+                            self.view = self.build()
+                        }
+                    } catch {
+                        input.fileHandleForWriting.closeFile()
+                        DispatchQueue.main.async {
+                            guard self.l2tpGeneration == generation else { return }
+                            self.l2tpTask = nil
+                            self.l2tpBusy = false
+                            self.l2tpStatus = "L2TP_NATIVE_LAUNCH_FAILED"
+                            self.view = self.build()
+                        }
+                    }
+                }
+            }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard l2tpReconnectAccount == session.namespace,
+                  l2tpReconnectOrigin == session.apiOrigin,
+                  l2tpReconnectServer == serverID,
+                  let cached = l2tpReconnectProfile else {
+                l2tpBusy = false
+                l2tpStatus = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            l2tpBusy = false
+            l2tpStatus = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareL2TPProfile(session, serverID: serverID, completion: complete)
+        }
+    }
+
+    @objc private func requestVPNConnection(_ sender: NSButton) {
+        // This callback must remain observable independently of the tunnel.
+        // Never log account identifiers, node IDs, tt:// links or passwords.
+        NSLog("TwinConnect AppKit: Connect button action received")
+        guard accountSession != nil else {
+            status = "Connection unavailable: Sign in to continue."
+            view = build()
+            return
+        }
+        if fullTunBusy || fullTunStatusUncertain {
+            status = "Connection unavailable: TUN request is still being checked."
+            view = build()
+            return
+        }
+        if localProxyBusy || ciscoTunnelBusy ||
+           wireGuardProbeBusy || l2tpBusy {
+            status = "Connection unavailable: A previous connection operation is still in progress."
+            view = build()
+            return
+        }
+        if let ks = nativeKillSwitchControlStatus(),
+           let state = ks["state"] as? String, state != "off" {
+            if l2tpTask != nil || l2tpSystemRouteVerified || (state == "locked" && activeProtocol == "l2tp") {
+                requestL2TPPreflight()
+            } else if ciscoTunnelTask != nil || (state == "locked" && activeProtocol == "cisco") {
+                requestCiscoTunnel(sender)
+            } else if fullTunActive {
+                stopFullTun()
+            } else if openVPNAppSessionActive || openVPNSystemRouteVerified {
+                stopPersistentOpenVPN()
+            } else if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
+               (state == "locked" && selectedWireGuardFamily) {
+                requestWireGuardProbe()
+            } else if state == "locked", activeProtocol == "openvpn",
+                      let session = accountSession, let serverID = activeServer,
+                      openVPNAppSessionInstalled() {
+                startPersistentOpenVPN(session, serverID: serverID)
+            } else if state == "locked",
+                      let protocolCode = activeProtocol,
+                      protocolCode == fullTunReconnectProtocol,
+                      let session = accountSession, let serverID = activeServer,
+                      fullTunServicePresent() {
+                startFullTun(session, serverID: serverID, protocolCode: protocolCode)
+            } else {
+                status = "Kill Switch is locked. Reconnect the same VPN or turn off Kill Switch."
+                wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"
+                view = build()
+            }
+            return
+        }
+        if activeProtocol == "l2tp" {
+            requestL2TPPreflight()
+            return
+        }
+        if wireGuardProbeTask != nil || wireGuardSystemRouteVerified {
+            requestWireGuardProbe()
+            return
+        }
+        if selectedWireGuardFamily {
+            requestWireGuardProbe()
+            return
+        }
+        if openVPNAppSessionActive {
+            stopPersistentOpenVPN()
+            return
+        }
+        if fullTunActive {
+            stopFullTun()
+            return
+        }
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+            return
+        }
+        if activeProtocol == "cisco" {
+            requestCiscoTunnel(sender)
+            return
+        }
+        if ciscoTunnelTask != nil || ciscoTunnelBusy {
+            status = "Stop the Cisco process before switching transports."
+            view = build()
+            return
+        }
+        if activeProtocol == "openvpn" {
+            guard let session = accountSession,
+                  let serverID = activeServer,
+                  snapshot?.protocols.contains(where: {
+                      $0.code == "openvpn" && $0.configured
+                  }) == true else {
+                status = "Choose an entitled OpenVPN server."
+                view = build()
+                return
+            }
+            if openVPNAppSessionInstalled() {
+                startPersistentOpenVPN(session, serverID: serverID)
+            } else if fullTunServicePresent() {
+                startOpenVPN(session, serverID: serverID)
+            } else {
+                startOpenVPNAppProbe(session, serverID: serverID)
+            }
+            return
+        }
+        let enabled: Set<String> = [
+            "hysteria2", "tuic", "anytls", "socks5",
+            "snell", "naive", "shadowtls", "v2ray", "mieru",
+            "trusttunnel", "sudoku"
+        ]
+        guard let selectedProtocol = activeProtocol,
+              enabled.contains(selectedProtocol),
+              let serverID = activeServer,
+              let session = accountSession,
+              snapshot?.protocols.contains(where: {
+                  $0.code == selectedProtocol && $0.configured
+              }) == true else {
+            status = activeProtocol == nil || activeServer == nil ?
+                "Connection unavailable: select a server and protocol in Locations." :
+                "Connection unavailable: this protocol needs a supported, entitled proxy profile."
+            localProxyStatus = status
+            if let code = activeProtocol {
+                recordProxyAttempt(code, "SELECTION_NOT_READY")
+            }
+            if activeProtocol == nil || activeServer == nil { tab = 1 }
+            view = build()
+            return
+        }
+        // An installed root-owned daemon is opt-in on a recoverable local Mac.
+        // On remote VPS or without that daemon the existing proxy path remains.
+        if fullTunServicePresent() {
+            startFullTun(session, serverID: serverID, protocolCode: selectedProtocol)
+            return
+        }
+        // Do not feed a tt:// deep-link into sing-box when no audited
+        // local TUN helper is installed, or claim a false VPN connection.
+        if selectedProtocol == "trusttunnel" || selectedProtocol == "sudoku" {
+            status = "Connection unavailable: privileged TUN helper not installed."
+            recordProxyAttempt(selectedProtocol, selectedProtocol.uppercased() + "_TUN_NOT_INSTALLED")
+            view = build()
+            return
+        }
+        localProxyBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Checking authorized " + selectedProtocol + " profile…"
+        recordProxyAttempt(selectedProtocol, "CONNECT_REQUESTED")
+        localProxyStatus = status
+        view = build()
+        directory.prepareLocalSingBox(
+            session, serverID: serverID, protocolCode: selectedProtocol,
+            v2rayInboundID: selectedProtocol == "v2ray" ? activeV2RayInbound : nil) {
+            [weak self] response in
+            guard let self = self,
+                  self.localProxyGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            switch response {
+            case .failure(let error):
+                self.localProxyBusy = false
+                let reason = error.localizedDescription
+                self.status = "Local proxy unavailable: " + (
+                    reason.range(of: "^[A-Z0-9_]{3,64}$",
+                                 options: .regularExpression) != nil ?
+                    reason : "PROFILE_REQUEST_FAILED")
+                // Expose this failure in Settings and Copy diagnostics. Most
+                // denied profiles never start an engine, so CLI diagnose
+                // cannot explain them after the fact.
+                self.localProxyStatus = self.status
+                let safeCode = reason.range(
+                    of: "^[A-Z][A-Z0-9_]{2,63}$",
+                    options: .regularExpression) != nil ?
+                    reason : "PROFILE_REQUEST_FAILED"
+                self.recordProxyAttempt(selectedProtocol, safeCode)
+                self.view = self.build()
+            case .success(let profile):
+                self.status = "Verifying " + selectedProtocol + " HTTPS exit…"
+                self.localProxyStatus = self.status
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let outcome = self.startVerifiedLocalProxy(
+                        profile, protocolCode: selectedProtocol)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        // A session change means this engine cannot be retained
+                        // for the previous account; stop it before returning.
+                        guard self.localProxyGeneration == generation,
+                              self.accountSession?.accessToken == session.accessToken
+                        else {
+                            if outcome.0 {
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = self.runLocalManager(
+                                        ["stop"], root: self.localRuntimeRoot())
+                                }
+                            }
+                            return
+                        }
+                        self.localProxyBusy = false
+                        self.localProxyActive = outcome.0
+                        self.verifiedProxyProtocol = outcome.0 ?
+                            selectedProtocol : nil
+                        self.localProxyExitIP = outcome.2
+                        self.resetTrafficMetrics()
+                        self.localProxyStartedAt = outcome.0 ? Date() : nil
+                        self.localProxyStatus = outcome.1
+                        self.status = outcome.1
+                        self.view = self.build()
+                        if outcome.0 {
+                            self.refreshTrafficMetrics()
+                            // Measure the selected public server address once.
+                            // ICMP is from this Mac, not a fabricated VPN ping.
+                            if let selected = self.snapshot?.servers.first(where: {
+                                $0.id == serverID
+                            }), selected.probeIP != nil {
+                                self.beginNodePing(selected)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// An actual remote HTTPS request must succeed before proxy mode becomes
+    /// active. The verified listener remains running until Disconnect, logout,
+    /// or the owner-process watchdog stops it; no system traffic is rerouted.
+    private func startVerifiedLocalProxy(_ config: Data,
+                                         protocolCode: String = "hysteria2")
+        -> (Bool, String, String?) {
+        let root = localRuntimeRoot()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-live-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            recordProxyAttempt(protocolCode, "PRIVATE_PROFILE_DIRECTORY_FAILED")
+            return (false, "Local proxy cannot create its private profile directory.", nil)
+        }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let profile = folder.appendingPathComponent("client.json")
+        guard FileManager.default.createFile(atPath: profile.path, contents: config,
+                                            attributes: [.posixPermissions: 0o600]) else {
+            recordProxyAttempt(protocolCode, "PRIVATE_PROFILE_WRITE_FAILED")
+            return (false, "Local proxy could not prepare its profile.", nil)
+        }
+        let started = runLocalManager([
+            "start", protocolCode, profile.path, "--owner-pid",
+            String(ProcessInfo.processInfo.processIdentifier)
+        ], root: root)
+        guard started.0 == 0 else {
+            let reason = safeManagerReason(started.2)
+            // Startup can terminate before writing a state file; 'status'
+            // will then be 'stopped' and a later diagnose may be stale.
+            // Capture the safe, categorized engine fault immediately.
+            let diagnostic = runLocalManager(["diagnose"], root: root)
+            let category = safeManagerReason(diagnostic.1)
+            let specific = category == "ENGINE_FAILURE_NOT_CLASSIFIED" ||
+                           category == "ENGINE_LOG_UNAVAILABLE" ||
+                           category == "UNKNOWN_PROXY_FAILURE" ?
+                "" : " · " + category
+            recordProxyAttempt(protocolCode,
+                               specific.isEmpty ? reason : category)
+            return (false, "Local proxy startup failed: " +
+                reason + specific, nil)
+        }
+        let tested = runLocalManager(["probe"], root: root)
+        // A successful curl alone is insufficient: the engine may exit
+        // between the HTTPS probe and updating the Connect button.
+        // Recheck the exact managed protocol before showing Disconnect.
+        let stillRunning = runLocalManager(["status"], root: root)
+        let activeState: [String: Any]? = {
+            guard stillRunning.0 == 0,
+                  let data = stillRunning.1.data(using: .utf8) else {
+                return nil
+            }
+            return (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any]
+        }()
+        if tested.0 == 0,
+           let bytes = tested.1.data(using: .utf8),
+           let result = (try? JSONSerialization.jsonObject(with: bytes))
+               as? [String: Any],
+           result["state"] as? String == "proxy_egress_reachable",
+           result["protocol"] as? String == protocolCode,
+           activeState?["state"] as? String == "process_running_unverified",
+           activeState?["protocol"] as? String == protocolCode,
+           let exitIP = result["egress_ip"] as? String,
+           TwinMacNativePing.validatedPublicIP(exitIP) != nil {
+            recordProxyAttempt(protocolCode, "PROXY_EGRESS_VERIFIED")
+            return (true, protocolCode.uppercased() + " proxy verified: " +
+                exitIP + " — SOCKS 127.0.0.1:17089", exitIP)
+        }
+        let diagnosis = runLocalManager(["diagnose"], root: root)
+        let why = safeManagerReason(tested.2)
+        let remote = safeManagerReason(diagnosis.1)
+        let stopped = runLocalManager(["stop"], root: root)
+        let cleanup = stopped.0 == 0 ? "" : " · STOP_PROXY_MANUALLY"
+        recordProxyAttempt(protocolCode,
+            remote != "ENGINE_FAILURE_NOT_CLASSIFIED" &&
+            remote != "ENGINE_LOG_UNAVAILABLE" &&
+            remote != "UNKNOWN_PROXY_FAILURE" ? remote :
+            (why == "UNKNOWN_PROXY_FAILURE" ? "PROXY_EGRESS_FAILED" : why))
+        return (false, "Local proxy failed: " + why + " · " + remote +
+            cleanup, nil)
+    }
+
+    /// Separate read-only diagnostic available from Settings only. Running a
+    /// privileged tunnel and routing system traffic requires a protected engine.
+    /// Never report Connected after a config check.
+    @objc private func unavailableConnect(_ sender: NSButton) {
+        guard !cliTunCheckBusy, let session = accountSession else { return }
+        guard activeProtocol == "hysteria2",
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "hysteria2" && $0.configured
+              }) == true else {
+            status = "TUN preflight: select an entitled Hysteria2 server in Locations."
+            view = build()
+            return
+        }
+        cliTunCheckBusy = true
+        status = "TUN preflight: retrieving authorized profile…"
+        view = build()
+        directory.prepareUnroutedHysteria2TUN(session, serverID: serverID) {
+            [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard self.accountSession?.accessToken == session.accessToken else {
+                    self.cliTunCheckBusy = false
+                    return
+                }
+                switch result {
+                case .failure(let error):
+                    self.cliTunCheckBusy = false
+                    // Only expose stable diagnostic identifiers, never API
+                    // response bodies or profile credentials in the UI.
+                    let rawCode = error.localizedDescription
+                    let safeCode = rawCode.range(
+                        of: "^[A-Z0-9_]{3,64}$", options: .regularExpression
+                    ) != nil ? rawCode : "UNEXPECTED_PROFILE_ERROR"
+                    let hint: String
+                    switch safeCode {
+                    case "PROFILES_NOT_READY":
+                        hint = "The panel has not generated this Hysteria2 profile."
+                    case "PROTOCOL_NOT_SELECTED", "PROTOCOL_NOT_ALLOWED":
+                        hint = "Hysteria2 is not entitled for this account."
+                    case "SERVER_NOT_ALLOWED":
+                        hint = "This server is not in the current account inventory."
+                    case "HYSTERIA2_PROFILE_INVALID":
+                        hint = "The selected server profile cannot be converted to sing-box."
+                    case "NETWORK_UNAVAILABLE":
+                        hint = "The panel could not be reached."
+                    default:
+                        hint = "Check the account, server, and panel connection."
+                    }
+                    self.status = "TUN preflight blocked (" + safeCode + "): " + hint
+                    self.view = self.build()
+                case .success(let profile):
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let checked = self.checkUnroutedTUNProfile(profile)
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self = self else { return }
+                            self.cliTunCheckBusy = false
+                            guard self.accountSession?.accessToken == session.accessToken else { return }
+                            self.status = checked ?
+                                "TUN configuration valid. VPN offline; privileged engine not started." :
+                                "TUN validation failed. VPN remains offline."
+                            self.view = self.build()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Config never reaches a shell. Private temporary data is removed on all
+    /// exits; no system route, DNS, or proxy is modified.
+    private func checkUnroutedTUNProfile(_ profile: Data) -> Bool {
+        let root = localRuntimeRoot()
+        #if arch(arm64)
+        let architecture = "arm64"
+        #else
+        let architecture = "amd64"
+        #endif
+        let binary = root + "/macos_native/build/singbox/" +
+            architecture + "/sing-box"
+        guard FileManager.default.isExecutableFile(atPath: binary) else { return false }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-tun-preflight-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch { return false }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let configURL = folder.appendingPathComponent("config.json")
+        guard FileManager.default.createFile(atPath: configURL.path,
+            contents: profile, attributes: [.posixPermissions: 0o600]) else { return false }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: binary)
+        task.arguments = ["check", "-c", configURL.path]
+        task.standardOutput = Pipe()
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            // Validation is bounded; timed out processes are terminated.
+            let finished = DispatchSemaphore(value: 0)
+            task.terminationHandler = { _ in finished.signal() }
+            if !task.isRunning {
+                // Avoid racing terminationHandler installation for very fast checks.
+                return task.terminationStatus == 0
+            }
+            if finished.wait(timeout: .now() + 15) == .timedOut {
+                if task.isRunning { task.terminate() }
+                task.waitUntilExit()
+                return false
+            }
+            return task.terminationStatus == 0
+        } catch { return false }
+    }
+
+    @objc private func openSupport(_ sender: NSButton) {
+        if let url = accountSession?.supportURL { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func openRenewal(_ sender: NSButton) {
+        if let url = accountSession?.renewalURL { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func openWebsite(_ sender: NSButton) {
+        if let url = accountSession?.websiteURL { NSWorkspace.shared.open(url) }
+    }
+
+    private func nativeKillSwitchReport() -> String {
+        if let control = nativeKillSwitchControlStatus(),
+           let state = control["state"] as? String {
+            return "Kill Switch: " + state + "; current boot only"
+        }
+        // Read only a fresh root-owned public status snapshot. This
+        // is not a preference, a connection badge or leak attestation.
+        let path = "/private/var/run/twinconnect-killswitch-status/status.json"
+        let manager = FileManager.default
+        let directory = (path as NSString).deletingLastPathComponent
+        guard let dir = try? manager.attributesOfItem(atPath: directory),
+              dir[.type] as? FileAttributeType == .typeDirectory,
+              (dir[.ownerAccountID] as? NSNumber)?.intValue == 0,
+              let dirMode = (dir[.posixPermissions] as? NSNumber)?.intValue,
+              dirMode & 0o022 == 0,
+              let attributes = try? manager.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.intValue == 0,
+              let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue,
+              mode & 0o022 == 0,
+              let size = (attributes[.size] as? NSNumber)?.intValue,
+              (1...4096).contains(size),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              data.count <= 4096,
+              let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              row["version"] as? Int == 1,
+              let timestamp = row["timestamp"] as? TimeInterval,
+              abs(Date().timeIntervalSince1970 - timestamp) < 45,
+              row["activation_available"] as? Bool == false,
+              row["leak_verified"] as? Bool == false else {
+            return "Status unavailable; protection not verified"
+        }
+        if row["state"] as? String == "off" {
+            if row["reason"] as? String == "KS_REMOTE_RECOVERY_REQUIRED" {
+                return "Off — independent recovery required on remote Mac"
+            }
+            return "Off — live acceptance test required"
+        }
+        return "Unknown — protection not verified"
+    }
+
+    @objc private func copyDiagnostics(_ sender: NSButton) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let protectionReport = nativeKillSwitchReport()
+        let report = [
+            "TwinConnect macOS connection report",
+            "App version: " + version,
+            "Connection: " + verifiedNetworkConnectionLabel,
+            protectionReport.hasPrefix("Kill Switch: ") ?
+                protectionReport : "Kill Switch: " + protectionReport,
+            "Account: " + (accountSession == nil ? "signed out" : "signed in"),
+            "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
+            "Protocol selected: " + (activeProtocol ?? "none"),
+            "TUN protocol: " + (fullTunConnectedProtocol ?? "none"),
+            "Server selected: " + (activeServer == nil ? "no" : "yes")
+        ].joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(report, forType: .string)
+        sender.title = "Copied"
+        sender.attributedTitle = NSAttributedString(string: "Copied",
+            attributes: [.foregroundColor: foreground,
+                         .font: NSFont.systemFont(ofSize: 13, weight: .semibold)])
+    }
+}
