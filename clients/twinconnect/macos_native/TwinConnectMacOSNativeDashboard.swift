@@ -2973,7 +2973,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let toggle = NSSwitch()
             toggle.target = self
             toggle.action = #selector(changeNativeKillSwitch(_:))
-            toggle.setAccessibilityLabel("WireGuard Kill Switch test")
+            toggle.setAccessibilityLabel("WireGuard Kill Switch")
             nativeKillSwitchToggle = toggle
             let indicator = text("Checking", size: 12, weight: .semibold, color: muted)
             nativeKillSwitchStatusLabel = indicator
@@ -2982,12 +2982,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             controls.addArrangedSubview(toggle)
             controls.addArrangedSubview(indicator)
             add(preferenceRow("Kill Switch • WireGuard",
-                              subtitle: "2-minute protected test. Keep provider console open.",
+                              subtitle: "Block internet when WireGuard disconnects.",
                               control: controls))
             let reset = button("Reset Internet", action: #selector(resetNativeKillSwitch(_:)))
             nativeKillSwitchResetButton = reset
             add(preferenceRow("Internet recovery",
-                              subtitle: "Turn off the TwinConnect test firewall.",
+                              subtitle: "Turn off Kill Switch and restore internet.",
                               control: reset))
             updateNativeKillSwitchControls()
         }
@@ -3046,15 +3046,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               row["version"] as? Int == 1,
               row["persistent"] as? Bool == false,
-              row["session_limit"] as? Int == 120,
+              row["mode"] as? String == "until_reset",
+              row["session_limit"] as? Int == 0,
+              row["expires_at"] as? Int == 0,
               let state = row["state"] as? String,
               ["off", "arming", "active", "locked", "fault"].contains(state),
               let timestamp = row["timestamp"] as? TimeInterval else { return nil }
         if state == "active" || state == "locked" || state == "arming" {
             let now = Date().timeIntervalSince1970
-            let expiry = row["expires_at"] as? TimeInterval ?? 0
-            if abs(now - timestamp) > 12 ||
-                (state != "arming" && (expiry <= now || expiry > now + 120)) {
+            if abs(now - timestamp) > 12 {
                 return ["state": "fault"]
             }
         }
@@ -3076,10 +3076,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if nativeKillSwitchActionBusy {
             caption = "Authorizing…"
         } else if on {
-            let expiry = row?["expires_at"] as? TimeInterval ?? 0
-            let remaining = max(0, Int(expiry - Date().timeIntervalSince1970))
-            caption = (state == "locked" ? "Locked" : "Active test") +
-                " • " + String(remaining) + "s"
+            caption = state == "locked" ?
+                (row?["reason"] as? String == "KS_RECONNECTING" ? "Reconnecting…" : "Internet blocked") :
+                "Active"
         } else if state == "off" {
             caption = wireguardReady ? "Off" : "Connect WireGuard"
         } else if state == "arming" {
@@ -3100,9 +3099,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 return
             }
             let alert = NSAlert()
-            alert.messageText = "Enable WireGuard Kill Switch test?"
-            alert.informativeText = "Keep your provider console open. Direct internet and remote management may stop. This test automatically releases its firewall after 2 minutes. It is not permanent protection."
-            alert.addButton(withTitle: "Enable test")
+            alert.messageText = "Enable WireGuard Kill Switch?"
+            alert.informativeText = "Keep your provider console open. Internet and remote management can be blocked until you reconnect WireGuard or manually turn off Kill Switch. Protection stays on for this macOS boot; restart protection is not supported."
+            alert.addButton(withTitle: "Enable")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else {
                 updateNativeKillSwitchControls()
@@ -3144,7 +3143,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.updateNativeKillSwitchControls()
                 if !success {
                     let alert = NSAlert()
-                    alert.messageText = enable ? "Kill Switch test not enabled" : "Internet reset not confirmed"
+                    alert.messageText = enable ? "Kill Switch not enabled" : "Internet reset not confirmed"
                     alert.informativeText = "Authorization was cancelled or the local safety check failed. Use the provider console if recovery is needed."
                     alert.runModal()
                 }
@@ -6486,7 +6485,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func nativeKillSwitchReport() -> String {
         if let control = nativeKillSwitchControlStatus(),
            let state = control["state"] as? String {
-            return "WireGuard 2-minute test: " + state + "; permanent protection not verified"
+            return "WireGuard Kill Switch: " + state + "; current boot only; other engines not supported"
         }
         // Read only a fresh root-owned public status snapshot. This
         // is not a preference, a connection badge or leak attestation.

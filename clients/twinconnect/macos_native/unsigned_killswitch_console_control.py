@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Bounded WireGuard Kill Switch session for a provider-console test Mac.
+"""WireGuard Kill Switch for the current macOS boot, until manual reset.
 
-Explicit local administrator authorization is required for each enable.
-Independent launchd recovery expires the session; this is NOT persistent
-production protection. No new sudoers permissions or arbitrary commands.
+Local administrator approval and provider-console recovery are required.
+The watchdog stays alive independently of the app and closes on restart.
+No automatic timeout releases an owned firewall. This is not boot-time
+protection, and does not claim support for other engines.
 """
 from __future__ import annotations
 import fcntl
@@ -41,7 +42,10 @@ ANCHOR="com.apple/twinconnect-killswitch"
 RULES="pass quick on lo0 all no state\nblock drop quick all\n"
 MAIN=("scrub-anchor \"com.apple/*\" all fragment reassemble",'anchor "com.apple/*" all')
 APPLE=('anchor "200.AirDrop/*" all','anchor "250.ApplicationFirewall/*" all')
-RECOVERY_SECONDS=120
+RECOVERY_SECONDS=0
+RECONNECT_SECONDS=60
+ARMING_TIMEOUT=30
+SESSION_MODE='until_reset'
 
 
 def run(*args, input=None, timeout=4):
@@ -158,7 +162,7 @@ def require_console_approval():
 def publish(state, reason, deadline=0):
     value={"version":1,"state":state,"reason":reason,"timestamp":int(time.time()),
            "expires_at":int(deadline),"session_limit":RECOVERY_SECONDS,
-           "persistent":False}
+           "persistent":False,"mode":SESSION_MODE}
     target=ROOT/"status.json"
     temp=ROOT/("status.next-"+secrets.token_hex(8))
     fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
@@ -251,15 +255,15 @@ def bootstrap_rules(identity, tunnel=None):
 
 def session_deadline(lease):
     ready=read_json("ready.json")
-    now=time.time()
     if (not ready or ready.get("nonce")!=lease.get("nonce") or
-            type(ready.get("deadline")) not in (int,float) or
-            not now<ready["deadline"]<=now+RECOVERY_SECONDS):
-        raise RuntimeError("KS_SESSION_EXPIRED")
+            ready.get("mode")!=SESSION_MODE or ready.get("deadline")!=0 or
+            lease.get("mode")!=SESSION_MODE):
+        raise RuntimeError("KS_SESSION_NOT_AUTHORIZED")
     job=checked("/bin/launchctl","print","system/"+LABEL)
     if "state = running" not in job or lease["nonce"] not in job:
         raise RuntimeError("KS_RECOVERY_NOT_RUNNING")
-    return ready["deadline"]
+    # No automatic unlock. Only a reconnect attempt has a time limit.
+    return 0
 
 
 def replace_owned_policy(lease,rules,**changes):
@@ -315,11 +319,9 @@ def begin_reconnect(raw,protocol):
                 hashlib.sha256(raw.encode("utf-8")).hexdigest()!=identity.get("digest")):
             raise RuntimeError("WG_KS_ORIGINAL_PROFILE_REQUIRED")
         deadline=session_deadline(lease)
-        if deadline-time.time()<65:
-            raise RuntimeError("WG_KS_TEST_TIME_TOO_SHORT")
         if anchor_rules()!=lines(RULES):
             raise RuntimeError("WG_KS_LOCK_NOT_VERIFIED")
-        until=min(deadline-3,time.time()+60)
+        until=time.time()+RECONNECT_SECONDS
         replace_owned_policy(lease,bootstrap_rules(identity),locked=True,
                              reconnect_stage="handshake",reconnect_until=until)
         publish("locked","KS_RECONNECTING",deadline)
@@ -419,9 +421,13 @@ def monitor_lease(lease):
     pid,iface=lease["pid"],lease["interface"]
     valid=False
     try:
+        identity=lease.get("reconnect_identity")
         valid=(process_command(pid)==WG_BIN+" -f "+iface and
                route_interface("1.1.1.1")==iface and
-               route_interface("129.0.0.1")==iface)
+               route_interface("129.0.0.1")==iface and
+               (identity is None or
+                (wg_uapi("wireguard",iface)==Transport(identity["ip"],identity["port"],"udp") and
+                 route_interface(identity["ip"])==identity["uplink"])))
     except Exception:
         pass
     if valid:
@@ -430,52 +436,64 @@ def monitor_lease(lease):
     return "locked"
 
 
+def watchdog_tick(nonce,restarted=False):
+    """One independent service tick; never release an owned firewall."""
+    with lock():
+        lease=read_json("lease.json")
+        if lease is None or lease.get("nonce")!=nonce:
+            return False
+        if lease.get("mode")!=SESSION_MODE:
+            raise RuntimeError("KS_SESSION_MODE_INVALID")
+        if lease.get("phase")=="owned":
+            if restarted:
+                # Never trust an old interface or interrupted handshake after
+                # watchdog restart. Reconnect needs a fresh peer handshake.
+                close_lease(lease)
+                state="locked"
+            else:
+                state=monitor_lease(lease)
+            reason=("KS_WG_ACTIVE" if state=="active" else
+                    "KS_RECONNECTING" if lease.get("reconnect_stage") else
+                    "KS_TUNNEL_LOST_LOCKED")
+            publish(state,reason)
+        elif lease.get("phase")=="prepared":
+            # No kernel change happened yet. This is the only timed cleanup
+            # of a preparation abandoned by its local authorization process.
+            started=lease.get("created_at",0)
+            if time.time()-started>ARMING_TIMEOUT and not anchor_rules() and not pf_enabled():
+                if not restore_locked():
+                    raise RuntimeError("KS_RECOVERY_REQUIRED")
+                publish("off","KS_ARMING_ABANDONED")
+                return False
+        else:
+            # Unknown acquisition progress, token gap or partial reset:
+            # never silently clear rules or disable a foreign PF reference.
+            publish("fault","KS_RECOVERY_REQUIRED")
+        return True
+
+
 def watchdog(nonce):
     lease=read_json("lease.json")
     if lease is None or lease.get("nonce")!=nonce:
         return
+    if lease.get("mode")!=SESSION_MODE:
+        raise RuntimeError("KS_SESSION_MODE_INVALID")
     prior=read_json("ready.json")
-    # launchd retries a crashed watchdog. Never extend the original lease;
-    # recover immediately if a running activation lost its watchdog.
-    if prior and prior.get("nonce")==nonce:
-        deadline=prior["deadline"]
-        end=time.monotonic()
-    elif lease.get("phase")=="prepared":
-        end=time.monotonic()+RECOVERY_SECONDS
-        deadline=time.time()+RECOVERY_SECONDS
-        write_json("ready.json",{"nonce":nonce,"deadline":int(deadline)})
-    else:
-        deadline=time.time()
-        end=time.monotonic()
-    while time.monotonic()<end:
+    restarted=bool(prior and prior.get("nonce")==nonce)
+    if not restarted:
+        if lease.get("phase")!="prepared":
+            raise RuntimeError("KS_WATCHDOG_START_UNVERIFIED")
+        write_json("ready.json",{"nonce":nonce,"deadline":0,"mode":SESSION_MODE})
+    while True:
         try:
-            with lock():
-                lease=read_json("lease.json")
-                if lease is None or lease.get("nonce")!=nonce:
-                    return
-                if lease.get("phase")=="owned":
-                    state=monitor_lease(lease)
-                    publish(state,"KS_WG_ACTIVE" if state=="active" else "KS_TUNNEL_LOST_LOCKED",deadline)
+            if not watchdog_tick(nonce,restarted):
+                return
+            restarted=False
         except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
-            publish("fault","KS_POLICY_UNVERIFIED",deadline)
-            # No early fail-open. The bounded recovery deadline still
-            # applies; never claim protection while readback is unknown.
+            publish("fault","KS_POLICY_UNVERIFIED")
+            # Continue monitoring and keep owned rules; manual recovery is
+            # available locally. Never restore the direct network on timeout.
         time.sleep(1)
-    for _ in range(4):
-        try:
-            with lock():
-                current=read_json("lease.json")
-                if current is None or current.get("nonce")!=nonce:
-                    return
-                good=restore_locked()
-                publish("off" if good else "fault",
-                        "KS_SESSION_EXPIRED" if good else "KS_RECOVERY_REQUIRED")
-                write_json("result.json",{"nonce":nonce,"restored":good,"source":"launchd"})
-            return
-        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
-            time.sleep(0.5)
-    publish("fault","KS_RECOVERY_REQUIRED")
-    write_json("result.json",{"nonce":nonce,"restored":False,"source":"launchd"})
 
 
 def start_watchdog(nonce):
@@ -489,7 +507,7 @@ def start_watchdog(nonce):
     checked("/bin/launchctl","bootstrap","system",str(PLIST))
     for _ in range(40):
         ready=read_json("ready.json")
-        if ready and ready.get("nonce")==nonce:
+        if ready and ready.get("nonce")==nonce and ready.get("mode")==SESSION_MODE and ready.get("deadline")==0:
             status=checked("/bin/launchctl","print","system/"+LABEL)
             if not re.search(r"(?m)^\s*state = running\s*$",status):
                 raise RuntimeError("WATCHDOG_NOT_RUNNING")
@@ -520,10 +538,14 @@ def enable():
         if not canonical or canonical[-1]!="block drop quick all":
             raise RuntimeError("WG_RULES_INVALID")
         nonce=secrets.token_hex(16)
+        identity=reconnect_identity(evidence)
+        if identity is None:
+            raise RuntimeError("WG_RECONNECT_PROFILE_REQUIRED")
         lease={"phase":"prepared","nonce":nonce,"token":None,
+               "mode":SESSION_MODE,"created_at":time.time(),
                "canonical":list(canonical),"pid":evidence.pid,
                "interface":evidence.interface,"locked":False,
-               "reconnect_identity":reconnect_identity(evidence)}
+               "reconnect_identity":identity}
         write_json("lease.json",lease)
         publish("arming","KS_ARMING")
         try:
@@ -546,12 +568,21 @@ def enable():
             if r.returncode or not m or not pf_enabled():
                 raise RuntimeError("PF_ENABLE_UNVERIFIED")
             ready=read_json("ready.json")
-            publish("active","KS_WG_ACTIVE",ready["deadline"])
-            print("KS_SESSION_ENABLED",flush=True)
+            if session_deadline(lease)!=0:
+                raise RuntimeError("KS_SESSION_NOT_AUTHORIZED")
+            publish("active","KS_WG_ACTIVE")
+            print("KS_ENABLED_UNTIL_RESET",flush=True)
         except BaseException:
             try:
-                good=restore_locked()
-                publish("off" if good else "fault","KS_ENABLE_FAILED")
+                current=read_json("lease.json")
+                if current and current.get("phase")=="owned":
+                    close_lease(current)
+                    publish("locked","KS_ENABLE_INTERRUPTED_LOCKED")
+                elif current and current.get("phase")=="prepared" and not pf_enabled() and not anchor_rules():
+                    good=restore_locked()
+                    publish("off" if good else "fault","KS_ENABLE_FAILED")
+                else:
+                    publish("fault","KS_RECOVERY_REQUIRED")
             except Exception:
                 publish("fault","KS_RECOVERY_REQUIRED")
             raise

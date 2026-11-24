@@ -692,10 +692,10 @@ def activate_full(interface: str, pid: int) -> str:
     return "WG_SYSTEM_IPV4_CONNECTED"
 
 
-# The strictly bounded console test owns its own root launchd recovery.
-# While that test deliberately blocks the management connector, it can
-# supply the recovery proof instead of an established Termalin socket.
-# Never add a firewall exception or accept a persistent/expired session.
+# The locally authorized, current-boot Kill Switch owns independent
+# root launchd monitoring and manual provider-console recovery. It can
+# replace the remote connector check only while the live rules and worker
+# match. This adds no firewall exception.
 KS_CONTROL_STATE = Path("/private/var/run/twinconnect-killswitch-control")
 KS_CONTROL_ROOT = Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
 KS_RECOVERY_LABEL = "system/com.twinconnect.killswitch-session-recovery"
@@ -751,11 +751,12 @@ def bounded_killswitch_recovery(current: dict) -> bool:
                 not isinstance(lease.get("token"), str) or
                 not re.fullmatch(r"[0-9]{1,20}", lease["token"]) or
                 ready.get("nonce") != nonce or
-                type(deadline) not in (int, float) or
-                not now < deadline <= now + 120 or
+                lease.get("mode") != "until_reset" or
+                ready.get("mode") != "until_reset" or deadline != 0 or
+                status.get("mode") != "until_reset" or
                 status.get("version") != 1 or status.get("persistent") is not False or
-                status.get("session_limit") != 120 or status.get("state") != "active" or
-                status.get("expires_at") != deadline or
+                status.get("session_limit") != 0 or status.get("state") != "active" or
+                status.get("expires_at") != 0 or
                 type(stamp) not in (int, float) or abs(now - stamp) > 8 or
                 not isinstance(rules, list) or not 3 <= len(rules) <= 20 or
                 not all(isinstance(line, str) for line in rules) or
@@ -776,9 +777,8 @@ def bounded_killswitch_recovery(current: dict) -> bool:
                 str(KS_CONTROL_ROOT / "unsigned_killswitch_console_control.py") not in job or
                 "--watchdog" not in job or nonce not in job):
             return False
-        # A concurrent Reset/expiry must not grant a new recovery exception.
-        return (time.time() < deadline and
-                read_trusted_ks_json(KS_CONTROL_STATE / "lease.json", True) == lease)
+        # A concurrent manual Reset must not grant a recovery exception.
+        return read_trusted_ks_json(KS_CONTROL_STATE / "lease.json", True) == lease
     except (OSError, ValueError, TypeError, subprocess.SubprocessError):
         return False
 

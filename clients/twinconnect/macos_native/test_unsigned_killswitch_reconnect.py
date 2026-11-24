@@ -30,24 +30,24 @@ class ReconnectTests(unittest.TestCase):
                 c.begin_reconnect("different","wireguard")
             replace.assert_not_called()
     def test_begin_has_deadline_and_no_tunnel_rule(self):
-        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=5110),patch.object(c.time,"time",return_value=5000),patch.object(c,"anchor_rules",return_value=c.lines(c.RULES)),patch.object(c,"replace_owned_policy") as replace,patch.object(c,"publish"):
+        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=0),patch.object(c.time,"time",return_value=5000),patch.object(c,"anchor_rules",return_value=c.lines(c.RULES)),patch.object(c,"replace_owned_policy") as replace,patch.object(c,"publish"):
             self.assertEqual(c.begin_reconnect(self.raw,"wireguard"),self.identity)
             self.assertNotIn("utun",replace.call_args.args[1])
             self.assertEqual(replace.call_args.kwargs["reconnect_stage"],"handshake")
-    def test_begin_refuses_near_expiry(self):
-        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=5050),patch.object(c.time,"time",return_value=5000),patch.object(c,"replace_owned_policy") as replace:
-            with self.assertRaisesRegex(RuntimeError,"WG_KS_TEST_TIME_TOO_SHORT"):
-                c.begin_reconnect(self.raw,"wireguard")
-            replace.assert_not_called()
+    def test_reconnect_timeout_does_not_unlock(self):
+        self.lease.update(reconnect_stage="handshake",reconnect_until=4999)
+        with patch.object(c,"pf_enabled",return_value=True),patch.object(c,"anchor_rules",return_value=tuple(self.lease["canonical"])),patch.object(c.time,"time",return_value=5000),patch.object(c,"close_lease") as close:
+            self.assertEqual(c.monitor_lease(self.lease),"locked")
+            close.assert_called_once_with(self.lease)
     def test_attach_requires_actual_worker_and_peer(self):
         self.lease.update(reconnect_stage="handshake",reconnect_until=5060)
-        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=5110),patch.object(c.time,"time",return_value=5000),patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun16"),patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51821,"udp")),patch.object(c,"route_interface",return_value="en0"),patch.object(c,"replace_owned_policy") as replace:
+        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=0),patch.object(c.time,"time",return_value=5000),patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun16"),patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51821,"udp")),patch.object(c,"route_interface",return_value="en0"),patch.object(c,"replace_owned_policy") as replace:
             with self.assertRaisesRegex(RuntimeError,"KS_RECONNECT_PEER_UNVERIFIED"):
                 c.attach_reconnect(124,"utun16")
             replace.assert_not_called()
     def test_attach_uses_attested_tunnel_not_old_interface(self):
         self.lease.update(reconnect_stage="handshake",reconnect_until=5060)
-        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=5110),patch.object(c.time,"time",return_value=5000),patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun16"),patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51820,"udp")),patch.object(c,"route_interface",return_value="en0"),patch.object(c,"replace_owned_policy") as replace:
+        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=0),patch.object(c.time,"time",return_value=5000),patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun16"),patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51820,"udp")),patch.object(c,"route_interface",return_value="en0"),patch.object(c,"replace_owned_policy") as replace:
             c.attach_reconnect(124,"utun16")
             self.assertIn("pass quick on utun16 all no state",replace.call_args.args[1])
             self.assertNotIn("utun15",replace.call_args.args[1])

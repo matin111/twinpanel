@@ -46,7 +46,8 @@ class ControlTests(unittest.TestCase):
             c.publish("locked","KS_TUNNEL_LOST_LOCKED",100)
             text=(pathlib.Path(d)/"status.json").read_text()
             self.assertIn('"persistent":false',text)
-            self.assertIn('"session_limit":120',text)
+            self.assertIn('"session_limit":0',text)
+            self.assertIn('"mode":"until_reset"',text)
             self.assertNotIn("token",text)
             self.assertNotIn("endpoint",text)
     def test_settings_control_uses_admin_authorization(self):
