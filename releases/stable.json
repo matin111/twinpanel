@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.12",
+  "version": "1.1.13",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-22T04:27:54Z",
+  "released_at": "2026-11-24T14:22:46Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "00c6a652a87ad77199247592cc1038c9fa3a27c7",
+  "source_sha": "0bd0a894b4070b5ddb2195a5bf003ebd1c813feb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.12/twinpanel-1.1.12-linux-x86_64.tar.gz",
-    "sha256": "d8f13d629af258c5d86189d87d1c8bea80064d02568f63c8a807d0054f6a66c5",
-    "size_bytes": 31419555
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.13/twinpanel-1.1.13-linux-x86_64.tar.gz",
+    "sha256": "3d28e03e1f3a2c323d26faa3e3238a9476227611a23b0484f064d53bd3334fcd",
+    "size_bytes": 31418088
   },
   "notes": {
-    "fa": "رفع نهایی مشکل تاریخ‌سازی هنگام تعیین اعتبار اکانت‌های فعال‌نشده: ویرایش مدت زمان بدون ثبت اولین اتصال واقعی، تاریخ شروع و انقضا تولید نمی‌کند. اصلاح موردی اشتراک mstr500571 روی سرور انجام شده است.",
-    "en": "Harden first-use subscription admin editing: setting a finite duration without an actual activation start no longer fabricates an expiry, including legacy expiry-only rows."
+    "fa": "اضافه‌شدن لینک دانلود کانکشن هوشمند TwinConnect نسخه macOS (Intel) به منوی ربات ادمین و نماینده و بخش آموزش و دانلود؛ همراه با راهنمای نصب و اجرای اولیه.",
+    "en": "Add the TwinConnect macOS Intel download link to the admin and reseller Telegram bot menus and the shared macOS learning/download catalog, with installation guidance."
   }
 }
