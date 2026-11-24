@@ -288,6 +288,25 @@ def verified_state() -> dict | None:
     return state
 
 
+def probe_route_entries(destination: str, uplink: str) -> set[str] | None:
+    """Ignore only scoped kernel clones on the original physical interface.
+    Never treat a static/admin host route as disposable.
+    """
+    result=run(NETSTAT,"-rn","-f","inet")
+    if result.returncode:
+        return None
+    entries=set()
+    for line in result.stdout.splitlines():
+        fields=line.split()
+        if len(fields)<4 or fields[0].removesuffix("/32")!=destination:
+            continue
+        flags,iface=fields[2:4]
+        if iface==uplink and "W" in flags and "I" in flags and "S" not in flags:
+            continue
+        entries.add(iface)
+    return entries
+
+
 def probe_host(interface: str, destination: str) -> str:
     if destination not in PROBES or not re.fullmatch(r"ppp[0-9]{1,4}", interface):
         return "L2TP_PROBE_INVALID"
@@ -298,18 +317,29 @@ def probe_host(interface: str, destination: str) -> str:
         return "L2TP_PPP_NOT_ESTABLISHED"
     if ppp_interface() != interface:
         return "L2TP_PPP_INTERFACE_UNVERIFIED"
-    if destination in (exact_hosts() or set()):
+    entries=probe_route_entries(destination,state["interface"])
+    if entries is None:
+        return "L2TP_PROBE_ROUTES_UNAVAILABLE"
+    current=route(destination).get("interface")
+    if entries and (entries!={interface} or current!=interface):
         return "L2TP_PROBE_ROUTE_PREEXISTS"
-    if route(destination).get("interface") != state["interface"]:
+    # Native PPP can supply a route of its own. Verify through it without
+    # acquiring ownership, and leave it untouched at rollback.
+    owned=current!=interface
+    if owned and current!=state["interface"]:
         return "L2TP_PROBE_NOT_ON_ORIGINAL_ROUTE"
+    state["probe_owned"]=owned
     state["probe_destination"] = destination
     state["full_interface"] = interface
     state["mode"] = "probing"
     state["deadline"] = time.time() + PROBE_TTL
     store(state)
-    r = run(ROUTE, "-n", "add", "-host", destination, "-interface", interface)
-    if r.returncode or route(destination).get("interface") != interface:
-        return "L2TP_PROBE_INSTALL_FAILED_" + rollback_probe()
+    if owned:
+        r = run(ROUTE, "-n", "add", "-host", destination, "-interface", interface)
+        if r.returncode or route(destination).get("interface") != interface:
+            return "L2TP_PROBE_INSTALL_FAILED_" + rollback_probe()
+    elif route(destination).get("interface")!=interface:
+        return "L2TP_PROBE_NATIVE_ROUTE_CHANGED_"+rollback_probe()
     return "L2TP_PROBE_HOST_ACTIVE"
 
 
@@ -360,15 +390,19 @@ def rollback_probe() -> str:
     destination, interface = state.get("probe_destination"), state.get("full_interface")
     if destination not in PROBES or not re.fullmatch(r"ppp[0-9]{1,4}", interface or ""):
         return "L2TP_PROBE_RECOVERY_STATE_INVALID"
-    exact = exact_hosts()
-    if exact is None:
-        return "L2TP_PROBE_ROUTES_UNAVAILABLE"
-    if destination in exact:
-        if route(destination).get("interface") != interface:
-            return "L2TP_PROBE_OWNERSHIP_CHANGED"
-        run(ROUTE, "-n", "delete", "-host", destination, "-interface", interface)
-    if destination in (exact_hosts() or set()):
-        return "L2TP_PROBE_RECOVERY_FAILED"
+    if state.get("probe_owned",True):
+        entries=probe_route_entries(destination,state["interface"])
+        if entries is None:
+            return "L2TP_PROBE_ROUTES_UNAVAILABLE"
+        if entries:
+            if entries!={interface} or route(destination).get("interface")!=interface:
+                return "L2TP_PROBE_OWNERSHIP_CHANGED"
+            if run(ROUTE,"-n","delete","-host",destination,"-interface",interface).returncode:
+                return "L2TP_PROBE_RECOVERY_FAILED"
+        after=probe_route_entries(destination,state["interface"])
+        if after is None or after:
+            return "L2TP_PROBE_RECOVERY_FAILED"
+    state.pop("probe_owned",None)
     state["probe_destination"] = None
     state["mode"] = "armed"
     state["deadline"] = time.time() + 25

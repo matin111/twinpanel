@@ -54,9 +54,33 @@ class L2TPGuardTests(unittest.TestCase):
              patch.object(guard, "native_status",
                           return_value="L2TP_NATIVE_LINK_CONNECTED_UNROUTED"), \
              patch.object(guard, "ppp_interface", return_value="ppp0"), \
-             patch.object(guard, "exact_hosts", return_value={"1.1.1.1"}):
+             patch.object(guard, "probe_route_entries", return_value={"en0"}), \
+             patch.object(guard, "route", return_value={"interface":"en0"}):
             self.assertEqual(guard.probe_host("ppp0", "1.1.1.1"),
                              "L2TP_PROBE_ROUTE_PREEXISTS")
+
+    def test_ignore_only_physical_scoped_kernel_clones(self):
+        table=("1.1.1.1 2.3.4.5 UGHWI en0\n"
+               "1.1.1.1 2.3.4.5 UGHS en0\n"
+               "1.1.1.1 link#18 UH ppp0\n")
+        with patch.object(guard,"run",return_value=response(table)):
+            self.assertEqual(guard.probe_route_entries("1.1.1.1","en0"),{"en0","ppp0"})
+        with patch.object(guard,"run",return_value=response(table.splitlines()[0])):
+            self.assertEqual(guard.probe_route_entries("1.1.1.1","en0"),set())
+
+    def test_native_ppp_probe_is_not_owned_or_deleted(self):
+        state={"mode":"armed","interface":"en0"}
+        with patch.object(guard,"verified_state",return_value=state), \
+             patch.object(guard,"native_status",return_value="L2TP_NATIVE_LINK_CONNECTED_UNROUTED"), \
+             patch.object(guard,"ppp_interface",return_value="ppp0"), \
+             patch.object(guard,"probe_route_entries",return_value={"ppp0"}), \
+             patch.object(guard,"route",return_value={"interface":"ppp0"}), \
+             patch.object(guard,"store"), patch.object(guard,"run") as calls:
+            self.assertEqual(guard.probe_host("ppp0","1.1.1.1"),"L2TP_PROBE_HOST_ACTIVE")
+            self.assertFalse(state["probe_owned"])
+            with patch.object(guard,"load",return_value=state):
+                self.assertEqual(guard.rollback_probe(),"L2TP_PROBE_ROLLBACK_VERIFIED")
+            calls.assert_not_called()
 
     def test_connected_status_requires_live_guard_and_ppp(self):
         with patch.object(guard, "load", return_value={"mode": "leased"}), \
