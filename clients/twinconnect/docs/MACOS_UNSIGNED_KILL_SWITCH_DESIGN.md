@@ -63,3 +63,30 @@ The native Settings connection report validates owner, mode and freshness
 before displaying it. No activation toggle is presented until live
 enforcement and recovery are tested. On the development VPS the service
 reports KS_REMOTE_RECOVERY_REQUIRED. No firewall rules are loaded.
+
+
+## Phase 5: bounded WireGuard control
+
+The provider-console offline and WireGuard-worker-cut trials passed the
+IPv4 HTTPS and TCP/UDP DNS block/recovery tests. IPv6 had no baseline and
+remains unverified. The Settings screen now exposes a clearly labeled
+120-second WireGuard test only on the staged development Mac. Activation
+requires the console-recovery receipts, a current privileged WireGuard
+attestation, empty pre-existing PF rules/state, an independent launchd
+recovery job and standard macOS administrator authorization. It retains
+the blocking policy when the worker disappears and never opens another
+engine automatically. Reset removes only the owned anchor/reference.
+The root status file reports expiry, lock and fault; there is no fake
+UserDefaults toggle, indefinite lease, automatic enable or new sudoers
+permission. The runtime is staged in
+/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl.
+The local console reset command is:
+sudo /usr/bin/python3 -I /Library/PrivilegedHelperTools/TwinConnectKillSwitchControl/unsigned_killswitch_console_control.py --reset
+
+This is not yet a production always-on kill switch. The VPS WireGuard
+route guard depends on Termalin's control transport; blocking it can
+end the VPN session even without an intentional disconnect. The tested
+temporary rules have no management bypass. The full Settings activation,
+watchdog expiry and Reset flows require live acceptance; pre-connect
+protection, reconnection, reboot behavior, IPv6 and other protocols
+remain unverified. Do not advertise permanent protection.

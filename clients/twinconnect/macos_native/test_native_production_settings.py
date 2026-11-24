@@ -6,7 +6,7 @@ PAGE=SOURCE.split("private func settingsPage() -> NSView {",1)[1].split("@objc p
 
 class ProductionSettingsTests(unittest.TestCase):
     def test_no_inactive_security_or_test_controls(self):
-        for label in ("Unavailable", "Kill Switch", "Split Tunneling", "DNS protection",
+        for label in ("Unavailable", "Split Tunneling", "DNS protection",
                       "Auto reconnect", "Test selected SOCKS", "Check TUN readiness",
                       "Test Cisco authentication", "App language"):
             self.assertNotIn(label,PAGE)

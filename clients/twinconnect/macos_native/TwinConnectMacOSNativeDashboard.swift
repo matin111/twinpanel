@@ -590,6 +590,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var logoGeneration = 0
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
     private var tab = 0
+    private weak var nativeKillSwitchToggle: NSSwitch?
+    private weak var nativeKillSwitchStatusLabel: NSTextField?
+    private weak var nativeKillSwitchResetButton: NSButton?
+    private var nativeKillSwitchActionBusy = false
+    private let nativeKillSwitchControlRoot =
+        "/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl"
     private var country = "All countries"
     private var expandedCountries = Set<String>()
     private var locationCountryIDs = [String]()
@@ -2956,6 +2962,29 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                           subtitle: "Limit decorative connection animations.",
                           control: motion))
 
+        if nativeKillSwitchControlStatus() != nil {
+            section.addArrangedSubview(text("Security", size: 18, weight: .semibold))
+            let toggle = NSSwitch()
+            toggle.target = self
+            toggle.action = #selector(changeNativeKillSwitch(_:))
+            toggle.setAccessibilityLabel("WireGuard Kill Switch test")
+            nativeKillSwitchToggle = toggle
+            let indicator = text("Checking", size: 12, weight: .semibold, color: muted)
+            nativeKillSwitchStatusLabel = indicator
+            let controls = stack(.vertical, spacing: 5)
+            controls.alignment = .trailing
+            controls.addArrangedSubview(toggle)
+            controls.addArrangedSubview(indicator)
+            add(preferenceRow("Kill Switch • WireGuard",
+                              subtitle: "2-minute protected test. Keep provider console open.",
+                              control: controls))
+            let reset = button("Reset Internet", action: #selector(resetNativeKillSwitch(_:)))
+            nativeKillSwitchResetButton = reset
+            add(preferenceRow("Internet recovery",
+                              subtitle: "Turn off the TwinConnect test firewall.",
+                              control: reset))
+            updateNativeKillSwitchControls()
+        }
         section.addArrangedSubview(text("Connection", size: 18, weight: .semibold))
         let refreshButton = button("Refresh", action: #selector(refresh(_:)))
         refreshButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
@@ -2985,6 +3014,136 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                           control: text(version + " (" + buildNumber + ")", size: 12,
                                         weight: .semibold, color: muted)))
         return section
+    }
+
+    private func nativeKillSwitchControlStatus() -> [String: Any]? {
+        let manager = FileManager.default
+        let root = nativeKillSwitchControlRoot
+        let helper = root + "/unsigned_killswitch_console_control.py"
+        let path = root + "/status.json"
+        func trusted(_ filename: String, type: FileAttributeType) -> Bool {
+            guard let attributes = try? manager.attributesOfItem(atPath: filename),
+                  attributes[.type] as? FileAttributeType == type,
+                  (attributes[.ownerAccountID] as? NSNumber)?.intValue == 0,
+                  let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue,
+                  mode & 0o022 == 0 else { return false }
+            return true
+        }
+        guard trusted(root, type: .typeDirectory),
+              trusted(helper, type: .typeRegular),
+              trusted(path, type: .typeRegular),
+              let attrs = try? manager.attributesOfItem(atPath: path),
+              let size = (attrs[.size] as? NSNumber)?.intValue,
+              (1...4096).contains(size),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              data.count <= 4096,
+              let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              row["version"] as? Int == 1,
+              row["persistent"] as? Bool == false,
+              row["session_limit"] as? Int == 120,
+              let state = row["state"] as? String,
+              ["off", "arming", "active", "locked", "fault"].contains(state),
+              let timestamp = row["timestamp"] as? TimeInterval else { return nil }
+        if state == "active" || state == "locked" || state == "arming" {
+            let now = Date().timeIntervalSince1970
+            let expiry = row["expires_at"] as? TimeInterval ?? 0
+            if abs(now - timestamp) > 12 ||
+                (state != "arming" && (expiry <= now || expiry > now + 120)) {
+                return ["state": "fault"]
+            }
+        }
+        return row
+    }
+
+    private func updateNativeKillSwitchControls() {
+        guard tab == 2, let toggle = nativeKillSwitchToggle else { return }
+        let row = nativeKillSwitchControlStatus()
+        let state = row?["state"] as? String ?? "fault"
+        let on = state == "active" || state == "locked"
+        toggle.state = on ? .on : .off
+        let wireguardReady = wireGuardSystemRouteVerified &&
+            wireGuardConnectionProtocol == "wireguard"
+        toggle.isEnabled = !nativeKillSwitchActionBusy &&
+            (on || (state == "off" && wireguardReady))
+        nativeKillSwitchResetButton?.isEnabled = !nativeKillSwitchActionBusy && state != "off"
+        let caption: String
+        if nativeKillSwitchActionBusy {
+            caption = "Authorizing…"
+        } else if on {
+            let expiry = row?["expires_at"] as? TimeInterval ?? 0
+            let remaining = max(0, Int(expiry - Date().timeIntervalSince1970))
+            caption = (state == "locked" ? "Locked" : "Active test") +
+                " • " + String(remaining) + "s"
+        } else if state == "off" {
+            caption = wireguardReady ? "Off" : "Connect WireGuard"
+        } else if state == "arming" {
+            caption = "Starting…"
+        } else {
+            caption = "Check recovery"
+        }
+        nativeKillSwitchStatusLabel?.stringValue = caption
+        nativeKillSwitchStatusLabel?.textColor = state == "fault" ? amber : muted
+    }
+
+    @objc private func changeNativeKillSwitch(_ sender: NSSwitch) {
+        let enable = sender.state == .on
+        if enable {
+            guard wireGuardSystemRouteVerified,
+                  wireGuardConnectionProtocol == "wireguard" else {
+                updateNativeKillSwitchControls()
+                return
+            }
+            let alert = NSAlert()
+            alert.messageText = "Enable WireGuard Kill Switch test?"
+            alert.informativeText = "Keep your provider console open. Direct internet and remote management may stop. This test automatically releases its firewall after 2 minutes. It is not permanent protection."
+            alert.addButton(withTitle: "Enable test")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                updateNativeKillSwitchControls()
+                return
+            }
+        }
+        performNativeKillSwitchAction(enable: enable)
+    }
+
+    @objc private func resetNativeKillSwitch(_ sender: NSButton) {
+        performNativeKillSwitchAction(enable: false)
+    }
+
+    private func performNativeKillSwitchAction(enable: Bool) {
+        guard !nativeKillSwitchActionBusy else { return }
+        nativeKillSwitchActionBusy = true
+        updateNativeKillSwitchControls()
+        // Standard macOS administrator authorization; no stored password,
+        // new sudo permission, or arbitrary shell command from the app.
+        let action = enable ? "--enable" : "--reset"
+        let command = "/usr/bin/python3 -I /Library/PrivilegedHelperTools/TwinConnectKillSwitchControl/unsigned_killswitch_console_control.py " + action
+        let script = "do shell script \"" + command + "\" with administrator privileges"
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            task.arguments = ["-e", script]
+            task.standardInput = FileHandle.nullDevice
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            var success = false
+            do {
+                try task.run()
+                task.waitUntilExit()
+                success = task.terminationStatus == 0
+            } catch {}
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.nativeKillSwitchActionBusy = false
+                self.updateNativeKillSwitchControls()
+                if !success {
+                    let alert = NSAlert()
+                    alert.messageText = enable ? "Kill Switch test not enabled" : "Internet reset not confirmed"
+                    alert.informativeText = "Authorization was cancelled or the local safety check failed. Use the provider console if recovery is needed."
+                    alert.runModal()
+                }
+            }
+        }
     }
 
     @objc private func changeNativeAppearance(_ sender: NSSegmentedControl) {
@@ -4235,6 +4394,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func refreshTrafficMetrics() {
+        updateNativeKillSwitchControls()
         updateConnectionDuration()
         refreshFullTunStatus()
         refreshOpenVPNAppSession()
@@ -6265,6 +6425,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func nativeKillSwitchReport() -> String {
+        if let control = nativeKillSwitchControlStatus(),
+           let state = control["state"] as? String {
+            return "WireGuard 2-minute test: " + state + "; permanent protection not verified"
+        }
         // Read only a fresh root-owned public status snapshot. This
         // is not a preference, a connection badge or leak attestation.
         let path = "/private/var/run/twinconnect-killswitch-status/status.json"
