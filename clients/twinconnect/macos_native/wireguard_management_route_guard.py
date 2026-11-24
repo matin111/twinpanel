@@ -30,6 +30,8 @@ NETWORKSETUP = "/usr/sbin/networksetup"
 TUN_DNS_STATE = ROOT / "tunnel-dns.json"
 OPENCONNECT_BIN = ("/Library/PrivilegedHelperTools/TwinConnectWireGuard/"
                    "wireguard-go")
+AMNEZIAWG_BIN = ("/Library/PrivilegedHelperTools/TwinConnectWireGuard/"
+                 "amneziawg-go")
 ROUTE = "/sbin/route"
 NETSTAT = "/usr/sbin/netstat"
 
@@ -161,9 +163,12 @@ def status_uptime() -> str:
                     started = recorded
         except (OSError, ValueError, TypeError, AttributeError):
             pass
-    if not isinstance(started, (int, float)) or not 0 < started <= time.time():
-        return json.dumps({"state": "connected", "connected_at": None})
-    return json.dumps({"state": "connected", "connected_at": int(started)})
+    result = {"state": "connected", "connected_at": None}
+    if isinstance(started, (int, float)) and 0 < started <= time.time():
+        result["connected_at"] = int(started)
+    if current.get("protocol_code") == "amneziawg":
+        result["protocol_code"] = "amneziawg"
+    return json.dumps(result)
 
 
 def rollback() -> str:
@@ -352,9 +357,8 @@ def stop_system() -> str:
                          "WG_MANAGEMENT_PIN_ROLLBACK_VERIFIED"):
         return recovered
     if isinstance(pid, int) and pid > 1:
-        command = run("/bin/ps", "-p", str(pid), "-o", "command=")
-        if command.returncode == 0 and command.stdout.strip().startswith(
-                OPENCONNECT_BIN + " "):
+        expected_protocol = current.get("protocol_code", "wireguard")
+        if wireguard_transport(pid, current.get("full_interface", "")) == expected_protocol:
             try:
                 os.kill(pid, 15)
             except ProcessLookupError:
@@ -405,17 +409,40 @@ def exit_ip() -> str | None:
     return verified_public(match.group(1)) if match else None
 
 
-def wireguard_endpoint(pid: int, interface: str) -> str | None:
-    """Check actual root-owned WireGuard process and peer UAPI handshake."""
-    import socket
+def wireguard_transport(pid: int, interface: str) -> str | None:
+    """Identify only exact, known privileged WireGuard-family engines."""
     if not isinstance(pid, int) or pid <= 1 or not re.fullmatch(
             r"utun[0-9]{1,4}", interface):
         return None
     process = run("/bin/ps", "-p", str(pid), "-o", "command=")
-    expected = OPENCONNECT_BIN + " -f " + interface
-    if process.returncode or process.stdout.strip() != expected:
+    if process.returncode:
         return None
-    sock = "/var/run/wireguard/" + interface + ".sock"
+    cmd = process.stdout.strip()
+    if cmd == OPENCONNECT_BIN + " -f " + interface:
+        return "wireguard"
+    if cmd == AMNEZIAWG_BIN + " -f " + interface:
+        uid = run("/bin/ps", "-p", str(pid), "-o", "uid=")
+        if uid.returncode == 0 and uid.stdout.strip() == "0":
+            return "amneziawg"
+    return None
+
+
+def wireguard_endpoint(pid: int, interface: str) -> str | None:
+    """Check the selected privileged engine and its own UAPI handshake."""
+    import socket
+    import stat
+    protocol = wireguard_transport(pid, interface)
+    if protocol is None:
+        return None
+    directory = "/var/run/amneziawg/" if protocol == "amneziawg" else "/var/run/wireguard/"
+    sock = directory + interface + ".sock"
+    if protocol == "amneziawg":
+        try:
+            info = os.lstat(sock)
+            if not stat.S_ISSOCK(info.st_mode) or info.st_uid != 0:
+                return None
+        except OSError:
+            return None
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(3)
@@ -554,8 +581,12 @@ def activate_full(interface: str, pid: int) -> str:
     dns_prior = saved_dns(service) if service else None
     if dns_prior is None:
         return "WG_DNS_BACKUP_UNAVAILABLE"
+    protocol = wireguard_transport(pid, interface)
+    if protocol is None:
+        return "WG_TRANSPORT_IDENTITY_UNVERIFIED"
     # The root-owned launchd daemon owns the rollback state before edits.
     state = {"mode": "trial-full", "peers": [], "gateway": gateway,
+             "protocol_code": protocol,
              "interface": baseline_interface, "full_interface": interface,
              "endpoint": endpoint, "endpoint_pinned": False,
              "worker_pid": pid, "dns_started": False,
@@ -621,6 +652,9 @@ def heartbeat(pid: int) -> str:
         os.kill(pid, 0)
     except OSError:
         return "WG_WORKER_NOT_RUNNING"
+    if wireguard_transport(pid, current.get("full_interface", "")) != current.get(
+            "protocol_code", "wireguard"):
+        return "WG_TRANSPORT_IDENTITY_UNVERIFIED"
     if wireguard_endpoint(pid, current.get("full_interface", "")) != current.get("endpoint"):
         return "WG_TRANSPORT_ENDPOINT_CHANGED"
     if any(route(ip).get("interface") != current.get("full_interface")

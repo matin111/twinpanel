@@ -164,6 +164,21 @@ else
 fi
 # The unsigned WireGuard userspace daemon is packaged as an ENGINE ONLY.
 # It never starts here, and this packaging must not alter the system network.
+# The official AmneziaWG engine and tools are a separate optional pair.
+awg_dir="macos_native/build/amneziawg/$arch"
+if [[ -e "$awg_dir/amneziawg-go" || -e "$awg_dir/awg" ]]; then
+  mkdir -p "$stage/macos_native/build/amneziawg/$arch"
+  for name in amneziawg-go awg; do
+    source="$awg_dir/$name"
+    [[ -f "$source" && ! -L "$source" && -x "$source" ]] ||
+      { echo "AMNEZIAWG_ENGINE_PAIR_INCOMPLETE" >&2; exit 3; }
+    /usr/bin/lipo -archs "$source" | tr ' ' '\n' |
+      grep -Fxq "$host_arch" ||
+      { echo "AMNEZIAWG_ENGINE_ARCHITECTURE_MISMATCH" >&2; exit 3; }
+    install -m 0755 "$source" "$stage/macos_native/build/amneziawg/$arch/$name"
+  done
+  echo "AMNEZIAWG_ENGINE_PAIR_PACKAGED"
+fi
 wg_source="macos_native/build/wireguard-userspace/$arch/wireguard-go"
 wg_packaged=0
 if [[ -f "$wg_source" && ! -L "$wg_source" && -x "$wg_source" ]]; then

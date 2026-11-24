@@ -24,6 +24,11 @@ import sys
 import time
 
 BINARY = Path("/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard-go")
+AWG_BINARY = BINARY.with_name("amneziawg-go")
+AWG_UAPI_DIRECTORY = Path("/var/run/amneziawg")
+AWG_REQUIRED = frozenset(("jc", "jmin", "jmax", "s1", "s2",
+                          "h1", "h2", "h3", "h4"))
+AWG_OPTIONAL = frozenset(("s3", "s4"))
 CISCO_GUARD = Path("/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_management_route_guard.py")
 WG_GUARD = Path("/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard_management_route_guard.py")
 WG_DNS_STATE = Path("/private/var/run/twinconnect-wireguard-route-guard/tunnel-dns.json")
@@ -48,7 +53,9 @@ def key_hex(value: str) -> str:
     return decoded.hex()
 
 
-def parse_profile(raw: str) -> dict:
+def parse_profile(raw: str, protocol: str = "wireguard") -> dict:
+    if protocol not in ("wireguard", "amneziawg"):
+        fail("WG_PROTOCOL_UNSUPPORTED")
     if not isinstance(raw, str) or not 80 <= len(raw.encode("utf-8")) <= MAX_PROFILE:
         fail("WG_PROFILE_INVALID_SIZE")
     parser = configparser.ConfigParser(interpolation=None, strict=True,
@@ -62,7 +69,31 @@ def parse_profile(raw: str) -> dict:
         fail("WG_SINGLE_PEER_REQUIRED")
     interface = dict(parser.items("Interface"))
     peer = dict(parser.items("Peer"))
-    if set(interface) - {"privatekey", "address", "dns", "mtu", "listenport"}:
+    permitted = {"privatekey", "address", "dns", "mtu", "listenport"}
+    obfuscation = {}
+    if protocol == "amneziawg":
+        permitted |= AWG_REQUIRED | AWG_OPTIONAL
+        if not AWG_REQUIRED.issubset(interface):
+            fail("WG_AWG_OBFUSCATION_MISSING")
+        # TwinPanel's client profile contract uses decimal v1 parameters.
+        # Do not discard or silently translate them into ordinary WG.
+        for field in sorted(AWG_REQUIRED | AWG_OPTIONAL):
+            if field not in interface:
+                continue
+            raw_value = interface[field]
+            maximum = 4294967295 if field.startswith("h") else 65535
+            if not re.fullmatch(r"[0-9]{1,10}", raw_value):
+                fail("WG_AWG_OBFUSCATION_INVALID")
+            value = int(raw_value)
+            if value > maximum:
+                fail("WG_AWG_OBFUSCATION_INVALID")
+            obfuscation[field] = str(value)
+        if int(obfuscation["jmin"]) > int(obfuscation["jmax"]) or (
+                int(obfuscation["jc"]) > 0 and int(obfuscation["jmax"]) == 0):
+            fail("WG_AWG_OBFUSCATION_INVALID")
+        if len({obfuscation[key] for key in ("h1", "h2", "h3", "h4")}) != 4:
+            fail("WG_AWG_OBFUSCATION_INVALID")
+    if set(interface) - permitted:
         fail("WG_INTERFACE_OPTION_UNSUPPORTED")
     if set(peer) - {"publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive"}:
         fail("WG_PEER_OPTION_UNSUPPORTED")
@@ -147,6 +178,7 @@ def parse_profile(raw: str) -> dict:
         "endpoint": f"{candidate}:{port}",
         "listenport": int(interface.get("listenport", "0")),
         "keepalive": max(1, int(peer.get("persistentkeepalive", "1"))),
+        "protocol": protocol, "obfuscation": obfuscation,
     }
 
 
@@ -167,16 +199,17 @@ def original_route() -> tuple[str, str]:
     return gateway.group(1), interface.group(1)
 
 
-def safe_binary() -> None:
-    if not BINARY.is_file() or BINARY.is_symlink():
+def safe_binary(binary: Path = BINARY) -> None:
+    if not binary.is_file() or binary.is_symlink():
         fail("WG_UNSIGNED_DAEMON_MISSING")
-    fileinfo = BINARY.stat()
+    fileinfo = binary.stat()
     if fileinfo.st_uid != 0 or fileinfo.st_mode & 0o022 or not fileinfo.st_mode & stat.S_IXUSR:
         fail("WG_UNSIGNED_DAEMON_UNTRUSTED")
 
 
-def uapi_request(name: str, request: str) -> dict[str, str]:
-    path = str(UAPI_DIRECTORY / (name + ".sock"))
+def uapi_request(name: str, request: str,
+                 directory: Path = UAPI_DIRECTORY) -> dict[str, str]:
+    path = str(directory / (name + ".sock"))
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
         client.settimeout(4)
         client.connect(path)
@@ -201,8 +234,16 @@ def uapi_request(name: str, request: str) -> dict[str, str]:
 
 def uapi_config(profile: dict) -> str:
     rows = ["set=1", f"private_key={profile['private']}",
-            f"listen_port={profile['listenport']}", "replace_peers=true",
-            f"public_key={profile['public']}"]
+            f"listen_port={profile['listenport']}"]
+    if profile.get("protocol") == "amneziawg":
+        extra = profile.get("obfuscation", {})
+        if not AWG_REQUIRED.issubset(extra) or set(extra) - (AWG_REQUIRED | AWG_OPTIONAL):
+            fail("WG_AWG_OBFUSCATION_MISSING")
+        for field in ("jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
+                      "h1", "h2", "h3", "h4"):
+            if field in extra:
+                rows.append(f"{field}={extra[field]}")
+    rows.extend(("replace_peers=true", f"public_key={profile['public']}"))
     if profile["psk"]:
         rows.append(f"preshared_key={profile['psk']}")
     rows.extend((f"endpoint={profile['endpoint']}",
@@ -288,10 +329,15 @@ def safe_probe_egress(interface: str) -> str:
     return "WG_MULTINET_EGRESS_VERIFIED"
 
 
-def probe(raw: str, system_vpn: bool = False) -> str:
+def probe(raw: str, system_vpn: bool = False,
+          protocol: str = "wireguard") -> str:
     if os.geteuid() != 0 or sys.platform != "darwin":
         fail("WG_MACOS_ROOT_REQUIRED")
-    safe_binary()
+    if protocol not in ("wireguard", "amneziawg"):
+        fail("WG_PROTOCOL_UNSUPPORTED")
+    binary = AWG_BINARY if protocol == "amneziawg" else BINARY
+    directory = AWG_UAPI_DIRECTORY if protocol == "amneziawg" else UAPI_DIRECTORY
+    safe_binary(binary)
     if CISCO_GUARD.is_file() and command(
             "/usr/bin/python3", str(CISCO_GUARD), "status").strip() != \
             "CISCO_MANAGEMENT_PIN_IDLE":
@@ -299,7 +345,7 @@ def probe(raw: str, system_vpn: bool = False) -> str:
     baseline = original_route()
     if baseline[1] != "en0":
         fail("WG_PHYSICAL_DEFAULT_REQUIRED")
-    profile = parse_profile(raw)
+    profile = parse_profile(raw, protocol)
     if system_vpn and guard_action("preflight") != "WG_MANAGEMENT_PRECHECK_READY":
         fail("WG_GUARD_PREFLIGHT_FAILED")
     interfaces = set(command(IFCONFIG, "-l").split())
@@ -307,11 +353,11 @@ def probe(raw: str, system_vpn: bool = False) -> str:
                  if f"utun{i}" not in interfaces), None)
     if name is None:
         fail("WG_NO_SAFE_INTERFACE")
-    child = subprocess.Popen([str(BINARY), "-f", name],
+    child = subprocess.Popen([str(binary), "-f", name],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)
     try:
-        path = UAPI_DIRECTORY / (name + ".sock")
+        path = directory / (name + ".sock")
         for _ in range(30):
             if child.poll() is not None:
                 fail("WG_ENGINE_EXITED")
@@ -327,7 +373,7 @@ def probe(raw: str, system_vpn: bool = False) -> str:
                 "netmask", "255.255.255.255", "mtu", str(profile["mtu"]), "up")
         if system_vpn:
             store_tunnel_dns(name, profile)
-        uapi_request(name, uapi_config(profile))
+        uapi_request(name, uapi_config(profile), directory)
         before = int(time.time())
         # Persistent keepalive will trigger a real handshake over the normal
         # UDP uplink; no default or single-host routes are installed yet.
@@ -336,7 +382,7 @@ def probe(raw: str, system_vpn: bool = False) -> str:
                 fail("WG_ENGINE_EXITED")
             if original_route() != baseline:
                 fail("WG_UNEXPECTED_ROUTE_CHANGE")
-            stats = uapi_request(name, "get=1\n\n")
+            stats = uapi_request(name, "get=1\n\n", directory)
             handshake = int(stats.get("last_handshake_time_sec", "0"))
             if handshake >= before - 2 and handshake <= time.time() + 1:
                 if not system_vpn:
@@ -393,9 +439,14 @@ def main() -> int:
         if len(data) > MAX_PROFILE + 1024:
             fail("WG_PROFILE_TOO_LARGE")
         payload = json.loads(data)
-        if not isinstance(payload, dict) or set(payload) != {"config"}:
+        if not isinstance(payload, dict) or set(payload) not in (
+                {"config"}, {"config", "protocol"}):
             fail("WG_INVALID_PAYLOAD")
-        result = probe(payload["config"], system_vpn=sys.argv[1:] == ["system"])
+        protocol = payload.get("protocol", "wireguard")
+        if protocol not in ("wireguard", "amneziawg"):
+            fail("WG_PROTOCOL_UNSUPPORTED")
+        result = probe(payload["config"], system_vpn=sys.argv[1:] == ["system"],
+                       protocol=protocol)
         print(json.dumps({"state": "stopped" if result == "WG_SYSTEM_DISCONNECTED" else "probe",
                           "reason": result, "vpn_connected": False}), flush=True)
         return 0 if result in ("WG_PEER_HANDSHAKE_VERIFIED_UNROUTED",

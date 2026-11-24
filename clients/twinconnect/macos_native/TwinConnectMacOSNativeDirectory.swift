@@ -1300,8 +1300,10 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     // selected server. Never persist private keys or accept remote commands.
     func prepareWireGuardProfile(_ session: TwinMacNativeSession,
                                  serverID: String,
+                                 protocolCode: String = "wireguard",
                                  completion: @escaping (Result<Data, Error>) -> Void) {
-        guard serverID.range(of: "^[0-9]{1,20}$",
+        guard ["wireguard", "amneziawg"].contains(protocolCode),
+              serverID.range(of: "^[0-9]{1,20}$",
                              options: .regularExpression) != nil else {
             completion(.failure(TwinMacNativeError.failure("WG_SERVER_ID_INVALID")))
             return
@@ -1316,7 +1318,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                   let protocols = catalog["protocols"] as? [[String: Any]],
                   protocols.count <= 16,
                   protocols.filter({
-                      ($0["code"] as? String) == "wireguard" &&
+                      ($0["code"] as? String) == protocolCode &&
                       ($0["selected"] as? Bool) == true &&
                       ($0["config_record_present"] as? Bool) == true
                   }).count == 1 else {
@@ -1333,11 +1335,11 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                     return
                 }
                 self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
-                             payload: ["protocol": "wireguard"], bearer: token,
+                             payload: ["protocol": protocolCode], bearer: token,
                              maxBytes: 1048576) { profiles in
                     guard case .success(let response) = profiles,
                           self.validEnvelope(response, session.namespace),
-                          (response["protocol"] as? String) == "wireguard",
+                          (response["protocol"] as? String) == protocolCode,
                           let items = response["items"] as? [[String: Any]],
                           items.count <= 200 else {
                         completion(.failure(TwinMacNativeError.failure("WG_PROFILE_UNAVAILABLE")))
@@ -1349,12 +1351,14 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         return false
                     }
                     guard candidates.count == 1,
+                          (protocolCode != "amneziawg" ||
+                           candidates[0]["config_format"] as? String == "amneziawg"),
                           let raw = candidates[0]["config"] as? String,
                           (80...16384).contains(raw.utf8.count),
                           raw.contains("[Interface]"), raw.contains("[Peer]"),
                           let content = raw.data(using: .utf8),
                           let payload = try? JSONSerialization.data(
-                            withJSONObject: ["config": raw]),
+                            withJSONObject: ["config": raw, "protocol": protocolCode]),
                           payload.count <= 18432,
                           !content.isEmpty else {
                         completion(.failure(TwinMacNativeError.failure("WG_PROFILE_INVALID")))

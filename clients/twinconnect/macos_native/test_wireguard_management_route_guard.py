@@ -32,6 +32,21 @@ class WatchdogTests(unittest.TestCase):
             self.assertEqual(json.loads(guard.status_uptime()),
                              {"state": "disconnected"})
 
+    def test_amneziawg_identity_is_root_owned_and_exact(self):
+        for uid, expected in (("0", "amneziawg"), ("502", None)):
+            with patch.object(guard, "run", side_effect=[
+                    ok(guard.AMNEZIAWG_BIN + " -f utun15"), ok(uid)]):
+                self.assertEqual(guard.wireguard_transport(123, "utun15"), expected)
+
+    def test_guard_status_attests_amneziawg(self):
+        with patch.object(guard, "load", return_value={
+                "mode": "leased", "connected_at": 5000,
+                "deadline": 5100, "protocol_code": "amneziawg"}), \
+             patch.object(guard.time, "time", return_value=5050):
+            self.assertEqual(json.loads(guard.status_uptime()),
+                {"state": "connected", "connected_at": 5000,
+                 "protocol_code": "amneziawg"})
+
     def test_rejects_invalid_utun_before_tunnel_process_probe(self):
         with patch.object(guard, "run") as command:
             self.assertIsNone(guard.wireguard_endpoint(2255, "en0"))

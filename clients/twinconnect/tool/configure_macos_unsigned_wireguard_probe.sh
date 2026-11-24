@@ -29,8 +29,24 @@ watchdog="$base/wireguard_management_route_guard.py"
 [[ "$(/usr/bin/python3 "$watchdog" status)" == WG_MANAGEMENT_PIN_IDLE ]] || {
   echo "WG_GUARD_ALREADY_ACTIVE" >&2; exit 2
 }
-if /usr/bin/pgrep -f '^/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard-go -f utun[0-9]+$' >/dev/null; then
+if /usr/bin/pgrep -f '^/Library/PrivilegedHelperTools/TwinConnectWireGuard/(wireguard-go|amneziawg-go) -f utun[0-9]+$' >/dev/null; then
   echo "WG_ENGINE_ACTIVE_INSTALL_REFUSED" >&2; exit 2
+fi
+awg_arch=amd64
+[[ "$(uname -m)" != arm64 ]] || awg_arch=arm64
+awg_dir="macos_native/build/amneziawg/$awg_arch"
+if [[ -e "$awg_dir/amneziawg-go" || -e "$awg_dir/awg" ]]; then
+  for name in amneziawg-go awg; do
+    [[ -f "$awg_dir/$name" && ! -L "$awg_dir/$name" && -x "$awg_dir/$name" ]] ||
+      { echo "AMNEZIAWG_ENGINE_PAIR_INCOMPLETE" >&2; exit 2; }
+    [[ ! -L "$base/$name" ]] ||
+      { echo "AMNEZIAWG_UNSAFE_INSTALL_DESTINATION" >&2; exit 2; }
+  done
+  "$awg_dir/amneziawg-go" --version | grep -q "Userspace AmneziaWG daemon for darwin-$awg_arch"
+  "$awg_dir/awg" --version | grep -q '^amneziawg-tools'
+  install -o root -g wheel -m 0755 "$awg_dir/amneziawg-go" "$base/amneziawg-go"
+  install -o root -g wheel -m 0755 "$awg_dir/awg" "$base/awg"
+  echo "AMNEZIAWG_ENGINE_PAIR_INSTALLED"
 fi
 install -d -o root -g wheel -m 0755 "$base"
 install -o root -g wheel -m 0755 "$src" "$base/wireguard-go"

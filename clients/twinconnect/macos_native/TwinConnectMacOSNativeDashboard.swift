@@ -619,6 +619,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var wireGuardProbeBusy = false
     private var wireGuardProbeGeneration = 0
     private var wireGuardProbeStatus = ""
+    private var wireGuardConnectionProtocol = "wireguard"
+    private var wireGuardConnectionTitle: String {
+        wireGuardConnectionProtocol == "amneziawg" ? "AmneziaWG" : "WireGuard"
+    }
+    private var selectedWireGuardFamily: Bool {
+        activeProtocol == "wireguard" || activeProtocol == "amneziawg"
+    }
     private var wireGuardSystemRouteVerified = false
     private var wireGuardConnectedAt: Date?
     private var wireGuardRoutePollBusy = false
@@ -1497,7 +1504,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let startedAt = verifiedConnectionStart {
             let protocolName = l2tpSystemRouteVerified ? "L2TP" :
-                (wireGuardSystemRouteVerified ? "WireGuard" :
+                (wireGuardSystemRouteVerified ? wireGuardConnectionTitle :
                 (ciscoSystemRouteVerified ? "Cisco" :
                 (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)))
             proxyUptimeText?.stringValue = "◷  " + protocolName + "  " +
@@ -1537,7 +1544,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return openVPNAppSessionActive ? "◌  Disconnecting…" : "◌  Connecting…"
         }
         if openVPNAppSessionActive { return "◉  OpenVPN · Tunnel only" }
-        if wireGuardSystemRouteVerified { return "◉  Connected · WireGuard" }
+        if wireGuardSystemRouteVerified { return "◉  Connected · " + wireGuardConnectionTitle }
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "◌  Connecting…" }
         if ciscoSystemRouteVerified { return "◉  Connected · Cisco" }
         if ciscoTunnelTask != nil { return "◌  Connecting…" }
@@ -1554,6 +1561,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Surface only redacted application error codes in the Network card,
     // never raw configuration, URLs, credentials, or protocol payloads.
     private var connectionAttemptNotice: String? {
+        if selectedWireGuardFamily && !wireGuardProbeBusy &&
+           wireGuardProbeTask == nil && wireGuardProbeStatus.hasPrefix("WG_") {
+            return wireGuardConnectionTitle + ": " + wireGuardProbeStatus
+        }
         if status.hasPrefix("TUN connection failed: ") ||
            status.hasPrefix("VPN profile request failed: ") ||
            status.hasPrefix("Connection unavailable: ") ||
@@ -1584,7 +1595,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return openVPNAppSessionActive ? "Disconnecting…" : "Connecting…"
         }
         if openVPNAppSessionActive { return "OpenVPN · Tunnel only" }
-        if wireGuardSystemRouteVerified { return "Connected · WireGuard" }
+        if wireGuardSystemRouteVerified { return "Connected · " + wireGuardConnectionTitle }
         if wireGuardProbeBusy || wireGuardProbeTask != nil { return "Connecting…" }
         if ciscoSystemRouteVerified { return "Connected · Cisco" }
         if ciscoTunnelTask != nil { return "Connecting…" }
@@ -1645,7 +1656,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              activeProtocol == "l2tp" ?
                              ((l2tpTask != nil || l2tpSystemRouteVerified) ?
                               "Disconnect" : (l2tpBusy ? "Connecting…" : "Connect")) :
-                             activeProtocol == "wireguard" ?
+                             selectedWireGuardFamily ?
                              ((wireGuardProbeTask != nil || wireGuardSystemRouteVerified) ?
                               "Disconnect" : (wireGuardProbeBusy ? "Connecting…" : "Connect")) :
                              activeProtocol == "cisco" ?
@@ -1669,7 +1680,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             l2tpHasDiagnostic ? l2tpStatus :
             activeProtocol == "l2tp" ?
             "Review authorized L2TP settings and native macOS VPN service." :
-            activeProtocol == "wireguard" ?
+            selectedWireGuardFamily ?
             (wireGuardProbeStatus.isEmpty ?
              "Connect to the selected WireGuard server." : wireGuardProbeStatus) :
             activeProtocol == "openvpn" && openVPNSystemRouteVerified ?
@@ -1842,7 +1853,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     elapsedConnectionTime($0) } ?? "◷  TUN session") :
                 verifiedConnectionStart.map { start in
                 "◷  " + (l2tpSystemRouteVerified ? "L2TP" :
-                         (wireGuardSystemRouteVerified ? "WireGuard" :
+                         (wireGuardSystemRouteVerified ? wireGuardConnectionTitle :
                          (ciscoSystemRouteVerified ? "Cisco" :
                         (openVPNSystemRouteVerified ? "OpenVPN" : connectedProtocolTitle)))) +
                 "  " + elapsedConnectionTime(start)
@@ -4429,8 +4440,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.wireGuardRoutePollBusy = false
+                let attestedProtocol = status?["protocol_code"] as? String ?? "wireguard"
                 let verified = self.wireGuardProbeTask != nil &&
-                    status?["state"] as? String == "connected"
+                    status?["state"] as? String == "connected" &&
+                    attestedProtocol == self.wireGuardConnectionProtocol
                 let start = verified ? (status?["connected_at"] as? NSNumber).map {
                     Date(timeIntervalSince1970: $0.doubleValue)
                 } : nil
@@ -4439,7 +4452,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if !changed && !startChanged { return }
                 self.wireGuardSystemRouteVerified = verified
                 self.wireGuardConnectedAt = start
-                self.wireGuardProbeStatus = verified ? "" : "WireGuard disconnected"
+                self.wireGuardProbeStatus = verified ? "" : self.wireGuardConnectionTitle + " disconnected"
                 if changed { self.resetTrafficMetrics() }
                 self.view = self.build()
             }
@@ -5569,7 +5582,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if wireGuardProbeTask != nil || wireGuardSystemRouteVerified {
             wireGuardProbeGeneration += 1
             wireGuardProbeBusy = true
-            wireGuardProbeStatus = "Disconnecting WireGuard…"
+            wireGuardProbeStatus = "Disconnecting " + wireGuardConnectionTitle + "…"
             view = build()
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 let stop = Process()
@@ -5588,7 +5601,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     self.wireGuardProbeBusy = false
                     self.wireGuardSystemRouteVerified = false
                     self.wireGuardConnectedAt = nil
-                    self.wireGuardProbeStatus = "WireGuard disconnected"
+                    self.wireGuardProbeStatus = self.wireGuardConnectionTitle + " disconnected"
                     self.resetTrafficMetrics()
                     self.view = self.build()
                 }
@@ -5598,10 +5611,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         guard !wireGuardProbeBusy,
               ciscoTunnelTask == nil, !ciscoSystemRouteVerified,
               !openVPNAppSessionActive, !localProxyActive,
+              !fullTunActive, !fullTunBusy, !l2tpSystemRouteVerified,
+              l2tpTask == nil,
               let session = accountSession,
               let serverID = activeServer,
+              let code = activeProtocol,
+              ["wireguard", "amneziawg"].contains(code),
               snapshot?.protocols.contains(where: {
-                  $0.code == "wireguard" && $0.configured
+                  $0.code == code && $0.configured
               }) == true else {
             wireGuardProbeStatus = "Disconnect the current VPN and select a WireGuard server."
             view = build()
@@ -5616,9 +5633,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         wireGuardProbeBusy = true
         wireGuardProbeGeneration += 1
         let generation = wireGuardProbeGeneration
-        wireGuardProbeStatus = "Checking WireGuard peer…"
+        wireGuardConnectionProtocol = code
+        wireGuardProbeStatus = "Checking " + wireGuardConnectionTitle + " peer…"
+        status = wireGuardProbeStatus
         view = build()
-        directory.prepareWireGuardProfile(session, serverID: serverID) {
+        directory.prepareWireGuardProfile(session, serverID: serverID,
+                                          protocolCode: code) {
             [weak self] result in
             guard let self = self,
                   self.wireGuardProbeGeneration == generation,
@@ -5648,7 +5668,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             if self.wireGuardProbeGeneration == generation {
                                 self.wireGuardProbeTask = task
                                 self.wireGuardProbeBusy = false
-                                self.wireGuardProbeStatus = "Connecting WireGuard…"
+                                self.wireGuardProbeStatus = "Connecting " + self.wireGuardConnectionTitle + "…"
                                 self.view = self.build()
                             } else {
                                 task.terminate()
@@ -5674,7 +5694,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             self.wireGuardSystemRouteVerified = false
                             self.wireGuardConnectedAt = nil
                             self.wireGuardProbeStatus =
-                                code == "WG_SYSTEM_DISCONNECTED" ? "WireGuard disconnected" :
+                                code == "WG_SYSTEM_DISCONNECTED" ? self.wireGuardConnectionTitle + " disconnected" :
                                 (code.range(of: "^WG_[A-Z0-9_]{3,120}$",
                                             options: .regularExpression) != nil ?
                                  code : "WG_ENGINE_EXITED")
@@ -5843,7 +5863,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             requestL2TPPreflight()
             return
         }
-        if activeProtocol == "wireguard" {
+        if wireGuardProbeTask != nil || wireGuardSystemRouteVerified {
+            requestWireGuardProbe()
+            return
+        }
+        if selectedWireGuardFamily {
             requestWireGuardProbe()
             return
         }

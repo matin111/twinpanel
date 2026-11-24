@@ -75,6 +75,23 @@ class UnsignedWireGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "WG_INTERFACE_OPTION_UNSUPPORTED"):
             wg.parse_profile(profile().replace("DNS =", "PostUp = /bin/rm -rf /\nDNS ="))
 
+    def test_amneziawg_profile_preserves_exact_obfuscation(self):
+        raw = profile().replace("DNS =", "Jc = 6\nJmin = 8\nJmax = 80\nS1 = 64\nS2 = 96\nH1 = 101\nH2 = 202\nH3 = 303\nH4 = 404\nDNS =")
+        with patch.object(wg.socket, "getaddrinfo",
+                          return_value=[(None,None,None,None,("1.2.3.4",51820))]):
+            data = wg.parse_profile(raw, "amneziawg")
+            message = wg.uapi_config(data)
+            for item in ("jc=6", "jmin=8", "jmax=80", "s1=64",
+                         "s2=96", "h1=101", "h2=202", "h3=303", "h4=404"):
+                self.assertIn(item + "\n", message)
+            self.assertNotIn("jc=", wg.uapi_config(wg.parse_profile(profile())))
+            with self.assertRaisesRegex(ValueError, "WG_INTERFACE_OPTION_UNSUPPORTED"):
+                wg.parse_profile(raw)
+            with self.assertRaisesRegex(ValueError, "WG_AWG_OBFUSCATION_MISSING"):
+                wg.parse_profile(profile(), "amneziawg")
+            with self.assertRaisesRegex(ValueError, "WG_AWG_OBFUSCATION_INVALID"):
+                wg.parse_profile(raw.replace("H4 = 404", "H4 = 101"), "amneziawg")
+
     def test_only_root_can_probe(self):
         with patch.object(wg.os, "geteuid", return_value=501):
             with self.assertRaisesRegex(ValueError, "WG_MACOS_ROOT_REQUIRED"):
