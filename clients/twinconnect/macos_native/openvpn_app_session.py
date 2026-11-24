@@ -8,6 +8,10 @@ default routes or DNS; it is not proof of system-wide VPN egress.
 from __future__ import annotations
 
 import fcntl
+import hashlib
+import ipaddress
+import re
+import shlex
 import json
 import os
 from pathlib import Path
@@ -23,6 +27,7 @@ from openvpn_profile_review import review, MAX_PROFILE_BYTES
 BASE = Path("/private/var/run/twinconnect-openvpn-app")
 STATE = BASE / "state.json"
 CONFIG = BASE / "session.ovpn"
+PROFILE_META=BASE/"profile-meta.json"
 LOG = BASE / "openvpn.log"
 STOP = BASE / "stop"
 LOCK = Path("/private/var/run/twinconnect-openvpn-app.lock")
@@ -59,13 +64,30 @@ def default_route() -> tuple[str, str] | None:
     return (values["gateway"], values["interface"])
 
 
-def safe_config(raw: bytes) -> bytes:
+def safe_config(raw: bytes, pinned=None) -> bytes:
     if len(raw) > MAX_PROFILE_BYTES or not raw:
         raise ValueError("OPENVPN_PROFILE_REJECTED")
     result = review(raw.decode("utf-8", errors="strict"))
     if "remote-cert-tls server" not in result["directives"]:
         raise ValueError("OPENVPN_PROFILE_REJECTED")
     lines = list(result["directives"])
+    if pinned is not None:
+        # Reconnect only the same authenticated profile, pin its already
+        # observed IPv4 transport and preserve certificate validation.
+        remote=[shlex.split(line) for line in lines if line.startswith("remote ")]
+        proto=[shlex.split(line)[1] for line in lines if line.startswith("proto ")]
+        if len(remote)!=1:
+            raise ValueError("OPENVPN_KS_MULTIPLE_REMOTES")
+        fields=remote[0]
+        port=int(fields[2]) if len(fields)>2 else 1194
+        selected=fields[3] if len(fields)>3 else (proto[0] if proto else "udp")
+        transport="tcp" if selected.startswith("tcp") else "udp"
+        if (port!=pinned["port"] or transport!=pinned["transport"] or
+                not ipaddress.IPv4Address(pinned["ip"]).is_global):
+            raise ValueError("OPENVPN_KS_TRANSPORT_CHANGED")
+        lines=[line for line in lines if not line.startswith(("remote ","proto ")) and line not in ("remote-random","float")]
+        lines.extend(["proto "+("tcp4-client" if transport=="tcp" else "udp4"),
+                      "remote "+pinned["ip"]+" "+str(port)])
     for tag, body in result["inline"].items():
         lines.extend(["<" + tag + ">", body.rstrip("\n"), "</" + tag + ">"])
     return ("\n".join(lines) + "\n").encode()
@@ -129,8 +151,8 @@ def cleanup(*, preserve_state: bool = False) -> None:
     # State directory is root-owned and never accessible to the app.
     # Keep the last root-only diagnostic log after a failed session. It is
     # removed on the next start; never keep the private .ovpn profile.
-    for p in ((CONFIG, STOP) if preserve_state else
-              (CONFIG, LOG, STOP, STATE)):
+    for p in ((CONFIG, STOP, PROFILE_META) if preserve_state else
+              (CONFIG, LOG, STOP, STATE, PROFILE_META)):
         try:
             p.unlink()
         except FileNotFoundError:
@@ -155,11 +177,13 @@ def stop_openvpn(child: subprocess.Popen) -> None:
 
 
 def state_write(state: str, worker_pid: int, deadline: float,
-                interface: str | None = None) -> None:
+                interface: str | None = None, engine_pid=None, peer=None) -> None:
     # Never include profile, tokens, endpoints or private key in status.
     payload = {"state": state, "worker_pid": worker_pid, "deadline": deadline}
     if interface is not None:
         payload["interface"] = interface
+    if engine_pid is not None and peer is not None:
+        payload.update(engine_pid=engine_pid,endpoint=peer[0],port=peer[1],transport=peer[2])
     write_private(STATE, json.dumps(payload).encode())
 
 
@@ -193,6 +217,57 @@ def tunnel_https_probe(interface: str) -> bool:
         return False
     return any(line.startswith(b"ip=") and 6 <= len(line) <= 68
                for line in result.stdout.splitlines())
+
+
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def authenticated_peer(log_bytes):
+    # Only a peer record preceding the latest completed TLS initialization.
+    end=log_bytes.rfind(SUCCESS)
+    if end<0:
+        return None
+    matches=list(re.finditer(
+        rb"(UDPv4 link remote|TCP connection established with|TCPv4_CLIENT link remote):?\s*\[AF_INET\]([0-9.]+):([0-9]{1,5})",
+        log_bytes[:end]))
+    if not matches:
+        return None
+    kind,host,port=matches[-1].groups()
+    try:
+        ip=ipaddress.IPv4Address(host.decode("ascii"))
+        number=int(port)
+        if ip.is_global and 1<=number<=65535:
+            return str(ip),number,"udp" if kind.startswith(b"UDP") else "tcp"
+    except (ValueError,UnicodeError):
+        pass
+    return None
 
 
 def worker() -> int:
@@ -241,13 +316,17 @@ def worker() -> int:
                                   "OPENVPN_ENGINE_EXITED")
                     state_write(reason, os.getpid(), deadline)
                     return 2
+                if child.poll() is not None:
+                    return 2
                 if not handshake:
                     if SUCCESS in log_bytes:
                         handshake = True
                         added = sorted(utun_interfaces() - before_utun)
+                        peer=authenticated_peer(log_bytes)
                         state_write("tunnel_established_unrouted",
                                     os.getpid(), deadline,
-                                    added[0] if len(added) == 1 else None)
+                                    added[0] if len(added) == 1 else None,
+                                    child.pid,peer)
                     else:
                         for pattern, reason in FAILURES:
                             if pattern.encode() in log_bytes:
@@ -258,7 +337,7 @@ def worker() -> int:
                     added = sorted(utun_interfaces() - before_utun)
                     if len(added) == 1 and tunnel_https_probe(added[0]):
                         state_write("tunnel_egress_verified_unrouted",
-                                    os.getpid(), deadline, added[0])
+                                    os.getpid(), deadline, added[0],child.pid,peer)
                 time.sleep(0.5)
             if not handshake and not STOP.exists():
                 state_write("OPENVPN_HANDSHAKE_TIMEOUT",
@@ -281,6 +360,12 @@ def worker() -> int:
                     time.sleep(1)
                     rollback_routes_before_stop()
             stop_openvpn(child)
+        try:
+            control=kill_switch_control()
+            if control:
+                control.abort_reconnect("openvpn")
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            pass
         cleanup(preserve_state=True)
 
 
@@ -306,8 +391,24 @@ def start() -> int:
         if BASE.is_symlink() or BASE.stat().st_uid != 0:
             output("OPENVPN_PRIVATE_DIR_UNTRUSTED")
             return 2
+        control=kill_switch_control()
+        protected=None
+        if control:
+            try:
+                protected=control.begin_reconnect(raw.decode("utf-8"),"openvpn")
+                if not protected:
+                    raise ValueError("OPENVPN_KS_RECONNECT_NOT_AUTHORIZED")
+                prepared=safe_config(raw,protected)
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                if protected:
+                    control.abort_reconnect("openvpn")
+                output("OPENVPN_KS_RECONNECT_NOT_AUTHORIZED")
+                return 2
         cleanup()
         write_private(CONFIG, prepared)
+        reviewed=review(raw.decode("utf-8"))
+        write_private(PROFILE_META,json.dumps({"digest":hashlib.sha256(raw).hexdigest(),
+                    "single_remote":reviewed["remotes"]==1}).encode())
         # Worker is a separate root process with a bounded lifetime.
         child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()),
                                   "worker"], stdin=subprocess.DEVNULL,

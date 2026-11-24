@@ -54,11 +54,22 @@ class AttestationTests(unittest.TestCase):
                 a.collect()
 
     def test_unimplemented_guard_is_never_promoted(self):
-        for index,reason in ((2,"KS_OPENVPN_TRANSPORT_NOT_ATTESTED"),(3,"KS_L2TP_TRANSPORT_NOT_ATTESTED")):
-            states=[None]*4
-            states[index]=lease()
-            with patch.object(a,"read_guard",side_effect=states):
-                with self.assertRaisesRegex(ValueError,reason): a.collect()
+        states=[None]*4
+        states[3]=lease()
+        with patch.object(a,"read_guard",side_effect=states):
+            with self.assertRaisesRegex(ValueError,"KS_L2TP_TRANSPORT_NOT_ATTESTED"): a.collect()
+
+    def test_openvpn_guard_requires_actual_session(self):
+        with patch.object(a,"openvpn_session_evidence",side_effect=ValueError("KS_OPENVPN_SOCKET_UNVERIFIED")):
+            with self.assertRaisesRegex(ValueError,"KS_OPENVPN_SOCKET_UNVERIFIED"):
+                a.openvpn_evidence(lease())
+        evidence=a.Evidence("openvpn","utun15","en0",(a.Transport("1.2.3.4",1194,"udp"),),124)
+        state=lease(interface="utun15",original_interface="en0")
+        with patch.object(a,"openvpn_session_evidence",return_value=(evidence,123,"a"*64)),patch.object(a,"route_interface",side_effect=route):
+            self.assertEqual(a.openvpn_evidence(state),evidence)
+            state["worker_pid"]=125
+            with self.assertRaisesRegex(ValueError,"KS_OPENVPN_ROUTE_UNVERIFIED"):
+                a.openvpn_evidence(state)
 
     def test_common_tun_protocol_map(self):
         for kind,expected in (("vless","v2ray"),("hysteria2","hysteria2"),("tuic","tuic"),

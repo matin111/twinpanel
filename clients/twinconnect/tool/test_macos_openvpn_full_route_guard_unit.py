@@ -110,6 +110,7 @@ class GuardTests(unittest.TestCase):
                 return reply("")
             return reply("")
         with (patch.object(guard, "load", return_value={}),
+              patch.object(guard, "kill_switch_control", return_value=None),
               patch.object(guard, "run", side_effect=fake_run),
               patch.object(guard, "management_peers", return_value=[]),
               patch.object(guard, "get_route",

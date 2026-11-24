@@ -198,6 +198,9 @@ def main() -> int:
         except OSError:
             safe_reply("L2TP_ROOT_HELPER_MISSING")
             return 2
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        safe_reply("L2TP_KS_RECONNECT_NOT_AUTHORIZED")
+        return 2
     # signal handlers run in main thread so disconnect can always restore.
     def terminate(_signum, _frame):
         raise Aborted()

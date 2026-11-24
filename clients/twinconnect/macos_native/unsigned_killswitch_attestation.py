@@ -158,6 +158,66 @@ def wireguard_evidence(state):
     return Evidence(protocol,iface,uplink,(transport,),pid)
 
 
+OPENVPN_APP=Path("/private/var/run/twinconnect-openvpn-app")
+OPENVPN_ENGINES=("/usr/local/opt/openvpn/sbin/openvpn",
+                 "/opt/homebrew/opt/openvpn/sbin/openvpn")
+
+
+def openvpn_session_evidence():
+    """Attest the current authenticated child and its exact live socket."""
+    session=root_private_json(OPENVPN_APP/"state.json")
+    meta=root_private_json(OPENVPN_APP/"profile-meta.json")
+    iface=session.get("interface")
+    worker=session.get("worker_pid")
+    pid=session.get("engine_pid")
+    if (session.get("state") not in ("tunnel_established_unrouted",
+             "tunnel_egress_verified_unrouted") or
+            type(session.get("deadline")) not in (int,float) or
+            not time.time()<session["deadline"] or
+            type(worker) is not int or worker<=1 or
+            type(pid) is not int or pid<=1 or
+            not isinstance(iface,str) or not re.fullmatch(r"utun[0-9]{1,4}",iface)):
+        raise ValueError("KS_OPENVPN_SESSION_UNVERIFIED")
+    workers=observed_tun_processes()
+    child=workers.get(pid)
+    parent=workers.get(worker)
+    helper="/Library/PrivilegedHelperTools/TwinConnectOpenVPN/macos_native/openvpn_app_session.py"
+    if (not parent or not parent[1].endswith(" "+helper+" worker") or
+            not child or child[0]!=worker or
+            not any(child[1].startswith(binary+" --config "+str(OPENVPN_APP/"session.ovpn")+" ")
+                    for binary in OPENVPN_ENGINES)):
+        raise ValueError("KS_OPENVPN_ENGINE_UNVERIFIED")
+    digest=meta.get("digest")
+    if meta.get("single_remote") is not True or not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest):
+        raise ValueError("KS_OPENVPN_PROFILE_UNVERIFIED")
+    # The root worker records only the exact authenticated remote after
+    # OpenVPN's Initialization Sequence Completed. Cross-check live sockets.
+    if session.get("transport") not in ("tcp","udp"):
+        raise ValueError("KS_OPENVPN_TRANSPORT_NOT_ATTESTED")
+    peer=Transport(session.get("endpoint"),session.get("port"),session["transport"])
+    if live_peers(pid)!={peer}:
+        raise ValueError("KS_OPENVPN_SOCKET_UNVERIFIED")
+    uplink=route_interface(peer.ip)
+    if not isinstance(uplink,str) or not re.fullmatch(r"en[0-9]{1,3}",uplink):
+        raise ValueError("KS_TRANSPORT_ROUTE_UNVERIFIED")
+    return Evidence("openvpn",iface,uplink,(peer,),pid),worker,digest
+
+
+def openvpn_evidence(state):
+    if not isinstance(state,dict) or state.get("mode")!="leased":
+        raise ValueError("KS_OPENVPN_TRANSPORT_NOT_ATTESTED")
+    evidence,worker,_=openvpn_session_evidence()
+    deadline=state.get("deadline")
+    if (type(deadline) not in (int,float) or not math.isfinite(deadline) or
+            not time.time()<deadline or state.get("worker_pid")!=worker or
+            state.get("interface")!=evidence.interface or
+            state.get("original_interface")!=evidence.uplink or
+            state.get("endpoint")!=evidence.transports[0].ip or
+            any(route_interface(ip)!=evidence.interface for ip in ("1.0.0.1","129.0.0.1"))):
+        raise ValueError("KS_OPENVPN_ROUTE_UNVERIFIED")
+    return evidence
+
+
 def cisco_evidence(state):
     iface,uplink,pid,endpoint=checked_lease(state,"cisco")
     if not process_command(pid).startswith(CISCO_BIN+" "):
@@ -393,6 +453,7 @@ def collect():
         name,state=found[0]
         if name=="wireguard": return wireguard_evidence(state)
         if name=="cisco": return cisco_evidence(state)
+        if name=="openvpn": return openvpn_evidence(state)
         raise ValueError("KS_"+name.upper()+"_TRANSPORT_NOT_ATTESTED")
     return tun_evidence(observed_tun_processes())
 

@@ -252,6 +252,8 @@ def rollback() -> str:
 
 
 def preflight() -> tuple[str, list[str], str, str]:
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        return "CISCO_KS_RECONNECT_NOT_AUTHORIZED", [], "", ""
     default = route("default")
     gateway, interface = default.get("gateway"), default.get("interface")
     if not gateway or not interface or not re.fullmatch(r"en[0-9]{1,3}", interface):

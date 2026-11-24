@@ -609,6 +609,8 @@ def main() -> int:
         if sys.argv[1:] not in (["probe"], ["system"]) and (
                 len(sys.argv) != 3 or sys.argv[1] != "connect"):
             raise ValueError("CISCO_INVALID_ACTION")
+        if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+            raise ValueError("CISCO_KS_RECONNECT_NOT_AUTHORIZED")
         # Validation before any privileged network operation.
         profile = validate(sys.stdin.buffer.read(16385))
         if not profile.get("servercert"):

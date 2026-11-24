@@ -653,6 +653,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var wireGuardProbeTask: Process?
     // A fresh authenticated profile is retained in memory only, scoped to
     // this account, panel and server. Never write keys/config to disk.
+    private var openVPNReconnectProfile: Data?
+    private var openVPNReconnectAccount: String?
+    private var openVPNReconnectOrigin: URL?
+    private var openVPNReconnectServer: String?
     private var wireGuardReconnectProfile: Data?
     private var wireGuardReconnectProtocol: String?
     private var wireGuardReconnectAccount: String?
@@ -3068,10 +3072,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let state = row?["state"] as? String ?? "fault"
         let on = state == "active" || state == "locked"
         toggle.state = on ? .on : .off
-        let wireguardReady = wireGuardSystemRouteVerified &&
-            ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)
+        let protectedConnectionReady = openVPNSystemRouteVerified ||
+            (wireGuardSystemRouteVerified &&
+             ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol))
         toggle.isEnabled = !nativeKillSwitchActionBusy &&
-            (on || (state == "off" && wireguardReady))
+            (on || (state == "off" && protectedConnectionReady))
         nativeKillSwitchResetButton?.isEnabled = !nativeKillSwitchActionBusy && state != "off"
         let caption: String
         if nativeKillSwitchActionBusy {
@@ -3081,7 +3086,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 (row?["reason"] as? String == "KS_RECONNECTING" ? "Reconnecting…" : "Internet blocked") :
                 "Active"
         } else if state == "off" {
-            caption = wireguardReady ? "Off" : "Connect supported VPN"
+            caption = protectedConnectionReady ? "Off" : "Connect supported VPN"
         } else if state == "arming" {
             caption = "Starting…"
         } else {
@@ -3094,8 +3099,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func changeNativeKillSwitch(_ sender: NSSwitch) {
         let enable = sender.state == .on
         if enable {
-            guard wireGuardSystemRouteVerified,
-                  ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol) else {
+            guard openVPNSystemRouteVerified ||
+                  (wireGuardSystemRouteVerified &&
+                   ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)) else {
                 updateNativeKillSwitchControls()
                 return
             }
@@ -3678,6 +3684,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpBusy = false
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
+        openVPNReconnectProfile = nil
+        openVPNReconnectAccount = nil
+        openVPNReconnectOrigin = nil
+        openVPNReconnectServer = nil
         wireGuardReconnectProfile = nil
         wireGuardReconnectProtocol = nil
         wireGuardReconnectAccount = nil
@@ -5042,8 +5052,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let generation = localProxyGeneration
         status = "OpenVPN: fetching authorized profile…"
         view = build()
-        directory.prepareOpenVPNProfile(session, serverID: serverID) {
-            [weak self] result in
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .failure:
@@ -5051,6 +5060,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "OpenVPN: PROFILE_UNAVAILABLE"
                 self.view = self.build()
             case .success(let profile):
+                self.openVPNReconnectProfile = profile
+                self.openVPNReconnectAccount = session.namespace
+                self.openVPNReconnectOrigin = session.apiOrigin
+                self.openVPNReconnectServer = serverID
                 DispatchQueue.global(qos: .userInitiated).async {
                     let valid = self.reviewOpenVPNProfile(profile)
                     let started = valid ?
@@ -5092,6 +5105,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     }
                 }
             }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard openVPNReconnectAccount == session.namespace,
+                  openVPNReconnectOrigin == session.apiOrigin,
+                  openVPNReconnectServer == serverID,
+                  let cached = openVPNReconnectProfile else {
+                fullTunBusy = false
+                status = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            fullTunBusy = false
+            status = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareOpenVPNProfile(session, serverID: serverID,
+                                              completion: complete)
         }
     }
 
@@ -6093,9 +6126,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let ks = nativeKillSwitchControlStatus(),
            let state = ks["state"] as? String, state != "off" {
-            if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
+            if openVPNAppSessionActive || openVPNSystemRouteVerified {
+                stopPersistentOpenVPN()
+            } else if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
                (state == "locked" && selectedWireGuardFamily) {
                 requestWireGuardProbe()
+            } else if state == "locked", activeProtocol == "openvpn",
+                      let session = accountSession, let serverID = activeServer,
+                      openVPNAppSessionInstalled() {
+                startPersistentOpenVPN(session, serverID: serverID)
             } else {
                 status = "Kill Switch is locked. Reconnect the same VPN or turn off Kill Switch."
                 wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"

@@ -217,11 +217,47 @@ def exact_host_routes() -> set[str] | None:
     return result
 
 
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def rollback() -> str:
     d = load()
     if not d:
         return "NO_OWNED_ROUTES"
     interface = d.get("interface", "")
+    try:
+        control=kill_switch_control()
+        if control:
+            control.before_openvpn_disconnect(d.get("worker_pid"),interface)
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return "OPENVPN_KS_CLOSE_BEFORE_ROLLBACK_FAILED"
     if not re.fullmatch(r"utun[0-9]{1,4}", interface):
         return "INVALID_STATE_MANUAL_RECOVERY_REQUIRED"
     successful = True
@@ -333,14 +369,23 @@ def trial(endpoint: str) -> str:
     # Require at least one *observed* inbound SSH session and pin all
     # active clients through the baseline interface before installing /1s.
     # No SSH session means no safe remote-management proof: fail closed.
-    ssh_peers = management_peers()
-    connector_peers = termalin_control_peers()
-    if not ssh_peers and not connector_peers:
-        return "REMOTE_MANAGEMENT_PEER_REQUIRED"
-    # Pin all observed remote control transports, not only the SSH socket.
-    # Without Connector's public peer a remotely managed Mac becomes
-    # unreachable even though its localhost SSH socket stays established.
-    peers = sorted(set(ssh_peers + connector_peers))
+    try:
+        control=kill_switch_control()
+        protected=control.reconnect_context("route") if control else None
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return "OPENVPN_KS_RECONNECT_UNVERIFIED"
+    if protected:
+        if (protected.get("protocol")!="openvpn" or protected.get("route_worker")!=worker_pid or
+                protected.get("interface")!=interface or protected.get("ip")!=endpoint or
+                protected.get("gateway")!=default.get("gateway") or protected.get("uplink")!=default.get("interface")):
+            return "OPENVPN_KS_RECONNECT_UNVERIFIED"
+        peers=[]
+    else:
+        ssh_peers = management_peers()
+        connector_peers = termalin_control_peers()
+        if not ssh_peers and not connector_peers:
+            return "REMOTE_MANAGEMENT_PEER_REQUIRED"
+        peers = sorted(set(ssh_peers + connector_peers))
     if endpoint in peers:
         return "SERVER_AND_MANAGEMENT_PEER_CONFLICT"
     existing = exact_host_routes()
@@ -399,14 +444,32 @@ def connect() -> str:
     """Lease full IPv4 routing only when HTTPS egress and DNS can be restored."""
     if load():
         return "ROUTE_ALREADY_OWNED"
-    baseline = external_ipv4()
+    control=None
+    protected=None
+    pid=None
+    try:
+        control=kill_switch_control()
+        if control:
+            protected=control.reconnect_context("handshake")
+            if not protected or protected.get("protocol")!="openvpn":
+                return "OPENVPN_KS_RECONNECT_UNVERIFIED"
+            session=json.loads(SESSION.read_text())
+            pid=control.attach_openvpn_reconnect(session["worker_pid"],session["interface"])
+    except (OSError,ValueError,RuntimeError,KeyError,TypeError,subprocess.SubprocessError):
+        return "OPENVPN_KS_RECONNECT_UNVERIFIED"
+    baseline = protected["baseline_ip"] if protected else external_ipv4()
     if baseline is None:
         return "BASELINE_IP_UNVERIFIED"
     endpoint = observed_openvpn_endpoint()
+    if protected and endpoint!=protected["ip"]:
+        control.abort_reconnect("openvpn")
+        return "OPENVPN_KS_ENDPOINT_CHANGED"
     if endpoint is None:
         return "OPENVPN_ENDPOINT_NOT_OBSERVED"
     result = trial(endpoint)
     if result != "IPV4_FULL_ROUTE_TRIAL_ACTIVE_45_SECONDS":
+        if protected:
+            control.abort_reconnect("openvpn")
         return result
     # The watchdog will recover the routes even if this command crashes.
     tunneled = external_ipv4()
@@ -426,9 +489,25 @@ def connect() -> str:
     store(state)
     if not set_dns(service, list(DNS_SERVERS)):
         return "DNS_APPLY_FAILED_" + rollback()
+    if protected:
+        try:
+            dns=subprocess.run(["/usr/bin/dig","+time=2","+tries=1","@1.1.1.1","example.com","A","+short"],
+                capture_output=True,text=True,timeout=4)
+            https=subprocess.run(["/usr/bin/curl","--noproxy","*","-4","-fsS","--connect-timeout","3",
+                "--max-time","8","-o","/dev/null","https://example.com"],capture_output=True,timeout=10)
+            if dns.returncode or not dns.stdout.strip() or https.returncode:
+                return "OPENVPN_KS_DNS_UNVERIFIED_"+rollback()
+        except (OSError,subprocess.SubprocessError):
+            return "OPENVPN_KS_DNS_UNVERIFIED_"+rollback()
     state["mode"] = "leased"
+    state["baseline_ip"]=baseline
     state["deadline"] = time.time() + LEASE_SECONDS
     store(state)
+    if protected:
+        try:
+            control.complete_reconnect(pid,state["interface"])
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "OPENVPN_KS_RECONNECT_FAILED_"+rollback()
     return "IPV4_FULL_ROUTE_CONNECTED"
 
 
@@ -456,7 +535,12 @@ def heartbeat() -> str:
     # silently routed through the VPN: expire and recover instead.
     observed = termalin_control_peers()
     if observed and not set(observed).issubset(set(d.get("management_pin_committed", []))):
-        return "MANAGEMENT_PEER_CHANGED"
+        try:
+            control=kill_switch_control()
+            if not control or not control.openvpn_active_recovery(d["worker_pid"],interface):
+                return "MANAGEMENT_PEER_CHANGED"
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "MANAGEMENT_PEER_CHANGED"
     d["deadline"] = time.time() + LEASE_SECONDS
     store(d)
     return "IPV4_FULL_ROUTE_CONNECTED"

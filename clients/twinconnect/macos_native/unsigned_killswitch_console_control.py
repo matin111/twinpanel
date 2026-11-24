@@ -29,7 +29,7 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence
 from unsigned_killswitch_policy import Transport, render_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
@@ -47,6 +47,7 @@ RECONNECT_SECONDS=60
 ARMING_TIMEOUT=30
 SESSION_MODE='until_reset'
 WG_PROTOCOLS={'wireguard':WG_BIN,'amneziawg':AWG_BIN}
+SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn'}
 
 
 def run(*args, input=None, timeout=4):
@@ -134,8 +135,8 @@ def preflight():
     canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=RULES))
     if canonical!=lines(RULES): raise RuntimeError("RULE_SYNTAX_READBACK_FAILED")
     evidence=collect()
-    if evidence is None or evidence.protocol not in WG_PROTOCOLS:
-        raise RuntimeError("CONNECT_WIREGUARD_OR_AMNEZIAWG_FIRST")
+    if evidence is None or evidence.protocol not in SUPPORTED_PROTOCOLS:
+        raise RuntimeError("CONNECT_SUPPORTED_VPN_FIRST")
     if route_interface("1.1.1.1")!=evidence.interface:
         raise RuntimeError("WG_ROUTE_UNVERIFIED")
     service=run("/bin/launchctl","print","system/"+LABEL)
@@ -220,12 +221,23 @@ WG_META=WG_STATE.with_name("tunnel-dns.json")
 
 def reconnect_identity(evidence):
     try:
+        if evidence.protocol=="openvpn":
+            current,worker,digest=openvpn_session_evidence()
+            state=root_private_json(Path("/private/var/run/twinconnect-full-route-guard/state.json"))
+            peer=evidence.transports[0]
+            baseline=state.get("baseline_ip")
+            if (current!=evidence or state.get("worker_pid")!=worker or
+                    not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
+                return None
+            return {"protocol":"openvpn","digest":digest,"ip":peer.ip,"port":peer.port,
+                    "transport":peer.proto,"uplink":evidence.uplink,"gateway":state["gateway"],
+                    "baseline_ip":baseline}
         state=root_private_json(WG_STATE)
         meta=root_private_json(WG_META)
         digest=meta.get("profile_digest")
         baseline=state.get("baseline_ip")
         transport=evidence.transports[0]
-        if (evidence.protocol not in WG_PROTOCOLS or len(evidence.transports)!=1 or
+        if (evidence.protocol not in SUPPORTED_PROTOCOLS or len(evidence.transports)!=1 or
                 state.get("protocol_code","wireguard")!=evidence.protocol or
                 state.get("worker_pid")!=evidence.pid or
                 state.get("full_interface")!=evidence.interface or
@@ -236,14 +248,14 @@ def reconnect_identity(evidence):
                 not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest) or
                 not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
             return None
-        return {"protocol":evidence.protocol,"digest":digest,"ip":transport.ip,"port":transport.port,
+        return {"protocol":evidence.protocol,"digest":digest,"ip":transport.ip,"port":transport.port,"transport":"udp",
                 "uplink":evidence.uplink,"gateway":state["gateway"],"baseline_ip":baseline}
     except (OSError,ValueError,KeyError,TypeError):
         return None
 
 
 def bootstrap_rules(identity, tunnel=None):
-    transport=Transport(identity["ip"],identity["port"],"udp")
+    transport=Transport(identity["ip"],identity["port"],identity.get("transport","udp"))
     uplink=identity["uplink"]
     if not re.fullmatch(r"en[0-9]{1,3}",uplink) or ipaddress.ip_address(transport.ip).version!=4:
         raise ValueError("KS_BOOTSTRAP_TRANSPORT_INVALID")
@@ -314,7 +326,7 @@ def begin_reconnect(raw,protocol):
         lease=read_json("lease.json")
         if lease is None:
             return None
-        if protocol not in WG_PROTOCOLS or not lease.get("locked") or lease.get("reconnect_stage"):
+        if protocol not in SUPPORTED_PROTOCOLS or not lease.get("locked") or lease.get("reconnect_stage"):
             raise RuntimeError("WG_KS_RECONNECT_NOT_ALLOWED")
         identity=lease.get("reconnect_identity")
         if not isinstance(identity,dict) or identity.get("protocol")!=protocol or not isinstance(raw,str) or (
@@ -345,8 +357,53 @@ def reconnect_context(stage=None):
             raise RuntimeError("KS_RECONNECT_UNVERIFIED")
         identity=lease["reconnect_identity"].copy()
         identity.update({"stage":lease["reconnect_stage"],"pid":lease["pid"],
-                         "interface":lease["interface"]})
+                         "interface":lease["interface"],"route_worker":lease.get("route_worker")})
         return identity
+
+
+def attach_openvpn_reconnect(worker,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="handshake":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        identity=lease["reconnect_identity"]
+        session_deadline(lease)
+        evidence,actual_worker,digest=openvpn_session_evidence()
+        if (identity.get("protocol")!="openvpn" or actual_worker!=worker or
+                evidence.interface!=iface or evidence.uplink!=identity["uplink"] or
+                evidence.transports!=(Transport(identity["ip"],identity["port"],identity["transport"]),) or
+                digest!=identity["digest"] or time.time()>=lease.get("reconnect_until",0)):
+            raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
+        replace_owned_policy(lease,bootstrap_rules(identity,iface),
+                             pid=evidence.pid,interface=iface,reconnect_stage="route",
+                             route_worker=worker)
+        return evidence.pid
+
+
+def openvpn_active_recovery(worker,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if (not lease or lease.get("locked") or lease.get("route_worker")!=worker or
+                lease.get("interface")!=iface or lease.get("reconnect_identity",{}).get("protocol")!="openvpn"):
+            return False
+        session_deadline(lease)
+        return monitor_lease(lease)=="active"
+
+
+def before_openvpn_disconnect(worker,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if lease is None:
+            return
+        identity=lease.get("reconnect_identity",{})
+        if identity.get("protocol")!="openvpn":
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if lease.get("interface")!=iface or lease.get("route_worker")!=worker:
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if not lease.get("locked") or lease.get("reconnect_stage"):
+            close_lease(lease)
+        elif anchor_rules()!=lines(RULES) or not pf_enabled():
+            raise RuntimeError("KS_CLOSED_POLICY_UNVERIFIED")
 
 
 def attach_reconnect(pid,iface):
@@ -359,7 +416,7 @@ def attach_reconnect(pid,iface):
         if (time.time()>=lease.get("reconnect_until",0) or
                 identity.get("protocol") not in WG_PROTOCOLS or
                 process_command(pid)!=WG_PROTOCOLS[identity["protocol"]]+" -f "+iface or
-                wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],"udp") or
+                wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],identity.get("transport","udp")) or
                 route_interface(identity["ip"])!=identity["uplink"]):
             raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
         replace_owned_policy(lease,bootstrap_rules(identity,iface),
@@ -377,7 +434,7 @@ def complete_reconnect(pid,iface):
         if (time.time()>=lease.get("reconnect_until",0) or evidence is None or
                 evidence.protocol!=identity.get("protocol") or evidence.pid!=pid or evidence.interface!=iface or
                 evidence.uplink!=identity["uplink"] or
-                evidence.transports!=(Transport(identity["ip"],identity["port"],"udp"),) or
+                evidence.transports!=(Transport(identity["ip"],identity["port"],identity.get("transport","udp")),) or
                 anchor_rules()!=tuple(lease["canonical"]) or not pf_enabled()):
             raise RuntimeError("KS_RECONNECT_ROUTE_UNVERIFIED")
         lease.update(locked=False,reconnect_stage=None,reconnect_until=0)
@@ -385,10 +442,10 @@ def complete_reconnect(pid,iface):
         publish("active","KS_WG_ACTIVE",deadline)
 
 
-def abort_reconnect():
+def abort_reconnect(protocol=None):
     with lock():
         lease=read_json("lease.json")
-        if lease and lease.get("reconnect_stage"):
+        if lease and lease.get("reconnect_stage") and (protocol is None or lease.get("reconnect_identity",{}).get("protocol")==protocol):
             close_lease(lease)
 
 
@@ -408,9 +465,15 @@ def monitor_lease(lease):
             try:
                 identity=lease["reconnect_identity"]
                 iface=lease["interface"]
-                expired=(identity.get("protocol") not in WG_PROTOCOLS or
+                if identity.get("protocol")=="openvpn":
+                    evidence,worker,digest=openvpn_session_evidence()
+                    expired=(evidence.pid!=lease["pid"] or worker!=lease.get("route_worker") or
+                             evidence.interface!=iface or digest!=identity["digest"] or
+                             evidence.transports!=(Transport(identity["ip"],identity["port"],identity["transport"]),))
+                else:
+                    expired=(identity.get("protocol") not in WG_PROTOCOLS or
                          process_command(lease["pid"])!=WG_PROTOCOLS[identity["protocol"]]+" -f "+iface or
-                         wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],"udp"))
+                         wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],identity.get("transport","udp")))
             except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
                 expired=True
         if expired:
@@ -427,11 +490,18 @@ def monitor_lease(lease):
     try:
         identity=lease.get("reconnect_identity")
         protocol=identity.get("protocol") if isinstance(identity,dict) else None
-        valid=(protocol in WG_PROTOCOLS and
+        if protocol=="openvpn":
+            evidence=collect()
+            valid=(evidence is not None and evidence.protocol=="openvpn" and
+                   evidence.pid==pid and evidence.interface==iface and
+                   evidence.uplink==identity["uplink"] and
+                   evidence.transports==(Transport(identity["ip"],identity["port"],identity["transport"]),))
+        else:
+            valid=(protocol in WG_PROTOCOLS and
                process_command(pid)==WG_PROTOCOLS[protocol]+" -f "+iface and
                route_interface("1.1.1.1")==iface and
                route_interface("129.0.0.1")==iface and
-               wg_uapi(protocol,iface)==Transport(identity["ip"],identity["port"],"udp") and
+               wg_uapi(protocol,iface)==Transport(identity["ip"],identity["port"],identity.get("transport","udp")) and
                route_interface(identity["ip"])==identity["uplink"])
     except Exception:
         pass
@@ -536,8 +606,8 @@ def enable():
             cleanup_job()
         preflight()
         evidence=collect()
-        if evidence is None or evidence.protocol not in WG_PROTOCOLS:
-            raise RuntimeError("CONNECT_WIREGUARD_OR_AMNEZIAWG_FIRST")
+        if evidence is None or evidence.protocol not in SUPPORTED_PROTOCOLS:
+            raise RuntimeError("CONNECT_SUPPORTED_VPN_FIRST")
         rules=evidence.rules()
         canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=rules))
         if not canonical or canonical[-1]!="block drop quick all":
@@ -551,6 +621,9 @@ def enable():
                "canonical":list(canonical),"pid":evidence.pid,
                "interface":evidence.interface,"locked":False,
                "reconnect_identity":identity}
+        if evidence.protocol=="openvpn":
+            _,worker,_=openvpn_session_evidence()
+            lease["route_worker"]=worker
         write_json("lease.json",lease)
         publish("arming","KS_ARMING")
         try:

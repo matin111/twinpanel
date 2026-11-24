@@ -193,6 +193,8 @@ def ppp_interface() -> str | None:
 
 
 def preflight() -> tuple[str, dict]:
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        return "L2TP_KS_RECONNECT_NOT_AUTHORIZED", {}
     if any(path.exists() for path in PROTECT_VPNS):
         return "L2TP_OTHER_SYSTEM_VPN_ACTIVE", {}
     if STATE.exists():

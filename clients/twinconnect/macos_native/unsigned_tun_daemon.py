@@ -389,6 +389,8 @@ class Session:
                 raise ValueError("TUN_ALREADY_RUNNING")
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
+            if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+                raise ValueError("TUN_KS_RECONNECT_NOT_AUTHORIZED")
             use_trusttunnel = profile.get("mode") == "trusttunnel"
             use_sudoku = profile.get("mode") == "sudoku"
             trust_toml = ""
