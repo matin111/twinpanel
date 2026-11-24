@@ -22,9 +22,10 @@ paths = {
     "guides": ROOT / "app" / "telegram_guides_bot.py",
 }
 sources = {name: path.read_text(encoding="utf-8") for name, path in paths.items()}
-trees = {}
-for name, source in sources.items():
-    trees[name] = ast.parse(source, filename=str(paths[name]))
+trees = {
+    name: ast.parse(source, filename=str(paths[name]))
+    for name, source in sources.items()
+}
 
 
 def function_source(module_name: str, function_name: str) -> str:
@@ -62,13 +63,14 @@ menus = {
 for name, (menu, callback) in menus.items():
     assert menu.count("آموزش و دانلود") == 1, name
     assert "⬇️ دانلود برنامه" not in menu, name
+    assert URL not in menu, name
     if callback:
         assert callback in menu, name
 
-# Old menu labels remain compatible while the new unified label routes to the
-# same app-first guide; downloads are offered inside each selected app page.
+# The learning center routes the unified label to the guide-first flow and
+# keeps old labels working for already-delivered Telegram keyboards.
 assert '(F.text == "📚 آموزش و دانلود") | (F.text == "📚 آموزش")' in learning
-assert "F.text == \"⬇️ دانلود برنامه\"" in learning
+assert 'F.text == "⬇️ دانلود برنامه"' in learning
 assert '(F.text=="📚 آموزش و دانلود") | (F.text=="📚 آموزش")' in sources["guides"]
 
 # The shared learning center remains registered by both bot runtimes.
