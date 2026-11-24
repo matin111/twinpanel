@@ -654,6 +654,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // A fresh authenticated profile is retained in memory only, scoped to
     // this account, panel and server. Never write keys/config to disk.
     private var wireGuardReconnectProfile: Data?
+    private var wireGuardReconnectProtocol: String?
     private var wireGuardReconnectAccount: String?
     private var wireGuardReconnectServer: String?
     private var wireGuardReconnectOrigin: URL?
@@ -2973,7 +2974,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let toggle = NSSwitch()
             toggle.target = self
             toggle.action = #selector(changeNativeKillSwitch(_:))
-            toggle.setAccessibilityLabel("WireGuard Kill Switch")
+            toggle.setAccessibilityLabel("Kill Switch")
             nativeKillSwitchToggle = toggle
             let indicator = text("Checking", size: 12, weight: .semibold, color: muted)
             nativeKillSwitchStatusLabel = indicator
@@ -2981,8 +2982,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             controls.alignment = .trailing
             controls.addArrangedSubview(toggle)
             controls.addArrangedSubview(indicator)
-            add(preferenceRow("Kill Switch • WireGuard",
-                              subtitle: "Block internet when WireGuard disconnects.",
+            add(preferenceRow("Kill Switch",
+                              subtitle: "Block internet when VPN disconnects.",
                               control: controls))
             let reset = button("Reset Internet", action: #selector(resetNativeKillSwitch(_:)))
             nativeKillSwitchResetButton = reset
@@ -3068,7 +3069,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let on = state == "active" || state == "locked"
         toggle.state = on ? .on : .off
         let wireguardReady = wireGuardSystemRouteVerified &&
-            wireGuardConnectionProtocol == "wireguard"
+            ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)
         toggle.isEnabled = !nativeKillSwitchActionBusy &&
             (on || (state == "off" && wireguardReady))
         nativeKillSwitchResetButton?.isEnabled = !nativeKillSwitchActionBusy && state != "off"
@@ -3080,7 +3081,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 (row?["reason"] as? String == "KS_RECONNECTING" ? "Reconnecting…" : "Internet blocked") :
                 "Active"
         } else if state == "off" {
-            caption = wireguardReady ? "Off" : "Connect WireGuard"
+            caption = wireguardReady ? "Off" : "Connect supported VPN"
         } else if state == "arming" {
             caption = "Starting…"
         } else {
@@ -3094,13 +3095,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let enable = sender.state == .on
         if enable {
             guard wireGuardSystemRouteVerified,
-                  wireGuardConnectionProtocol == "wireguard" else {
+                  ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol) else {
                 updateNativeKillSwitchControls()
                 return
             }
             let alert = NSAlert()
-            alert.messageText = "Enable WireGuard Kill Switch?"
-            alert.informativeText = "Keep your provider console open. Internet and remote management can be blocked until you reconnect WireGuard or manually turn off Kill Switch. Protection stays on for this macOS boot; restart protection is not supported."
+            alert.messageText = "Enable Kill Switch?"
+            alert.informativeText = "Keep your provider console open. Internet and remote management can be blocked until you reconnect the same VPN or manually turn off Kill Switch. Protection stays on for this macOS boot; restart protection is not supported."
             alert.addButton(withTitle: "Enable")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else {
@@ -3678,6 +3679,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
         wireGuardReconnectProfile = nil
+        wireGuardReconnectProtocol = nil
         wireGuardReconnectAccount = nil
         wireGuardReconnectServer = nil
         wireGuardReconnectOrigin = nil
@@ -5847,7 +5849,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     detail : "WG_PROFILE_UNAVAILABLE"
                 self.view = self.build()
             case .success(let payload):
-                if code == "wireguard" {
+                if ["wireguard", "amneziawg"].contains(code) {
+                    self.wireGuardReconnectProtocol = code
                     self.wireGuardReconnectProfile = payload
                     self.wireGuardReconnectAccount = session.namespace
                     self.wireGuardReconnectServer = self.activeServer
@@ -5915,7 +5918,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         let ks = nativeKillSwitchControlStatus()
         if ks?["state"] as? String == "locked" {
-            guard code == "wireguard",
+            guard ["wireguard", "amneziawg"].contains(code),
+                  wireGuardReconnectProtocol == code,
                   wireGuardReconnectAccount == session.namespace,
                   wireGuardReconnectOrigin == session.apiOrigin,
                   wireGuardReconnectServer == serverID,
@@ -6090,10 +6094,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let ks = nativeKillSwitchControlStatus(),
            let state = ks["state"] as? String, state != "off" {
             if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
-               (state == "locked" && activeProtocol == "wireguard") {
+               (state == "locked" && selectedWireGuardFamily) {
                 requestWireGuardProbe()
             } else {
-                status = "Kill Switch is locked. Reconnect WireGuard or turn off Kill Switch."
+                status = "Kill Switch is locked. Reconnect the same VPN or turn off Kill Switch."
                 wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"
                 view = build()
             }
@@ -6485,7 +6489,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func nativeKillSwitchReport() -> String {
         if let control = nativeKillSwitchControlStatus(),
            let state = control["state"] as? String {
-            return "WireGuard Kill Switch: " + state + "; current boot only; other engines not supported"
+            return "Kill Switch: " + state + "; current boot only"
         }
         // Read only a fresh root-owned public status snapshot. This
         // is not a preference, a connection badge or leak attestation.

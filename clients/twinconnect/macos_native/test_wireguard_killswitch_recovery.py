@@ -8,7 +8,7 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.current={"worker_pid":123,"full_interface":"utun15","protocol_code":"wireguard"}
         self.nonce="a"*32
         self.rules=["pass quick on lo0 all no state","pass quick on utun15 all no state","block drop quick all"]
-        self.lease={"phase":"owned","mode":"until_reset","locked":False,"nonce":self.nonce,"pid":123,"interface":"utun15","token":"12345","canonical":self.rules}
+        self.lease={"phase":"owned","mode":"until_reset","locked":False,"nonce":self.nonce,"pid":123,"interface":"utun15","token":"12345","canonical":self.rules,"reconnect_identity":{"protocol":"wireguard"}}
         self.ready={"nonce":self.nonce,"deadline":0,"mode":"until_reset"}
         self.status={"version":1,"persistent":False,"mode":"until_reset","session_limit":0,"state":"active","expires_at":0,"timestamp":5000}
         self.job="state = running\n"+str(guard.KS_CONTROL_ROOT/"unsigned_killswitch_console_control.py")+"\n--watchdog\n"+self.nonce
@@ -34,6 +34,10 @@ class BoundedRecoveryTests(unittest.TestCase):
     def test_other_protocol(self):
         self.current["protocol_code"]="amneziawg"
         self.assertFalse(self.accepts())
+    def test_amneziawg_matching_authorized_lease(self):
+        self.current["protocol_code"]="amneziawg"
+        self.lease["reconnect_identity"]["protocol"]="amneziawg"
+        self.assertTrue(self.accepts())
     def test_persistent(self):
         self.status["persistent"]=True
         self.assertFalse(self.accepts())

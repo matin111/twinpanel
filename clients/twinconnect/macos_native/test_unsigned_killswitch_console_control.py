@@ -10,9 +10,9 @@ class ControlTests(unittest.TestCase):
         self.lease={"phase":"owned","nonce":"a"*32,"token":"123",
                     "canonical":["pass quick on lo0 all no state",
                                  "pass quick on utun15 all no state","block drop quick all"],
-                    "pid":123,"interface":"utun15","locked":False}
+                    "pid":123,"interface":"utun15","locked":False,"reconnect_identity":{"protocol":"wireguard","ip":"1.2.3.4","port":51820,"uplink":"en0"}}
     def test_valid_worker_keeps_policy(self):
-        with patch.object(c,"pf_enabled",return_value=True), patch.object(c,"anchor_rules",return_value=tuple(self.lease["canonical"])), patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun15"), patch.object(c,"route_interface",return_value="utun15"), patch.object(c,"checked") as checked:
+        with patch.object(c,"pf_enabled",return_value=True), patch.object(c,"anchor_rules",return_value=tuple(self.lease["canonical"])), patch.object(c,"process_command",return_value=c.WG_BIN+" -f utun15"), patch.object(c,"route_interface",side_effect=lambda ip: "en0" if ip=="1.2.3.4" else "utun15"), patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51820,"udp")), patch.object(c,"checked") as checked:
             self.assertEqual(c.monitor_lease(self.lease),"active")
             checked.assert_not_called()
     def test_loss_closes_and_never_reopens(self):
@@ -52,7 +52,10 @@ class ControlTests(unittest.TestCase):
             self.assertNotIn("endpoint",text)
     def test_settings_control_uses_admin_authorization(self):
         source=pathlib.Path(__file__).with_name("TwinConnectMacOSNativeDashboard.swift").read_text()
-        self.assertIn("Kill Switch • WireGuard",source)
+        self.assertIn('preferenceRow("Kill Switch",',source)
+        self.assertNotIn("Kill Switch • WireGuard",source)
+        self.assertNotIn('subtitle: "WireGuard and AmneziaWG"',source)
+        self.assertNotIn('"Connect WireGuard or AmneziaWG"',source)
         self.assertIn('with administrator privileges',source)
         self.assertIn('nativeKillSwitchControlStatus()',source)
         self.assertIn('row["persistent"] as? Bool == false',source)

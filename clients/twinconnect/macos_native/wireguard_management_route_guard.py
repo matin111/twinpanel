@@ -620,6 +620,7 @@ def activate_full(interface: str, pid: int) -> str:
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
         return "WG_KS_RECONNECT_UNVERIFIED"
     if protected and (protected.get("stage")!="route" or
+            protected.get("protocol")!=wireguard_transport(pid,interface) or
             protected.get("pid")!=pid or protected.get("interface")!=interface or
             protected.get("ip")!=endpoint):
         return "WG_KS_CANDIDATE_MISMATCH"
@@ -731,7 +732,8 @@ def ks_recovery_command(*args: str) -> str:
 
 
 def bounded_killswitch_recovery(current: dict) -> bool:
-    if current.get("protocol_code", "wireguard") != "wireguard":
+    protocol=current.get("protocol_code","wireguard")
+    if protocol not in ("wireguard","amneziawg"):
         return False
     try:
         lease = read_trusted_ks_json(KS_CONTROL_STATE / "lease.json", True)
@@ -743,6 +745,9 @@ def bounded_killswitch_recovery(current: dict) -> bool:
         stamp = status.get("timestamp")
         iface = current.get("full_interface", "")
         rules = lease.get("canonical")
+        identity=lease.get("reconnect_identity")
+        if not isinstance(identity,dict) or identity.get("protocol")!=protocol:
+            return False
         if (not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce) or
                 lease.get("phase") != "owned" or lease.get("locked") is not False or
                 lease.get("pid") != current.get("worker_pid") or

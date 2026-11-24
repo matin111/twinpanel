@@ -11,7 +11,7 @@ import wireguard_unsigned_tunnel as w
 class ReconnectTests(unittest.TestCase):
     def setUp(self):
         self.raw="synthetic original profile"
-        self.identity={"digest":hashlib.sha256(self.raw.encode()).hexdigest(),
+        self.identity={"protocol":"wireguard","digest":hashlib.sha256(self.raw.encode()).hexdigest(),
                        "ip":"1.2.3.4","port":51820,"uplink":"en0",
                        "gateway":"1.2.3.1","baseline_ip":"8.8.4.4"}
         self.lease={"phase":"owned","nonce":"a"*32,"token":"123","locked":True,
@@ -52,6 +52,23 @@ class ReconnectTests(unittest.TestCase):
             self.assertIn("pass quick on utun16 all no state",replace.call_args.args[1])
             self.assertNotIn("utun15",replace.call_args.args[1])
             self.assertEqual(replace.call_args.kwargs["reconnect_stage"],"route")
+    def test_amneziawg_requires_its_own_engine_and_uapi(self):
+        self.identity["protocol"]="amneziawg"
+        self.lease.update(reconnect_stage="handshake",reconnect_until=5060)
+        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"session_deadline",return_value=0),patch.object(c.time,"time",return_value=5000),patch.object(c,"process_command",return_value=c.AWG_BIN+" -f utun16") as process,patch.object(c,"wg_uapi",return_value=c.Transport("1.2.3.4",51820,"udp")) as uapi,patch.object(c,"route_interface",return_value="en0"),patch.object(c,"replace_owned_policy") as replace:
+            c.attach_reconnect(124,"utun16")
+            uapi.assert_called_once_with("amneziawg","utun16")
+            replace.assert_called_once()
+            process.return_value=c.WG_BIN+" -f utun16"
+            replace.reset_mock()
+            with self.assertRaisesRegex(RuntimeError,"KS_RECONNECT_PEER_UNVERIFIED"):
+                c.attach_reconnect(124,"utun16")
+            replace.assert_not_called()
+    def test_cannot_switch_protocol_while_locked(self):
+        with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"replace_owned_policy") as replace:
+            with self.assertRaisesRegex(RuntimeError,"WG_KS_ORIGINAL_PROFILE_REQUIRED"):
+                c.begin_reconnect(self.raw,"amneziawg")
+            replace.assert_not_called()
     def test_close_before_disconnect(self):
         self.lease["locked"]=False
         with patch.object(c,"lock",return_value=MagicMock()),patch.object(c,"read_json",return_value=self.lease),patch.object(c,"close_lease") as close:

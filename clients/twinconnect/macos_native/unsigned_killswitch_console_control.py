@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""WireGuard Kill Switch for the current macOS boot, until manual reset.
+"""WireGuard-family Kill Switch for the current macOS boot, until manual reset.
 
 Local administrator approval and provider-console recovery are required.
 The watchdog stays alive independently of the app and closes on restart.
@@ -29,7 +29,7 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, wg_uapi, root_private_json
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json
 from unsigned_killswitch_policy import Transport, render_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
@@ -46,6 +46,7 @@ RECOVERY_SECONDS=0
 RECONNECT_SECONDS=60
 ARMING_TIMEOUT=30
 SESSION_MODE='until_reset'
+WG_PROTOCOLS={'wireguard':WG_BIN,'amneziawg':AWG_BIN}
 
 
 def run(*args, input=None, timeout=4):
@@ -133,8 +134,8 @@ def preflight():
     canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=RULES))
     if canonical!=lines(RULES): raise RuntimeError("RULE_SYNTAX_READBACK_FAILED")
     evidence=collect()
-    if evidence is None or evidence.protocol!="wireguard":
-        raise RuntimeError("CONNECT_WIREGUARD_FIRST")
+    if evidence is None or evidence.protocol not in WG_PROTOCOLS:
+        raise RuntimeError("CONNECT_WIREGUARD_OR_AMNEZIAWG_FIRST")
     if route_interface("1.1.1.1")!=evidence.interface:
         raise RuntimeError("WG_ROUTE_UNVERIFIED")
     service=run("/bin/launchctl","print","system/"+LABEL)
@@ -224,7 +225,8 @@ def reconnect_identity(evidence):
         digest=meta.get("profile_digest")
         baseline=state.get("baseline_ip")
         transport=evidence.transports[0]
-        if (evidence.protocol!="wireguard" or len(evidence.transports)!=1 or
+        if (evidence.protocol not in WG_PROTOCOLS or len(evidence.transports)!=1 or
+                state.get("protocol_code","wireguard")!=evidence.protocol or
                 state.get("worker_pid")!=evidence.pid or
                 state.get("full_interface")!=evidence.interface or
                 state.get("interface")!=evidence.uplink or
@@ -234,7 +236,7 @@ def reconnect_identity(evidence):
                 not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest) or
                 not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
             return None
-        return {"digest":digest,"ip":transport.ip,"port":transport.port,
+        return {"protocol":evidence.protocol,"digest":digest,"ip":transport.ip,"port":transport.port,
                 "uplink":evidence.uplink,"gateway":state["gateway"],"baseline_ip":baseline}
     except (OSError,ValueError,KeyError,TypeError):
         return None
@@ -312,10 +314,10 @@ def begin_reconnect(raw,protocol):
         lease=read_json("lease.json")
         if lease is None:
             return None
-        if protocol!="wireguard" or not lease.get("locked") or lease.get("reconnect_stage"):
+        if protocol not in WG_PROTOCOLS or not lease.get("locked") or lease.get("reconnect_stage"):
             raise RuntimeError("WG_KS_RECONNECT_NOT_ALLOWED")
         identity=lease.get("reconnect_identity")
-        if not isinstance(identity,dict) or not isinstance(raw,str) or (
+        if not isinstance(identity,dict) or identity.get("protocol")!=protocol or not isinstance(raw,str) or (
                 hashlib.sha256(raw.encode("utf-8")).hexdigest()!=identity.get("digest")):
             raise RuntimeError("WG_KS_ORIGINAL_PROFILE_REQUIRED")
         deadline=session_deadline(lease)
@@ -355,8 +357,9 @@ def attach_reconnect(pid,iface):
         identity=lease["reconnect_identity"]
         session_deadline(lease)
         if (time.time()>=lease.get("reconnect_until",0) or
-                process_command(pid)!=WG_BIN+" -f "+iface or
-                wg_uapi("wireguard",iface)!=Transport(identity["ip"],identity["port"],"udp") or
+                identity.get("protocol") not in WG_PROTOCOLS or
+                process_command(pid)!=WG_PROTOCOLS[identity["protocol"]]+" -f "+iface or
+                wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],"udp") or
                 route_interface(identity["ip"])!=identity["uplink"]):
             raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
         replace_owned_policy(lease,bootstrap_rules(identity,iface),
@@ -372,7 +375,7 @@ def complete_reconnect(pid,iface):
         evidence=collect()
         identity=lease["reconnect_identity"]
         if (time.time()>=lease.get("reconnect_until",0) or evidence is None or
-                evidence.protocol!="wireguard" or evidence.pid!=pid or evidence.interface!=iface or
+                evidence.protocol!=identity.get("protocol") or evidence.pid!=pid or evidence.interface!=iface or
                 evidence.uplink!=identity["uplink"] or
                 evidence.transports!=(Transport(identity["ip"],identity["port"],"udp"),) or
                 anchor_rules()!=tuple(lease["canonical"]) or not pf_enabled()):
@@ -405,8 +408,9 @@ def monitor_lease(lease):
             try:
                 identity=lease["reconnect_identity"]
                 iface=lease["interface"]
-                expired=(process_command(lease["pid"])!=WG_BIN+" -f "+iface or
-                         wg_uapi("wireguard",iface)!=Transport(identity["ip"],identity["port"],"udp"))
+                expired=(identity.get("protocol") not in WG_PROTOCOLS or
+                         process_command(lease["pid"])!=WG_PROTOCOLS[identity["protocol"]]+" -f "+iface or
+                         wg_uapi(identity["protocol"],iface)!=Transport(identity["ip"],identity["port"],"udp"))
             except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
                 expired=True
         if expired:
@@ -422,12 +426,13 @@ def monitor_lease(lease):
     valid=False
     try:
         identity=lease.get("reconnect_identity")
-        valid=(process_command(pid)==WG_BIN+" -f "+iface and
+        protocol=identity.get("protocol") if isinstance(identity,dict) else None
+        valid=(protocol in WG_PROTOCOLS and
+               process_command(pid)==WG_PROTOCOLS[protocol]+" -f "+iface and
                route_interface("1.1.1.1")==iface and
                route_interface("129.0.0.1")==iface and
-               (identity is None or
-                (wg_uapi("wireguard",iface)==Transport(identity["ip"],identity["port"],"udp") and
-                 route_interface(identity["ip"])==identity["uplink"])))
+               wg_uapi(protocol,iface)==Transport(identity["ip"],identity["port"],"udp") and
+               route_interface(identity["ip"])==identity["uplink"])
     except Exception:
         pass
     if valid:
@@ -531,8 +536,8 @@ def enable():
             cleanup_job()
         preflight()
         evidence=collect()
-        if evidence is None or evidence.protocol!="wireguard":
-            raise RuntimeError("CONNECT_WIREGUARD_FIRST")
+        if evidence is None or evidence.protocol not in WG_PROTOCOLS:
+            raise RuntimeError("CONNECT_WIREGUARD_OR_AMNEZIAWG_FIRST")
         rules=evidence.rules()
         canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=rules))
         if not canonical or canonical[-1]!="block drop quick all":
