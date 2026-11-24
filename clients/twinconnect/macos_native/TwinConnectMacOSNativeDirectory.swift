@@ -1298,9 +1298,75 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
 
     // WireGuard: fetch one fresh, tenant-authorized wg-quick profile for the
     // selected server. Never persist private keys or accept remote commands.
+    // Select only issued profiles within the authenticated inventory.
+    // A missing direct profile can use another online exit in the same
+    // country. A corrupt/duplicate direct profile must not be hidden.
+    private static func resolveWireGuardProfile(
+        servers: [[String: Any]], items: [[String: Any]], serverID: String,
+        protocolCode: String
+    ) -> (id: String?, raw: String?, reason: String) {
+        func id(_ item: [String: Any], _ key: String) -> String? {
+            (item[key] as? String) ?? (item[key] as? Int).map(String.init)
+        }
+        func valid(_ item: [String: Any]) -> String? {
+            guard ["wireguard", "amneziawg"].contains(protocolCode),
+                  (protocolCode != "amneziawg" ||
+                   item["config_format"] as? String == "amneziawg"),
+                  let raw = item["config"] as? String,
+                  (80...16384).contains(raw.utf8.count),
+                  raw.contains("[Interface]"), raw.contains("[Peer]"),
+                  !raw.contains("\u{0}") else { return nil }
+            return raw
+        }
+        let requested = servers.filter { id($0, "id") == serverID }
+        guard requested.count == 1 else {
+            return (nil, nil, "WG_SERVER_NOT_ALLOWED")
+        }
+        let direct = items.filter { id($0, "node_id") == serverID }
+        if !direct.isEmpty {
+            guard direct.count == 1 else {
+                return (nil, nil, "WG_DUPLICATE_SERVER_PROFILE")
+            }
+            guard let raw = valid(direct[0]) else {
+                return (nil, nil, "WG_SERVER_PROFILE_INVALID")
+            }
+            return (serverID, raw, "WG_DIRECT_PROFILE_SELECTED")
+        }
+        guard let country = requested[0]["country_code"] as? String,
+              !country.isEmpty else {
+            return (nil, nil, "WG_SERVER_PROFILE_MISSING")
+        }
+        let candidates = servers.filter { row in
+            guard let candidate = id(row, "id"), candidate != serverID,
+                  candidate.range(of: "^[0-9]{1,20}$",
+                                  options: .regularExpression) != nil,
+                  row["node_online"] as? Bool == true,
+                  let candidateCountry = row["country_code"] as? String else {
+                return false
+            }
+            return candidateCountry.uppercased() == country.uppercased()
+        }.sorted { lhs, rhs in
+            let a = lhs["latency_ms"] as? Int ?? 1000000
+            let b = rhs["latency_ms"] as? Int ?? 1000000
+            return a == b ? (id(lhs, "id") ?? "") < (id(rhs, "id") ?? "") : a < b
+        }
+        for candidate in candidates {
+            guard let actual = id(candidate, "id"),
+                  servers.filter({ id($0, "id") == actual }).count == 1 else {
+                continue
+            }
+            let matching = items.filter { id($0, "node_id") == actual }
+            if matching.count == 1, let raw = valid(matching[0]) {
+                return (actual, raw, "WG_SAME_COUNTRY_PROFILE_SELECTED")
+            }
+        }
+        return (nil, nil, "WG_SERVER_PROFILE_MISSING")
+    }
+
     func prepareWireGuardProfile(_ session: TwinMacNativeSession,
                                  serverID: String,
                                  protocolCode: String = "wireguard",
+                                 resolvedServer: @escaping (String) -> Void,
                                  completion: @escaping (Result<Data, Error>) -> Void) {
         guard ["wireguard", "amneziawg"].contains(protocolCode),
               serverID.range(of: "^[0-9]{1,20}$",
@@ -1330,7 +1396,11 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                 guard case .success(let response) = inventory,
                       self.validEnvelope(response, session.namespace),
                       let servers = response["servers"] as? [[String: Any]],
-                      servers.filter({ ($0["id"] as? String) == serverID }).count == 1 else {
+                      servers.count <= 200,
+                      servers.filter({
+                          ($0["id"] as? String) == serverID ||
+                          ($0["id"] as? Int).map(String.init) == serverID
+                      }).count == 1 else {
                     completion(.failure(TwinMacNativeError.failure("WG_SERVER_NOT_ALLOWED")))
                     return
                 }
@@ -1345,25 +1415,20 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         completion(.failure(TwinMacNativeError.failure("WG_PROFILE_UNAVAILABLE")))
                         return
                     }
-                    let candidates = items.filter { item in
-                        if let id = item["node_id"] as? String { return id == serverID }
-                        if let id = item["node_id"] as? Int { return String(id) == serverID }
-                        return false
-                    }
-                    guard candidates.count == 1,
-                          (protocolCode != "amneziawg" ||
-                           candidates[0]["config_format"] as? String == "amneziawg"),
-                          let raw = candidates[0]["config"] as? String,
-                          (80...16384).contains(raw.utf8.count),
-                          raw.contains("[Interface]"), raw.contains("[Peer]"),
-                          let content = raw.data(using: .utf8),
+                    let result = Self.resolveWireGuardProfile(
+                        servers: servers, items: items, serverID: serverID,
+                        protocolCode: protocolCode)
+                    NSLog("TwinConnect AppKit: WG profile rows=%d result=%@",
+                          items.count, result.reason)
+                    guard let raw = result.raw, let actualID = result.id,
                           let payload = try? JSONSerialization.data(
                             withJSONObject: ["config": raw, "protocol": protocolCode]),
-                          payload.count <= 18432,
-                          !content.isEmpty else {
-                        completion(.failure(TwinMacNativeError.failure("WG_PROFILE_INVALID")))
+                          payload.count <= 17408 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            result.raw == nil ? result.reason : "WG_PROFILE_INVALID_SIZE")))
                         return
                     }
+                    resolvedServer(actualID)
                     completion(.success(payload))
                 }
             }

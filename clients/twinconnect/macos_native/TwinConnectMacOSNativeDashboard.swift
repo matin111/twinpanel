@@ -5653,7 +5653,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         status = wireGuardProbeStatus
         view = build()
         directory.prepareWireGuardProfile(session, serverID: serverID,
-                                          protocolCode: code) {
+                                          protocolCode: code,
+                                          resolvedServer: { [weak self] actualID in
+            guard let self = self,
+                  self.wireGuardProbeGeneration == generation,
+                  self.accountSession?.accessToken == session.accessToken else { return }
+            self.activeServer = actualID
+            self.persistCurrentSelection()
+        }) {
             [weak self] result in
             guard let self = self,
                   self.wireGuardProbeGeneration == generation,
