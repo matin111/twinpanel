@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -32,9 +33,24 @@ class Aborted(Exception):
     pass
 
 
+def record_result(reason: str) -> None:
+    """Persist only a sanitized reason, never profile or SAD contents."""
+    root=Path("/private/var/run/twinconnect-l2tp-route-guard")
+    try:
+        info=root.lstat()
+        if os.geteuid()!=0 or info.st_uid!=0 or not stat.S_ISDIR(info.st_mode) or info.st_mode&0o077:
+            return
+        fd=os.open(root/"last-result.json",os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600)
+        with os.fdopen(fd,"w") as out:
+            json.dump({"reason":reason,"timestamp":time.time()},out)
+    except OSError:
+        pass
+
+
 def safe_reply(reason: str, *, state: str = "error", vpn: bool = False) -> None:
     if not re.fullmatch(r"L2TP_[A-Z0-9_]{4,125}", reason):
         reason = "L2TP_OPERATION_FAILED"
+    record_result(reason)
     print(json.dumps({"state": state, "reason": reason,
                       "vpn_connected": vpn}), flush=True)
 
@@ -203,7 +219,15 @@ def full_connection(payload: dict) -> None:
                 break
     if interface is None:
         raise ValueError("L2TP_PPP_HANDSHAKE_TIMEOUT")
-    if not verify_ipsec_peer(address):
+    # PPP can become visible slightly before both mature SAs are observable.
+    # Wait briefly within the existing watchdog window, never bypass the check.
+    verified=False
+    for _ in range(4):
+        if verify_ipsec_peer(address):
+            verified=True
+            break
+        time.sleep(0.5)
+    if not verified:
         raise ValueError("L2TP_IPSEC_ENDPOINT_MISMATCH")
     for destination in ("1.1.1.1", "8.8.8.8"):
         check_probe(interface, destination)
