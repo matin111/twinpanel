@@ -6,6 +6,18 @@ import CryptoKit
 
 // Low-cost AppKit renderer for remote/macOS machines without a working Metal
 // backend. Set TWINCONNECT_MAC_LIGHTWEIGHT_UI=0 before launching to opt out.
+private enum TwinNativePreferences {
+    static let appearanceKey = "TwinConnect.native.appearance"
+    static let motionKey = "TwinConnect.native.reduceMotion"
+    static var light: Bool {
+        UserDefaults.standard.string(forKey: appearanceKey) == "light"
+    }
+    static var reducedMotion: Bool {
+        UserDefaults.standard.bool(forKey: motionKey) ||
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+}
+
 private enum TwinNativeRenderBudget {
     static let lightweight =
         ProcessInfo.processInfo.environment["TWINCONNECT_MAC_LIGHTWEIGHT_UI"] != "0"
@@ -46,7 +58,7 @@ private final class TwinNativeBackdrop: NSView {
             glow.withAlphaComponent(0).cgColor
         ]
         guard !TwinNativeRenderBudget.lightweight,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              !TwinNativePreferences.reducedMotion,
               ambientAura.animation(forKey: "ambientBreath") == nil
         else { return }
         let breathe = CABasicAnimation(keyPath: "opacity")
@@ -87,7 +99,8 @@ private final class TwinNativeBackdrop: NSView {
         let h = area.height
         let accent = glow
         let frost = accent.blended(withFraction: 0.57, of: .white) ?? accent
-        let shade = base.blended(withFraction: 0.40, of: .black) ?? base
+        let shade = base.blended(withFraction: TwinNativePreferences.light ? 0.15 : 0.40,
+                                 of: TwinNativePreferences.light ? .white : .black) ?? base
 
         // Deep architectural backdrop rather than flat aqua wallpaper.
         NSGradient(colors: [
@@ -268,6 +281,22 @@ private final class TwinNativeGlassCard: NSView {
                               blue: 0.151, alpha: 1)
             strength = 0.18
         }
+        if TwinNativePreferences.light {
+            let white = NSColor(calibratedWhite: 0.99, alpha: 1)
+            let brand = white.blended(withFraction: 0.08, of: accent) ?? white
+            let pale = white.blended(withFraction: 0.14, of: accent) ?? white
+            blur.appearance = NSAppearance(named: .aqua)
+            glassGradient.colors = [
+                white.withAlphaComponent(0.95).cgColor,
+                brand.withAlphaComponent(0.93).cgColor,
+                pale.withAlphaComponent(0.92).cgColor
+            ]
+            upperEdge.colors = [
+                accent.withAlphaComponent(0.22).cgColor,
+                accent.withAlphaComponent(0.04).cgColor
+            ]
+            return
+        }
         let supplied = style == .sidebar ?
             (background ?? surface) : (surface ?? background)
         let foundation = supplied.flatMap {
@@ -420,7 +449,7 @@ private final class TwinNativeNetworkFabric: NSView {
         halo.removeAllAnimations()
         halo.opacity = proxyActive ? 0.62 : 0
         guard proxyActive,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+              !TwinNativePreferences.reducedMotion else { return }
         // Two Core Animation properties only: no high-frequency AppKit redraw
         // or artificial download/upload animation on the cloud Mac.
         let breathe = CABasicAnimation(keyPath: "transform.scale")
@@ -443,7 +472,7 @@ private final class TwinNativeNetworkFabric: NSView {
 
     private func updateTravellingDots() {
         let running = proxyActive &&
-            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
+            !TwinNativePreferences.reducedMotion &&
             bounds.width > 100 && bounds.height > 80
         for (index, dot) in travelDots.enumerated() {
             dot.removeAllAnimations()
@@ -695,12 +724,32 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
 
-    private let base = NSColor(calibratedRed: 0.035, green: 0.105, blue: 0.143, alpha: 1)
-    private let panelColor = NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.24, alpha: 0.85)
-    private let muted = NSColor(calibratedRed: 0.69, green: 0.79, blue: 0.82, alpha: 1)
+    private var lightAppearance: Bool { TwinNativePreferences.light }
+    private var foreground: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.09, green: 0.20, blue: 0.26, alpha: 1) :
+            NSColor(calibratedWhite: 0.96, alpha: 1)
+    }
+    private var base: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.91, green: 0.95, blue: 0.97, alpha: 1) :
+            NSColor(calibratedRed: 0.035, green: 0.105, blue: 0.143, alpha: 1)
+    }
+    private var panelColor: NSColor {
+        lightAppearance ? NSColor(calibratedWhite: 0.97, alpha: 1) :
+            NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.24, alpha: 0.85)
+    }
+    private var muted: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.28, green: 0.39, blue: 0.45, alpha: 1) :
+            NSColor(calibratedRed: 0.69, green: 0.79, blue: 0.82, alpha: 1)
+    }
     private let teal = NSColor(calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1)
-    private let sea = NSColor(calibratedRed: 0.40, green: 0.72, blue: 0.70, alpha: 1)
-    private let amber = NSColor(calibratedRed: 1.0, green: 0.78, blue: 0.51, alpha: 1)
+    private var sea: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.08, green: 0.43, blue: 0.43, alpha: 1) :
+            NSColor(calibratedRed: 0.40, green: 0.72, blue: 0.70, alpha: 1)
+    }
+    private var amber: NSColor {
+        lightAppearance ? NSColor(calibratedRed: 0.63, green: 0.34, blue: 0.08, alpha: 1) :
+            NSColor(calibratedRed: 1.0, green: 0.78, blue: 0.51, alpha: 1)
+    }
 
     override func loadView() {
         view = build()
@@ -793,7 +842,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func tint() -> NSColor {
         // The panel's primary_color is authoritative. Invalid/missing
         // values fall back to the default accent instead of assuming a tenant.
-        return panelHexColor(accountSession?.accentHex) ?? teal
+        let brand = panelHexColor(accountSession?.accentHex) ?? teal
+        return lightAppearance ? (brand.blended(withFraction: 0.30, of: .black) ?? brand) : brand
     }
 
     private func text(_ string: String, size: CGFloat = 13,
@@ -801,7 +851,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       color: NSColor? = nil) -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: string)
         label.font = NSFont.systemFont(ofSize: size, weight: weight)
-        label.textColor = color ?? NSColor(calibratedWhite: 0.96, alpha: 1)
+        label.textColor = color ?? foreground
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         label.alignment = .left
@@ -897,8 +947,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         control.wantsLayer = true
         control.layer?.cornerRadius = 14
         control.layer?.borderWidth = 1
-        let color = primary ? NSColor.white :
-            NSColor(calibratedWhite: 0.94, alpha: 1)
+        let color = lightAppearance ? foreground : (primary ? NSColor.white :
+            NSColor(calibratedWhite: 0.94, alpha: 1))
         // Never paint an opaque backing behind translucent button glass.
         control.layer?.backgroundColor = NSColor.clear.cgColor
         control.layer?.borderColor = tint().withAlphaComponent(
@@ -914,9 +964,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (brand.blended(withFraction: 0.18, of: .black) ?? brand) :
             (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.22, alpha: 1)
                 .blended(withFraction: 0.22, of: brand) ?? brand)
-        control.setAccentGradient(
-            upper.withAlphaComponent(primary ? 0.64 : 0.36),
-            lower.withAlphaComponent(primary ? 0.52 : 0.27))
+        if lightAppearance {
+            control.setAccentGradient(
+                (NSColor.white.blended(withFraction: primary ? 0.30 : 0.08, of: brand) ?? .white),
+                (NSColor.white.blended(withFraction: primary ? 0.42 : 0.14, of: brand) ?? .white))
+        } else {
+            control.setAccentGradient(
+                upper.withAlphaComponent(primary ? 0.64 : 0.36),
+                lower.withAlphaComponent(primary ? 0.52 : 0.27))
+        }
         control.layer?.borderColor = brand.withAlphaComponent(
             primary ? 0.74 : 0.38).cgColor
         control.attributedTitle = NSAttributedString(
@@ -950,10 +1006,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         let root = TwinNativeBackdrop(frame:
             NSRect(x: 0, y: 0, width: 1180, height: 740))
-        let configuredBackground = panelBackgroundColor()?
-            .blended(withFraction: 0.60, of: base) ?? base
+        let configuredBackground = lightAppearance ? base :
+            (panelBackgroundColor()?.blended(withFraction: 0.60, of: base) ?? base)
         root.base = configuredBackground.blended(
-            withFraction: 0.19, of: tint()) ?? base
+            withFraction: lightAppearance ? 0.06 : 0.19, of: tint()) ?? base
+        root.appearance = NSAppearance(named: lightAppearance ? .aqua : .darkAqua)
         root.glow = tint()
         root.beginAmbientMotion()
         if accountSession == nil {
@@ -971,9 +1028,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         field.isEditable = true
         field.isSelectable = true
         field.drawsBackground = true
-        field.backgroundColor = NSColor(calibratedRed: 0.16, green: 0.23,
-                                        blue: 0.28, alpha: 1)
-        field.textColor = .white
+        field.backgroundColor = lightAppearance ? .white :
+            NSColor(calibratedRed: 0.16, green: 0.23, blue: 0.28, alpha: 1)
+        field.textColor = foreground
         field.font = NSFont.systemFont(ofSize: 15)
         field.controlSize = .large
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -1334,7 +1391,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             } else {
                 let glyph = NSImageView(image: sidebarIcon(index))
                 glyph.imageScaling = .scaleProportionallyDown
-                glyph.contentTintColor = tab == index ? NSColor.white : tint()
+                glyph.contentTintColor = tab == index && !lightAppearance ? NSColor.white : tint()
                 glyph.translatesAutoresizingMaskIntoConstraints = false
                 glyph.widthAnchor.constraint(equalToConstant: 23).isActive = true
                 glyph.heightAnchor.constraint(equalToConstant: 23).isActive = true
@@ -1355,7 +1412,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
             control.layer?.cornerRadius = 16
             control.layer?.borderWidth = 1
-            if tab == index {
+            if lightAppearance {
+                control.setAccentGradient(
+                    NSColor.white.blended(withFraction: tab == index ? 0.26 : 0.05, of: tint()) ?? .white,
+                    NSColor.white.blended(withFraction: tab == index ? 0.37 : 0.11, of: tint()) ?? .white)
+            } else if tab == index {
                 control.setAccentGradient(
                     (tint().blended(withFraction: 0.26, of: .white) ?? tint())
                         .withAlphaComponent(0.70),
@@ -1392,6 +1453,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             link.heightAnchor.constraint(equalToConstant: 62).isActive = true
             link.layer?.cornerRadius = 12
             link.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
+            if !lightAppearance {
             link.setAccentGradient(
                 (NSColor(calibratedRed: 0.15, green: 0.27, blue: 0.32, alpha: 1)
                     .blended(withFraction: 0.32, of: tint()) ?? tint())
@@ -1399,6 +1461,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 (NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.23, alpha: 1)
                     .blended(withFraction: 0.20, of: tint()) ?? tint())
                     .withAlphaComponent(0.27))
+            }
             quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
@@ -1790,7 +1853,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                        weight: .medium, color: muted))
         content.addArrangedSubview(heading)
         let number = text(value, size: 23, weight: .bold,
-                          color: valueColor ?? NSColor.white)
+                          color: valueColor ?? foreground)
         number.lineBreakMode = .byTruncatingTail
         number.maximumNumberOfLines = 1
         number.toolTip = value
@@ -1982,10 +2045,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         guard let latency = value else { return muted }
         if latency <= 300 {
-            return NSColor(calibratedRed: 0.21, green: 0.85, blue: 0.65, alpha: 1)
+            return lightAppearance ? NSColor(calibratedRed: 0.04, green: 0.43, blue: 0.26, alpha: 1) :
+                NSColor(calibratedRed: 0.21, green: 0.85, blue: 0.65, alpha: 1)
         }
         if latency <= 700 { return amber }
-        return NSColor(calibratedRed: 1.0, green: 0.41, blue: 0.48, alpha: 1)
+        return lightAppearance ? NSColor(calibratedRed: 0.70, green: 0.13, blue: 0.21, alpha: 1) :
+            NSColor(calibratedRed: 1.0, green: 0.41, blue: 0.48, alpha: 1)
     }
 
     private func pingDetails(_ server: TwinMacNativeServer?) -> String {
@@ -2800,8 +2865,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     tile.wantsLayer = true
                     tile.layer?.backgroundColor = (selected ?
                         tint().withAlphaComponent(0.25) :
-                        NSColor(calibratedRed: 0.10, green: 0.18,
-                                blue: 0.22, alpha: 0.89)).cgColor
+                        (lightAppearance ? panelColor :
+                         NSColor(calibratedRed: 0.10, green: 0.18,
+                                 blue: 0.22, alpha: 0.89))).cgColor
                     tile.layer?.borderColor = (selected ? sea : tint())
                         .withAlphaComponent(selected ? 0.77 : 0.23).cgColor
                     tile.layer?.borderWidth = selected ? 1.5 : 1
@@ -2847,154 +2913,90 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return scroller
     }
 
-    private func settingRow(_ title: String, subtitle: String,
-                            state: String, tone: NSColor? = nil) -> NSView {
-        let row = stack(.horizontal, spacing: 12)
+    private func preferenceRow(_ title: String, subtitle: String,
+                               control: NSView) -> NSView {
+        let row = stack(.horizontal, spacing: 16)
         let info = stack(spacing: 5)
-        info.addArrangedSubview(text(title, size: 13, weight: .semibold))
-        info.addArrangedSubview(text(subtitle, size: 11, color: muted))
+        info.addArrangedSubview(text(title, size: 14, weight: .semibold))
+        info.addArrangedSubview(text(subtitle, size: 12, color: muted))
         row.addArrangedSubview(info)
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        row.addArrangedSubview(spacer)
-        row.addArrangedSubview(pill(state, color: tone ?? muted))
-        return card([row], radius: 16, padding: 15)
+        let space = NSView()
+        space.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(space)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        control.setContentCompressionResistancePriority(.required, for: .horizontal)
+        row.addArrangedSubview(control)
+        return card([row], radius: 16, padding: 17)
     }
 
     private func settingsPage() -> NSView {
-        let section = stack(spacing: 12)
+        let section = stack(spacing: 14)
         section.alignment = .leading
-        section.addArrangedSubview(text("Connection & privacy",
-                                        size: 18, weight: .semibold))
-        // Render disabled state rather than non-functional toggles. These
-        // settings are controlled by the actual tunnel runtime when signed.
-        let killSwitch = settingRow(
-            "◈  Kill Switch",
-            subtitle: "Block unprotected traffic when the VPN disconnects",
-            state: "Unavailable", tone: amber)
-        section.addArrangedSubview(killSwitch)
-        killSwitch.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-        let splitTunneling = settingRow(
-            "≡  Split Tunneling",
-            subtitle: "Choose which apps use the secure connection",
-            state: "Unavailable", tone: amber)
-        section.addArrangedSubview(splitTunneling)
-        splitTunneling.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-        let dns = settingRow(
-            "◉  DNS protection",
-            subtitle: "Secure resolver and DNS leak protection",
-            state: "Unavailable", tone: amber)
-        section.addArrangedSubview(dns)
-        dns.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-        let reconnect = settingRow(
-            "↻  Auto reconnect",
-            subtitle: "Restore a connection if its network path changes",
-            state: "Unavailable", tone: amber)
-        section.addArrangedSubview(reconnect)
-        reconnect.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-
-        section.addArrangedSubview(text("Application", size: 18,
-                                        weight: .semibold))
-        let language = settingRow("◎  App language", subtitle: "English",
-                                  state: "EN")
-        section.addArrangedSubview(language)
-        language.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-        let appearance = settingRow("◉  Appearance",
-                                    subtitle: "TwinConnect dark glass",
-                                    state: "Dark")
-        section.addArrangedSubview(appearance)
-        appearance.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-
-        // The unsigned preflight is a separate, explicitly diagnostic action.
-        // It must not replace the Connect button on the home page.
-        section.addArrangedSubview(text("VPN engine diagnostics",
-                                        size: 18, weight: .semibold))
-        let tunCheck = button(cliTunCheckBusy ? "Checking TUN readiness…" :
-                              "Check TUN readiness",
-                              action: #selector(unavailableConnect(_:)),
-                              mutedButton: true)
-        tunCheck.isEnabled = accountSession != nil && !cliTunCheckBusy
-        tunCheck.heightAnchor.constraint(equalToConstant: 40).isActive = true
-        section.addArrangedSubview(tunCheck)
-        if status.contains("TUN") {
-            section.addArrangedSubview(text(status, size: 11, color: amber))
+        func add(_ row: NSView) {
+            section.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
         }
+        section.addArrangedSubview(text("Appearance", size: 18, weight: .semibold))
+        let theme = NSSegmentedControl(labels: ["Light", "Dark"],
+                                      trackingMode: .selectOne,
+                                      target: self, action: #selector(changeNativeAppearance(_:)))
+        theme.selectedSegment = lightAppearance ? 0 : 1
+        theme.segmentStyle = .rounded
+        theme.controlSize = .large
+        theme.setAccessibilityLabel("App appearance")
+        add(preferenceRow("Theme", subtitle: "Choose the look of TwinConnect.",
+                          control: theme))
+        let motion = NSSwitch()
+        motion.target = self
+        motion.action = #selector(changeNativeMotion(_:))
+        motion.state = TwinNativePreferences.reducedMotion ? .on : .off
+        motion.isEnabled = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        motion.setAccessibilityLabel("Reduce motion")
+        add(preferenceRow("Reduce motion",
+                          subtitle: "Limit decorative connection animations.",
+                          control: motion))
 
-        // Cisco is a separate OpenConnect transport. On an unsigned Mac,
-        // authenticate without creating a tunnel, routes or system proxy.
-        section.addArrangedSubview(text("Cisco / OpenConnect diagnostics",
-                                        size: 18, weight: .semibold))
-        let ciscoTest = button(ciscoAuthBusy ?
-            "Checking Cisco authentication…" :
-            "Test Cisco authentication (no VPN)",
-            action: #selector(testCiscoAuthentication(_:)),
-            mutedButton: true)
-        ciscoTest.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        ciscoTest.isEnabled = !ciscoAuthBusy && accountSession != nil &&
-            activeServer != nil && activeProtocol == "cisco" &&
-            snapshot?.protocols.contains(where: {
-                $0.code == "cisco" && $0.configured
-            }) == true
-        section.addArrangedSubview(ciscoTest)
-        if !ciscoAuthStatus.isEmpty {
-            section.addArrangedSubview(text(ciscoAuthStatus, size: 11,
-                                           color: muted))
-        }
-
-        // A Cisco task can survive a location change. Keep an explicit
-        // emergency stop independent of the currently selected protocol.
+        section.addArrangedSubview(text("Connection", size: 18, weight: .semibold))
+        let refreshButton = button("Refresh", action: #selector(refresh(_:)))
+        refreshButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
+        add(preferenceRow("Servers & subscription",
+                          subtitle: "Update your available locations and account.",
+                          control: refreshButton))
+        // Emergency controls appear only for a live worker. Never offer a
+        // diagnostic connection or an inactive placeholder in Settings.
         if ciscoTunnelTask != nil {
-            let stopCisco = button("■  Stop Cisco process",
-                action: #selector(requestCiscoTunnel(_:)), mutedButton: true)
-            stopCisco.heightAnchor.constraint(equalToConstant: 44).isActive = true
-            section.addArrangedSubview(stopCisco)
+            add(preferenceRow("Cisco connection", subtitle: "Stop the active Cisco worker.",
+                              control: button("Disconnect", action: #selector(requestCiscoTunnel(_:)))))
+        }
+        if localProxyActive {
+            add(preferenceRow("Local proxy", subtitle: "Stop the active local proxy.",
+                              control: button("Disconnect", action: #selector(stopLocalProxyNow(_:)))))
         }
 
-        // Independent local proxy diagnostics and emergency stop.
-        section.addArrangedSubview(text("Local proxy diagnostics",
-                                        size: 18, weight: .semibold))
-        // Technical proxy-mode details remain in Copy diagnostics.
-        let proxyActions = stack(.horizontal, spacing: 10)
-        proxyActions.distribution = .fillEqually
-        let testProxy = button("Test selected SOCKS",
-                               action: #selector(primaryProxyAction(_:)),
-                               mutedButton: true)
-        testProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        testProxy.isEnabled = !localProxyBusy && !localProxyActive
-        proxyActions.addArrangedSubview(testProxy)
-        let stopProxy = button("■  Stop local proxy",
-                               action: #selector(stopLocalProxyNow(_:)),
-                               mutedButton: true)
-        stopProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        proxyActions.addArrangedSubview(stopProxy)
-        section.addArrangedSubview(proxyActions)
-        proxyActions.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-        if !localProxyStatus.isEmpty {
-            section.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
-        }
-
-        let actions = stack(.horizontal, spacing: 10)
-        actions.distribution = .fillEqually
-        actions.addArrangedSubview(button("↻  Refresh servers & account",
-            action: #selector(refresh(_:)), primary: true))
-        actions.addArrangedSubview(button("Copy diagnostics",
-            action: #selector(copyDiagnostics(_:)), mutedButton: true))
-        section.addArrangedSubview(actions)
-        actions.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
-
-        let detail = snapshot?.errors.keys.sorted().map { name in
-            name + ": " + (snapshot?.errors[name] ?? "unavailable")
-        }.joined(separator: " · ") ?? ""
-        let count = snapshot?.sectionsLoaded.count ?? 0
-        section.addArrangedSubview(text(
-            "Panel information: " + String(count) + "/4 sections loaded" +
-                (detail.isEmpty ? "" : " · " + detail),
-            size: 11, color: detail.isEmpty ? muted : amber))
-        section.addArrangedSubview(text(
-            "VPN controls require a verified Packet Tunnel. This preview " +
-            "does not claim a working VPN connection.",
-            size: 11, color: muted))
+        section.addArrangedSubview(text("Support", size: 18, weight: .semibold))
+        let copy = button("Copy report", action: #selector(copyDiagnostics(_:)))
+        copy.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
+        add(preferenceRow("Connection report",
+                          subtitle: "Copy technical status for troubleshooting.",
+                          control: copy))
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        add(preferenceRow("App version", subtitle: "TwinConnect for macOS",
+                          control: text(version + " (" + buildNumber + ")", size: 12,
+                                        weight: .semibold, color: muted)))
         return section
+    }
+
+    @objc private func changeNativeAppearance(_ sender: NSSegmentedControl) {
+        UserDefaults.standard.set(sender.selectedSegment == 0 ? "light" : "dark",
+                                  forKey: TwinNativePreferences.appearanceKey)
+        view = build()
+    }
+
+    @objc private func changeNativeMotion(_ sender: NSSwitch) {
+        UserDefaults.standard.set(sender.state == .on,
+                                  forKey: TwinNativePreferences.motionKey)
+        view = build()
     }
 
     private func expiryText(_ account: TwinMacNativeAccount?) -> String {
@@ -6256,26 +6258,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func copyDiagnostics(_ sender: NSButton) {
-        let hysteriaAvailable = snapshot?.protocols.contains(where: {
-            $0.code == "hysteria2" && $0.configured
-        }) == true
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let report = [
-            "TwinConnect macOS diagnostics (no credentials included)",
-            "System VPN: offline — unsigned Network Extension",
-            "App account: " + (accountSession == nil ? "signed out" : "signed in"),
+            "TwinConnect macOS connection report",
+            "App version: " + version,
+            "Connection: " + verifiedNetworkConnectionLabel,
+            "Account: " + (accountSession == nil ? "signed out" : "signed in"),
             "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
-            "Hysteria2 entitled/configured: " + (hysteriaAvailable ? "yes" : "no"),
             "Protocol selected: " + (activeProtocol ?? "none"),
-            "Proxy verified protocol: " + (verifiedProxyProtocol ?? "none"),
-            "Server selected: " + (activeServer == nil ? "no" : "yes"),
-            "Last connection status: " +
-                (status.isEmpty ? "not attempted" : status),
-            "TUN preflight: " + (status.contains("TUN") ? status : "not run"),
-            "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus),
-            "Cisco auth-only test: " + (ciscoAuthStatus.isEmpty ? "not run" : ciscoAuthStatus)
+            "TUN protocol: " + (fullTunConnectedProtocol ?? "none"),
+            "Server selected: " + (activeServer == nil ? "no" : "yes")
         ].joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
         sender.title = "Copied"
+        sender.attributedTitle = NSAttributedString(string: "Copied",
+            attributes: [.foregroundColor: foreground,
+                         .font: NSFont.systemFont(ofSize: 13, weight: .semibold)])
     }
 }
