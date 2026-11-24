@@ -183,7 +183,7 @@ GUIDES={
 def create_guides_router():
     router=Router(name="twinpanel-guides")
 
-    @router.message(F.text=="📚 آموزش")
+    @router.message((F.text=="📚 آموزش و دانلود") | (F.text=="📚 آموزش"))
     async def guides(message:Message):
         await message.answer(
             "📚 <b>آموزش اتصال</b>\n\n"
