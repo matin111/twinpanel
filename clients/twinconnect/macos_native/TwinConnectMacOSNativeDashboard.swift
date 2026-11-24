@@ -651,6 +651,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var ciscoRoutePollBusy = false
     private var ciscoRouteLastPoll = Date.distantPast
     private var wireGuardProbeTask: Process?
+    // A fresh authenticated profile is retained in memory only, scoped to
+    // this account, panel and server. Never write keys/config to disk.
+    private var wireGuardReconnectProfile: Data?
+    private var wireGuardReconnectAccount: String?
+    private var wireGuardReconnectServer: String?
+    private var wireGuardReconnectOrigin: URL?
     private var wireGuardProbeBusy = false
     private var wireGuardProbeGeneration = 0
     private var wireGuardProbeStatus = ""
@@ -3672,6 +3678,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpBusy = false
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
+        wireGuardReconnectProfile = nil
+        wireGuardReconnectAccount = nil
+        wireGuardReconnectServer = nil
+        wireGuardReconnectOrigin = nil
         wireGuardProbeGeneration += 1
         wireGuardProbeTask?.terminate()
         wireGuardProbeTask = nil
@@ -5768,9 +5778,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 stop.standardInput = FileHandle.nullDevice
                 stop.standardOutput = FileHandle.nullDevice
                 stop.standardError = FileHandle.nullDevice
-                if (try? stop.run()) != nil { stop.waitUntilExit() }
+                let reply = Pipe()
+                stop.standardOutput = reply
+                let started = (try? stop.run()) != nil
+                let result = started ? reply.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: result, encoding: .utf8) ?? "").contains("WG_SYSTEM_DISCONNECTED")
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
+                    if !stopped {
+                        self.wireGuardProbeBusy = false
+                        self.wireGuardProbeStatus = "WG_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                        return
+                    }
                     self.wireGuardProbeTask?.terminate()
                     self.wireGuardProbeTask = nil
                     self.wireGuardProbeBusy = false
@@ -5812,16 +5834,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         wireGuardProbeStatus = "Checking " + wireGuardConnectionTitle + " peer…"
         status = wireGuardProbeStatus
         view = build()
-        directory.prepareWireGuardProfile(session, serverID: serverID,
-                                          protocolCode: code,
-                                          resolvedServer: { [weak self] actualID in
-            guard let self = self,
-                  self.wireGuardProbeGeneration == generation,
-                  self.accountSession?.accessToken == session.accessToken else { return }
-            self.activeServer = actualID
-            self.persistCurrentSelection()
-        }) {
-            [weak self] result in
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self,
                   self.wireGuardProbeGeneration == generation,
                   self.accountSession?.accessToken == session.accessToken else { return }
@@ -5835,6 +5848,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     detail : "WG_PROFILE_UNAVAILABLE"
                 self.view = self.build()
             case .success(let payload):
+                if code == "wireguard" {
+                    self.wireGuardReconnectProfile = payload
+                    self.wireGuardReconnectAccount = session.namespace
+                    self.wireGuardReconnectServer = self.activeServer
+                    self.wireGuardReconnectOrigin = session.apiOrigin
+                }
                 DispatchQueue.global(qos: .userInitiated).async {
                     let task = Process()
                     task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
@@ -5894,6 +5913,34 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     }
                 }
             }
+        }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard code == "wireguard",
+                  wireGuardReconnectAccount == session.namespace,
+                  wireGuardReconnectOrigin == session.apiOrigin,
+                  wireGuardReconnectServer == serverID,
+                  let cached = wireGuardReconnectProfile else {
+                wireGuardProbeBusy = false
+                wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            wireGuardProbeBusy = false
+            wireGuardProbeStatus = "WG_KS_STATE_NOT_READY"
+            view = build()
+        } else {
+            directory.prepareWireGuardProfile(session, serverID: serverID,
+                                              protocolCode: code,
+                                              resolvedServer: { [weak self] actualID in
+                guard let self = self,
+                      self.wireGuardProbeGeneration == generation,
+                      self.accountSession?.accessToken == session.accessToken else { return }
+                self.activeServer = actualID
+                self.persistCurrentSelection()
+            }, completion: complete)
         }
     }
 
@@ -6039,6 +6086,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
            wireGuardProbeBusy || l2tpBusy {
             status = "Connection unavailable: A previous connection operation is still in progress."
             view = build()
+            return
+        }
+        if let ks = nativeKillSwitchControlStatus(),
+           let state = ks["state"] as? String, state != "off" {
+            if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
+               (state == "locked" && activeProtocol == "wireguard") {
+                requestWireGuardProbe()
+            } else {
+                status = "Kill Switch is locked. Reconnect WireGuard or turn off Kill Switch."
+                wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"
+                view = build()
+            }
             return
         }
         if activeProtocol == "l2tp" {

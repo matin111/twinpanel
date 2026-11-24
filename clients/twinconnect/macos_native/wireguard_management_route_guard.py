@@ -171,6 +171,32 @@ def status_uptime() -> str:
     return json.dumps(result)
 
 
+def load_killswitch_control():
+    """Only the installed, root-owned local control may coordinate routes."""
+    import stat
+    import importlib.util
+    base=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    lease=Path("/private/var/run/twinconnect-killswitch-control/lease.json")
+    if not lease.exists():
+        return None
+    script=base/"unsigned_killswitch_console_control.py"
+    for path,kind in ((base,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("WG_KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("WG_KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def protected_reconnect_context():
+    control=load_killswitch_control()
+    return control.reconnect_context() if control else None
+
+
 def rollback() -> str:
     data = load()
     if not data:
@@ -204,6 +230,12 @@ def rollback() -> str:
     # Recovery of temporary /1 routes must precede the removal of
     # management and server bypasses; otherwise Termalin could be lost.
     if data.get("mode") in ("trial-full", "leased"):
+        try:
+            control=load_killswitch_control()
+            if control:
+                control.before_wg_disconnect(data.get("worker_pid"),data.get("full_interface"))
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "WG_KS_CLOSE_BEFORE_ROLLBACK_FAILED"
         tun = data.get("full_interface", "")
         if not re.fullmatch(r"utun[0-9]{1,4}", tun):
             return "WG_FULL_ROUTE_STATE_INVALID"
@@ -265,10 +297,19 @@ def preflight() -> tuple[str, list[str], str, str]:
         return "WG_BASELINE_GATEWAY_INVALID", [], "", ""
     if STATE.exists():
         return "WG_MANAGEMENT_TRIAL_ALREADY_ACTIVE", [], "", ""
-    peers = sorted(set(management_peers() + connector_peers()))
-    if not connector_peers():
+    try:
+        protected=protected_reconnect_context()
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return "WG_KS_RECONNECT_UNVERIFIED", [], "", ""
+    if protected:
+        if protected.get("gateway")!=gateway or protected.get("uplink")!=interface:
+            return "WG_KS_BASELINE_CHANGED", [], "", ""
+        peers=[]
+    else:
+        peers = sorted(set(management_peers() + connector_peers()))
+    if not protected and not connector_peers():
         return "WG_TERMALIN_CONTROL_MISSING", [], "", ""
-    if not peers:
+    if not peers and not protected:
         return "WG_MANAGEMENT_CONNECTION_MISSING", [], "", ""
     exact = exact_routes()
     if exact is None:
@@ -574,7 +615,15 @@ def activate_full(interface: str, pid: int) -> str:
     ipv6 = run(ROUTE, "-n", "get", "-inet6", "default")
     if ipv6.returncode == 0 and "interface:" in ipv6.stdout:
         return "WG_IPV6_DEFAULT_PRESENT"
-    baseline_ip = exit_ip()
+    try:
+        protected=protected_reconnect_context()
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return "WG_KS_RECONNECT_UNVERIFIED"
+    if protected and (protected.get("stage")!="route" or
+            protected.get("pid")!=pid or protected.get("interface")!=interface or
+            protected.get("ip")!=endpoint):
+        return "WG_KS_CANDIDATE_MISMATCH"
+    baseline_ip = verified_public(protected.get("baseline_ip","")) if protected else exit_ip()
     if baseline_ip is None:
         return "WG_BASELINE_IP_UNVERIFIED"
     service = network_service(baseline_interface)
@@ -590,6 +639,7 @@ def activate_full(interface: str, pid: int) -> str:
              "interface": baseline_interface, "full_interface": interface,
              "endpoint": endpoint, "endpoint_pinned": False,
              "worker_pid": pid, "dns_started": False,
+             "baseline_ip": baseline_ip,
              "dns_service": service, "dns_prior": dns_prior,
              "deadline": time.time() + LEASE_SECONDS}
     store(state)
@@ -818,6 +868,14 @@ def main() -> int:
             result = probe_host(sys.argv[2])
         elif sys.argv[1:] == ["rollback"]:
             result = rollback()
+        elif len(sys.argv)==3 and sys.argv[1]=="rollback-worker" and sys.argv[2].isdecimal():
+            current=load()
+            if not current:
+                result="WG_MANAGEMENT_PIN_IDLE"
+            elif current.get("worker_pid")==int(sys.argv[2]):
+                result=rollback()
+            else:
+                result="WG_ROLLBACK_WORKER_MISMATCH"
         elif sys.argv[1:] == ["stop"]:
             result = stop_system()
         else:

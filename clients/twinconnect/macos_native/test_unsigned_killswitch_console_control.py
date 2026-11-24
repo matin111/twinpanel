@@ -16,12 +16,18 @@ class ControlTests(unittest.TestCase):
             self.assertEqual(c.monitor_lease(self.lease),"active")
             checked.assert_not_called()
     def test_loss_closes_and_never_reopens(self):
-        with patch.object(c,"pf_enabled",return_value=True), patch.object(c,"anchor_rules",side_effect=[tuple(self.lease["canonical"]),c.lines(c.RULES),c.lines(c.RULES)]), patch.object(c,"process_command",side_effect=ValueError("lost")), patch.object(c,"checked") as checked, patch.object(c,"write_json"):
+        live=list(self.lease["canonical"])
+        def command(*args,input=None,**kwargs):
+            if "-n" in args: return input
+            if "-f" in args: live[:]=c.lines(input)
+            return ""
+        with patch.object(c,"pf_enabled",return_value=True), patch.object(c,"anchor_rules",side_effect=lambda:tuple(live)), patch.object(c,"process_command",side_effect=ValueError("lost")), patch.object(c,"checked",side_effect=command) as checked, patch.object(c,"write_json"), patch.object(c,"session_deadline",return_value=999),patch.object(c,"publish"):
             self.assertEqual(c.monitor_lease(self.lease),"locked")
             self.assertTrue(self.lease["locked"])
-            checked.assert_called_once_with(c.PF,"-a",c.ANCHOR,"-f","-",input=c.RULES)
+            self.assertIn(c.PF,checked.call_args_list[1].args)
+            self.assertEqual(tuple(live),c.lines(c.RULES))
             self.assertEqual(c.monitor_lease(self.lease),"locked")
-            self.assertEqual(checked.call_count,1)
+            self.assertEqual(checked.call_count,2)
     def test_drift_and_disabled_are_not_active(self):
         with patch.object(c,"pf_enabled",return_value=False):
             with self.assertRaises(RuntimeError): c.monitor_lease(self.lease)

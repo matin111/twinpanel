@@ -7,6 +7,8 @@ production protection. No new sudoers permissions or arbitrary commands.
 """
 from __future__ import annotations
 import fcntl
+import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -26,7 +28,8 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, wg_uapi, root_private_json
+from unsigned_killswitch_policy import Transport, render_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
 SCRIPT=ROOT/"unsigned_killswitch_console_control.py"
@@ -182,7 +185,8 @@ def restore_locked():
         expected=lease.get("canonical")
         if not isinstance(expected,list) or len(expected)>20:
             raise RuntimeError("LEASE_RULES_INVALID")
-        if current and current not in (tuple(expected),lines(RULES)):
+        pending=lease.get("pending_canonical",[])
+        if current and current not in (tuple(expected),tuple(pending),lines(RULES)):
             raise RuntimeError("UNEXPECTED_ANCHOR_RULES")
         if current:
             checked(PF,"-a",ANCHOR,"-F","rules")
@@ -205,10 +209,207 @@ def restore_locked():
     return True
 
 
+WG_STATE=Path("/private/var/run/twinconnect-wireguard-route-guard/state.json")
+WG_META=WG_STATE.with_name("tunnel-dns.json")
+
+
+def reconnect_identity(evidence):
+    try:
+        state=root_private_json(WG_STATE)
+        meta=root_private_json(WG_META)
+        digest=meta.get("profile_digest")
+        baseline=state.get("baseline_ip")
+        transport=evidence.transports[0]
+        if (evidence.protocol!="wireguard" or len(evidence.transports)!=1 or
+                state.get("worker_pid")!=evidence.pid or
+                state.get("full_interface")!=evidence.interface or
+                state.get("interface")!=evidence.uplink or
+                state.get("endpoint")!=transport.ip or
+                meta.get("interface")!=evidence.interface or
+                meta.get("endpoint")!=transport.ip+":"+str(transport.port) or
+                not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest) or
+                not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
+            return None
+        return {"digest":digest,"ip":transport.ip,"port":transport.port,
+                "uplink":evidence.uplink,"gateway":state["gateway"],"baseline_ip":baseline}
+    except (OSError,ValueError,KeyError,TypeError):
+        return None
+
+
+def bootstrap_rules(identity, tunnel=None):
+    transport=Transport(identity["ip"],identity["port"],"udp")
+    uplink=identity["uplink"]
+    if not re.fullmatch(r"en[0-9]{1,3}",uplink) or ipaddress.ip_address(transport.ip).version!=4:
+        raise ValueError("KS_BOOTSTRAP_TRANSPORT_INVALID")
+    if tunnel is not None:
+        return render_policy(tunnel,uplink,(transport,))
+    # Only the exact previously attested root WireGuard UDP transport;
+    # no app data, DNS, control-plane HTTPS or generic direct bypass.
+    rules=render_policy("utun9999",uplink,(transport,))
+    return rules.replace("pass quick on utun9999 all no state\n","")
+
+
+def session_deadline(lease):
+    ready=read_json("ready.json")
+    now=time.time()
+    if (not ready or ready.get("nonce")!=lease.get("nonce") or
+            type(ready.get("deadline")) not in (int,float) or
+            not now<ready["deadline"]<=now+RECOVERY_SECONDS):
+        raise RuntimeError("KS_SESSION_EXPIRED")
+    job=checked("/bin/launchctl","print","system/"+LABEL)
+    if "state = running" not in job or lease["nonce"] not in job:
+        raise RuntimeError("KS_RECOVERY_NOT_RUNNING")
+    return ready["deadline"]
+
+
+def replace_owned_policy(lease,rules,**changes):
+    if lease.get("phase")!="owned" or not pf_enabled():
+        raise RuntimeError("KS_LEASE_NOT_ACTIVE")
+    current=anchor_rules()
+    if current not in (tuple(lease["canonical"]),tuple(lease.get("pending_canonical",[]))):
+        raise RuntimeError("KS_POLICY_DRIFT")
+    canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=rules))
+    if not canonical or canonical[-1]!="block drop quick all":
+        raise RuntimeError("KS_POLICY_INVALID")
+    lease["pending_canonical"]=list(canonical)
+    write_json("lease.json",lease)
+    checked(PF,"-a",ANCHOR,"-f","-",input=rules)
+    if anchor_rules()!=canonical:
+        raise RuntimeError("KS_POLICY_READBACK_FAILED")
+    lease.update(changes)
+    lease["canonical"]=list(canonical)
+    lease.pop("pending_canonical",None)
+    write_json("lease.json",lease)
+
+
+def close_lease(lease):
+    replace_owned_policy(lease,RULES,locked=True,reconnect_stage=None,
+                         reconnect_until=0)
+    publish("locked","KS_TUNNEL_LOST_LOCKED",session_deadline(lease))
+
+
+def before_wg_disconnect(pid,interface):
+    """Close the firewall BEFORE the guard removes any VPN route."""
+    with lock():
+        lease=read_json("lease.json")
+        if lease is None:
+            return
+        if (lease.get("phase")!="owned" or
+                lease.get("pid")!=pid or lease.get("interface")!=interface):
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if not lease.get("locked") or lease.get("reconnect_stage"):
+            close_lease(lease)
+        elif anchor_rules()!=lines(RULES) or not pf_enabled():
+            raise RuntimeError("KS_CLOSED_POLICY_UNVERIFIED")
+
+
+def begin_reconnect(raw,protocol):
+    with lock():
+        lease=read_json("lease.json")
+        if lease is None:
+            return None
+        if protocol!="wireguard" or not lease.get("locked") or lease.get("reconnect_stage"):
+            raise RuntimeError("WG_KS_RECONNECT_NOT_ALLOWED")
+        identity=lease.get("reconnect_identity")
+        if not isinstance(identity,dict) or not isinstance(raw,str) or (
+                hashlib.sha256(raw.encode("utf-8")).hexdigest()!=identity.get("digest")):
+            raise RuntimeError("WG_KS_ORIGINAL_PROFILE_REQUIRED")
+        deadline=session_deadline(lease)
+        if deadline-time.time()<65:
+            raise RuntimeError("WG_KS_TEST_TIME_TOO_SHORT")
+        if anchor_rules()!=lines(RULES):
+            raise RuntimeError("WG_KS_LOCK_NOT_VERIFIED")
+        until=min(deadline-3,time.time()+60)
+        replace_owned_policy(lease,bootstrap_rules(identity),locked=True,
+                             reconnect_stage="handshake",reconnect_until=until)
+        publish("locked","KS_RECONNECTING",deadline)
+        return identity.copy()
+
+
+def reconnect_context(stage=None):
+    """Read-only proof for the existing root WireGuard route guard."""
+    with lock():
+        lease=read_json("lease.json")
+        if lease is None or lease.get("reconnect_stage") not in ("handshake","route"):
+            return None
+        if stage is not None and lease["reconnect_stage"]!=stage:
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        session_deadline(lease)
+        if (lease.get("phase")!="owned" or not lease.get("locked") or
+                time.time()>=lease.get("reconnect_until",0) or
+                not pf_enabled() or anchor_rules()!=tuple(lease["canonical"])):
+            raise RuntimeError("KS_RECONNECT_UNVERIFIED")
+        identity=lease["reconnect_identity"].copy()
+        identity.update({"stage":lease["reconnect_stage"],"pid":lease["pid"],
+                         "interface":lease["interface"]})
+        return identity
+
+
+def attach_reconnect(pid,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="handshake":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        identity=lease["reconnect_identity"]
+        session_deadline(lease)
+        if (time.time()>=lease.get("reconnect_until",0) or
+                process_command(pid)!=WG_BIN+" -f "+iface or
+                wg_uapi("wireguard",iface)!=Transport(identity["ip"],identity["port"],"udp") or
+                route_interface(identity["ip"])!=identity["uplink"]):
+            raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
+        replace_owned_policy(lease,bootstrap_rules(identity,iface),
+                             pid=pid,interface=iface,reconnect_stage="route")
+
+
+def complete_reconnect(pid,iface):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="route":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        deadline=session_deadline(lease)
+        evidence=collect()
+        identity=lease["reconnect_identity"]
+        if (time.time()>=lease.get("reconnect_until",0) or evidence is None or
+                evidence.protocol!="wireguard" or evidence.pid!=pid or evidence.interface!=iface or
+                evidence.uplink!=identity["uplink"] or
+                evidence.transports!=(Transport(identity["ip"],identity["port"],"udp"),) or
+                anchor_rules()!=tuple(lease["canonical"]) or not pf_enabled()):
+            raise RuntimeError("KS_RECONNECT_ROUTE_UNVERIFIED")
+        lease.update(locked=False,reconnect_stage=None,reconnect_until=0)
+        write_json("lease.json",lease)
+        publish("active","KS_WG_ACTIVE",deadline)
+
+
+def abort_reconnect():
+    with lock():
+        lease=read_json("lease.json")
+        if lease and lease.get("reconnect_stage"):
+            close_lease(lease)
+
+
 def monitor_lease(lease):
     if not pf_enabled():
         raise RuntimeError("PF_DISABLED_UNEXPECTEDLY")
     current=anchor_rules()
+    if lease.get("pending_canonical"):
+        # Crash in a policy transition: close rather than adopt it.
+        close_lease(lease)
+        return "locked"
+    if lease.get("reconnect_stage"):
+        if current!=tuple(lease["canonical"]):
+            raise RuntimeError("RECONNECT_POLICY_DRIFT")
+        expired=time.time()>=lease.get("reconnect_until",0)
+        if not expired and lease.get("reconnect_stage")=="route":
+            try:
+                identity=lease["reconnect_identity"]
+                iface=lease["interface"]
+                expired=(process_command(lease["pid"])!=WG_BIN+" -f "+iface or
+                         wg_uapi("wireguard",iface)!=Transport(identity["ip"],identity["port"],"udp"))
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                expired=True
+        if expired:
+            close_lease(lease)
+        return "locked"
     if lease.get("locked"):
         if current!=lines(RULES):
             raise RuntimeError("LOCKED_POLICY_DRIFT")
@@ -225,12 +426,7 @@ def monitor_lease(lease):
         pass
     if valid:
         return "active"
-    # Keep the lock closed after loss; never re-open for a new process.
-    checked(PF,"-a",ANCHOR,"-f","-",input=RULES)
-    if anchor_rules()!=lines(RULES):
-        raise RuntimeError("CLOSED_POLICY_READBACK_FAILED")
-    lease["locked"]=True
-    write_json("lease.json",lease)
+    close_lease(lease)
     return "locked"
 
 
@@ -326,7 +522,8 @@ def enable():
         nonce=secrets.token_hex(16)
         lease={"phase":"prepared","nonce":nonce,"token":None,
                "canonical":list(canonical),"pid":evidence.pid,
-               "interface":evidence.interface,"locked":False}
+               "interface":evidence.interface,"locked":False,
+               "reconnect_identity":reconnect_identity(evidence)}
         write_json("lease.json",lease)
         publish("arming","KS_ARMING")
         try:
