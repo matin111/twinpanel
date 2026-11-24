@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import platform
 import pwd
+import re
 import secrets
 import select
 import signal
@@ -350,6 +351,50 @@ def write_session_meta(path,uid,primary,digest,secondary=None):
     return target
 
 
+def pin_reviewed_endpoint(profile,protocol):
+    """Resolve the reviewed outer hostname before TUN starts, retaining TLS identity."""
+    candidate=copy.deepcopy(profile)
+    rows=candidate.get("outbounds",[])
+    selected=[row for row in rows if isinstance(row,dict) and
+              row.get("tag")==("shadowtls-transport" if protocol=="shadowtls" else "proxy")]
+    if len(selected)!=1:
+        raise ValueError("TUN_KS_OUTBOUND_AMBIGUOUS")
+    row=selected[0]
+    host=row.get("server")
+    port=row.get("server_port")
+    if not isinstance(host,str) or type(port) is not int or not 1<=port<=65535:
+        raise ValueError("TUN_KS_ENDPOINT_INVALID")
+    try:
+        ip=ipaddress.IPv4Address(host)
+    except ipaddress.AddressValueError:
+        if not re.fullmatch(r"(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}",host):
+            raise ValueError("TUN_KS_ENDPOINT_INVALID") from None
+        try:
+            addresses=socket.getaddrinfo(host,port,socket.AF_INET,
+                socket.SOCK_DGRAM if protocol in ("hysteria2","tuic") else socket.SOCK_STREAM)
+            ips=list(dict.fromkeys(ipaddress.IPv4Address(item[4][0]) for item in addresses))
+        except (OSError,ValueError,IndexError):
+            raise ValueError("TUN_KS_ENDPOINT_UNRESOLVED") from None
+        if not ips or len(ips)>16 or any(not ip.is_global for ip in ips):
+            raise ValueError("TUN_KS_ENDPOINT_INVALID")
+        ip=ips[0]
+        tls=row.get("tls")
+        if isinstance(tls,dict) and tls.get("enabled") is True:
+            if not tls.get("server_name"):
+                tls["server_name"]=host
+        transport=row.get("transport")
+        if isinstance(transport,dict) and transport.get("type")=="ws":
+            headers=transport.setdefault("headers",{})
+            if not isinstance(headers,dict):
+                raise ValueError("TUN_KS_WS_HEADERS_INVALID")
+            if not any(key.lower()=="host" for key in headers):
+                headers["Host"]=host if port==443 else host+":"+str(port)
+    if not ip.is_global:
+        raise ValueError("TUN_KS_ENDPOINT_INVALID")
+    row["server"]=str(ip)
+    return candidate
+
+
 def pinned_reconnect_profile(profile,identity):
     # The root daemon reuses its previously reviewed runtime, never the app's
     # proposed bypasses. Only the single attested outer endpoint is excluded.
@@ -380,6 +425,7 @@ class Session:
         self.ks_cache = None
         self.ks_meta = None
         self.ks_candidate = False
+        self.ks_candidate_reason = "KS_NO_ATTESTED_ENGINE"
 
     def console_owner_present(self) -> bool:
         """Kill the tunnel when console ownership changes or user logs out."""
@@ -472,6 +518,7 @@ class Session:
             if self.process is not None:
                 status.update(observe_route())
                 status["killswitch_candidate"]=self.ks_candidate
+                status["killswitch_reason"]=self.ks_candidate_reason
                 if self.ks_candidate and self.ks_cache:
                     status["protocol_code"]=self.ks_cache["protocol"]
                 # Only the root daemon knows whether this sing-box SOCKS
@@ -529,6 +576,13 @@ class Session:
                 profile = sudoku_singbox_tun()
             if protected:
                 profile=copy.deepcopy(cached["profile"])
+            elif protocol is not None and not (use_trusttunnel or use_sudoku):
+                # Leave the ordinary connection available if strict endpoint
+                # preparation fails. Such a session is never KS eligible.
+                try:
+                    profile=pin_reviewed_endpoint(profile,protocol)
+                except (ValueError,OSError):
+                    pass
             prepared_profile=copy.deepcopy(profile)
             use_openvpn = profile.get("mode") == "openvpn"
             # Only a single, tightly-reviewed Mieru outbound can select the
@@ -737,8 +791,12 @@ class Session:
                         _,identity=runtime.tun_session_identity(False)
                         self.ks_candidate=(identity.get("digest")==digest and
                                            identity.get("primary_pid")==child.pid)
-                    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                        self.ks_candidate_reason=("KS_READY" if self.ks_candidate else "KS_TUN_PROFILE_UNVERIFIED")
+                    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:
                         self.ks_candidate=False
+                        code=str(exc)
+                        self.ks_candidate_reason=(code if re.fullmatch(r"KS_[A-Z0-9_]{3,80}",code)
+                                                  else "KS_TUN_ATTESTATION_FAILED")
                 if protected:
                     try:
                         pid,iface=control.attach_tun_reconnect(child.pid)

@@ -74,6 +74,39 @@ class TunProtectionTests(unittest.TestCase):
         updated=d.pinned_reconnect_profile(config,self.identity)
         self.assertEqual(updated["inbounds"][0]["route_exclude_address"],["1.2.3.4/32"])
         self.assertEqual(config["inbounds"][0]["route_exclude_address"],["8.8.8.8/32"])
+    def test_hostname_pin_preserves_tls_and_ws_identity(self):
+        config={"outbounds":[{"type":"vless","tag":"proxy","server":"vpn.example.com",
+                   "server_port":443,"tls":{"enabled":True,"server_name":"tls.example.com"},
+                   "transport":{"type":"ws","path":"/test","headers":{"Host":"ws.example.com"}}}]}
+        with patch.object(d.socket,"getaddrinfo",return_value=[(2,1,6,"",("1.2.3.4",443))]):
+            pinned=d.pin_reviewed_endpoint(config,"v2ray")
+        self.assertEqual(pinned["outbounds"][0]["server"],"1.2.3.4")
+        self.assertEqual(pinned["outbounds"][0]["tls"],config["outbounds"][0]["tls"])
+        self.assertEqual(pinned["outbounds"][0]["transport"],config["outbounds"][0]["transport"])
+        self.assertEqual(config["outbounds"][0]["server"],"vpn.example.com")
+    def test_all_single_outbound_kinds_pin_before_tun(self):
+        for kind,protocol in (("vless","v2ray"),("hysteria2","hysteria2"),("tuic","tuic"),
+                    ("anytls","anytls"),("socks","socks5"),("snell","snell"),
+                    ("naive","naive"),("mieru","mieru")):
+            config={"outbounds":[{"type":kind,"tag":"proxy","server":"vpn.example.com",
+                       "server_port":443,"tls":{"enabled":True}}]}
+            with patch.object(d.socket,"getaddrinfo",return_value=[(2,1,6,"",("1.2.3.4",443))]):
+                pinned=d.pin_reviewed_endpoint(config,protocol)
+            self.assertEqual(pinned["outbounds"][0]["server"],"1.2.3.4")
+            self.assertEqual(pinned["outbounds"][0]["tls"]["server_name"],"vpn.example.com")
+    def test_shadowtls_pins_only_outer_transport(self):
+        config={"outbounds":[{"type":"shadowsocks","tag":"proxy","detour":"shadowtls-transport"},
+                 {"type":"shadowtls","tag":"shadowtls-transport","server":"vpn.example.com",
+                  "server_port":443,"tls":{"enabled":True,"server_name":"tls.example.com"}}]}
+        with patch.object(d.socket,"getaddrinfo",return_value=[(2,1,6,"",("1.2.3.4",443))]):
+            pinned=d.pin_reviewed_endpoint(config,"shadowtls")
+        self.assertEqual(pinned["outbounds"][0],config["outbounds"][0])
+        self.assertEqual(pinned["outbounds"][1]["server"],"1.2.3.4")
+    def test_private_dns_result_is_rejected(self):
+        config={"outbounds":[{"tag":"proxy","server":"vpn.example.com","server_port":443}]}
+        with patch.object(d.socket,"getaddrinfo",return_value=[(2,1,6,"",("127.0.0.1",443))]):
+            with self.assertRaisesRegex(ValueError,"TUN_KS_ENDPOINT_INVALID"):
+                d.pin_reviewed_endpoint(config,"v2ray")
     def test_other_profile_refused_before_bootstrap(self):
         session=d.Session()
         session.ks_cache={"uid":501,"digest":"b"*64,"protocol":"v2ray"}
