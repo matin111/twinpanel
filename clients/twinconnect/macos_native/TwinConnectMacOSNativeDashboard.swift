@@ -1357,8 +1357,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         logo.translatesAutoresizingMaskIntoConstraints = false
         logo.widthAnchor.constraint(equalToConstant: 47).isActive = true
         logo.heightAnchor.constraint(equalToConstant: 47).isActive = true
-        if let tenantLogo = tenantLogo {
-            let image = NSImageView(image: tenantLogo)
+        let resolvedBrandImage: NSImage? = tenantLogo ?? NSApplication.shared.applicationIconImage
+        if let brandImage = resolvedBrandImage {
+            let image = NSImageView(image: brandImage)
             image.imageScaling = .scaleProportionallyUpOrDown
             image.translatesAutoresizingMaskIntoConstraints = false
             logo.addSubview(image)
@@ -1793,8 +1794,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
-        if localProxyActive || ciscoSystemRouteVerified || wireGuardSystemRouteVerified ||
-           l2tpSystemRouteVerified || fullTunHTTPSConnected {
+        if localProxyActive || openVPNSystemRouteVerified || ciscoSystemRouteVerified ||
+           wireGuardSystemRouteVerified || l2tpSystemRouteVerified || fullTunHTTPSConnected {
             // More vivid green state like the shared Windows design, while
             // still representing ONLY a verified SOCKS proxy.
             let mint = NSColor(calibratedRed: 0.07, green: 0.82,
@@ -6727,11 +6728,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func copyDiagnostics(_ sender: NSButton) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let protectionReport = nativeKillSwitchReport()
         let report = [
             "TwinConnect macOS connection report",
             "App version: " + version,
             "Connection: " + verifiedNetworkConnectionLabel,
-            "Kill Switch: " + nativeKillSwitchReport(),
+            protectionReport.hasPrefix("Kill Switch: ") ?
+                protectionReport : "Kill Switch: " + protectionReport,
             "Account: " + (accountSession == nil ? "signed out" : "signed in"),
             "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
             "Protocol selected: " + (activeProtocol ?? "none"),

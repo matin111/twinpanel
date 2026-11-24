@@ -29,6 +29,18 @@ class ProductionSettingsTests(unittest.TestCase):
         self.assertNotIn('System VPN: offline',report)
         self.assertNotIn('accessToken',report)
         self.assertNotIn('username',report)
+    def test_branding_preserves_tenant_override_and_uses_app_icon_fallback(self):
+        self.assertIn("tenantLogo ?? NSApplication.shared.applicationIconImage",SOURCE)
+        self.assertIn("NSImageView(image: brandImage)",SOURCE)
+    def test_verified_openvpn_uses_connected_button_color(self):
+        start=SOURCE.index("connect.heightAnchor.constraint(equalToConstant: 54)")
+        color=SOURCE[start:SOURCE.index("connect.layer?.borderColor",start)]
+        self.assertIn("openVPNSystemRouteVerified",color)
+    def test_report_uses_one_kill_switch_label(self):
+        report=SOURCE.split("@objc private func copyDiagnostics(",1)[1]
+        self.assertIn('let protectionReport = nativeKillSwitchReport()',report)
+        self.assertIn('protectionReport.hasPrefix("Kill Switch: ")',report)
+        self.assertEqual(report.count("nativeKillSwitchReport()"),1)
     def test_emergency_controls_only_active(self):
         self.assertIn('if ciscoTunnelTask != nil {',PAGE)
         self.assertIn('if localProxyActive {',PAGE)
