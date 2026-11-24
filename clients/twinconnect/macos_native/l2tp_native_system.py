@@ -10,6 +10,7 @@ DNS/HTTPS over the installed system routes have all been verified.
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import ipaddress
 import json
 import os
@@ -190,13 +191,66 @@ def verify_ipsec_peer(endpoint: str) -> bool:
                for source,dest in pairs)
 
 
-def full_connection(payload: dict) -> None:
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def full_connection(payload: dict,raw=None) -> None:
+    if raw is None:
+        raw=json.dumps(payload,sort_keys=True,separators=(",",":")).encode("utf-8")
+    digest=hashlib.sha256(raw).hexdigest()
+    control=kill_switch_control()
+    protected=None
+    if control:
+        try:
+            protected=control.begin_reconnect(raw.decode("utf-8"),"l2tp")
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            raise ValueError("L2TP_KS_RECONNECT_NOT_AUTHORIZED") from None
+        if not protected:
+            raise ValueError("L2TP_KS_RECONNECT_NOT_AUTHORIZED")
+    try:
+        connect_reviewed(payload,digest,control,protected)
+    finally:
+        if protected:
+            try:
+                control.abort_reconnect("l2tp")
+            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                pass
+
+
+def connect_reviewed(payload,digest,control,protected):
     if guard("preflight") != "L2TP_MANAGEMENT_PRECHECK_READY":
         raise ValueError("L2TP_PREFLIGHT_FAILED")
-    address = resolved_endpoint(payload["server"])
+    address = protected["ip"] if protected else resolved_endpoint(payload["server"])
     fixed = {**payload, "server": address}
     blob = json.dumps(fixed, separators=(",", ":")).encode("utf-8")
-    if guard("arm", address) != "L2TP_MANAGEMENT_PIN_ARMED":
+    if guard("arm", address,str(os.getpid()),digest) != "L2TP_MANAGEMENT_PIN_ARMED":
         raise ValueError("L2TP_MANAGEMENT_PIN_FAILED")
     # Root-only native API will not persist PPP password or IPsec PSK.
     profile = native("capabilities")
@@ -229,6 +283,11 @@ def full_connection(payload: dict) -> None:
         time.sleep(0.5)
     if not verified:
         raise ValueError("L2TP_IPSEC_ENDPOINT_MISMATCH")
+    if protected:
+        try:
+            control.attach_l2tp_reconnect(os.getpid(),interface,digest)
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            raise ValueError("L2TP_KS_PEER_UNVERIFIED") from None
     for group in (("1.1.1.1","1.0.0.1"),("8.8.8.8","8.8.4.4")):
         for destination in group:
             try:
@@ -239,6 +298,11 @@ def full_connection(payload: dict) -> None:
                     raise
     if guard("activate", interface, timeout=30) != "L2TP_SYSTEM_IPV4_CONNECTED":
         raise ValueError("L2TP_FULL_ROUTE_UNVERIFIED")
+    if protected:
+        try:
+            control.complete_reconnect(os.getpid(),interface)
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            raise ValueError("L2TP_KS_RECONNECT_UNVERIFIED") from None
     safe_reply("L2TP_SYSTEM_IPV4_CONNECTED", state="connected", vpn=True)
     # Continuous heartbeat preserves the lease. A crash or a closed window
     # causes the independently installed watchdog to roll everything back.
@@ -265,17 +329,15 @@ def main() -> int:
         except OSError:
             safe_reply("L2TP_ROOT_HELPER_MISSING")
             return 2
-    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
-        safe_reply("L2TP_KS_RECONNECT_NOT_AUTHORIZED")
-        return 2
     # signal handlers run in main thread so disconnect can always restore.
     def terminate(_signum, _frame):
         raise Aborted()
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
     try:
-        payload = parse_profile(os.read(0, MAX_PROFILE + 1))
-        full_connection(payload)
+        raw=os.read(0, MAX_PROFILE + 1)
+        payload = parse_profile(raw)
+        full_connection(payload,raw)
         return 0
     except Aborted:
         safe_reply("L2TP_SYSTEM_DISCONNECTED", state="disconnected")
@@ -286,7 +348,10 @@ def main() -> int:
     finally:
         # Never let a failed connection retain routing privileges.
         try:
-            invoke(["/usr/bin/python3", str(GUARD), "stop"], timeout=17)
+            state=Path("/private/var/run/twinconnect-l2tp-route-guard/state.json")
+            current=json.loads(state.read_text()) if state.exists() else {}
+            if current.get("worker_pid")==os.getpid():
+                invoke(["/usr/bin/python3", str(GUARD), "stop"], timeout=17)
         except Exception:
             pass  # watchdog still has a root-owned deadline
 

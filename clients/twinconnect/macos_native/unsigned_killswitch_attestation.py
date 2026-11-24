@@ -19,7 +19,7 @@ import subprocess
 import sys
 import time
 
-from unsigned_killswitch_policy import Transport, render_policy, validate_kernel_syntax
+from unsigned_killswitch_policy import Transport, render_policy, validate_kernel_syntax, render_l2tp_policy
 
 WG_ROOT = Path("/private/var/run/twinconnect-wireguard-route-guard")
 CISCO_ROOT = Path("/private/var/run/twinconnect-cisco-route-guard")
@@ -38,8 +38,13 @@ class Evidence:
     uplink: str
     transports: tuple[Transport, ...]
     pid: int
+    local_ip: str | None = None
 
     def rules(self):
+        if self.protocol=="l2tp":
+            if len(self.transports)!=1 or self.transports[0].proto!="udp" or self.transports[0].port!=500:
+                raise ValueError("KS_L2TP_TRANSPORT_INVALID")
+            return render_l2tp_policy(self.interface,self.uplink,self.local_ip,self.transports[0].ip)
         return render_policy(self.interface, self.uplink, self.transports)
 
 
@@ -492,6 +497,99 @@ def tun_session_identity(require_live=True):
                      "uplink":evidence.uplink,"primary_pid":primary}
 
 
+L2TP_NATIVE="/Library/PrivilegedHelperTools/TwinConnectL2TP/twinconnect-l2tp-native"
+L2TP_RUNNER="/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_native_system.py"
+
+
+def l2tp_worker(pid):
+    command=process_command(pid)
+    executable,sep,args=command.partition(" ")
+    if (not sep or args!=L2TP_RUNNER+" system" or
+            executable not in ("/usr/bin/python3",
+            "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+            "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python")):
+        raise ValueError("KS_L2TP_WORKER_UNVERIFIED")
+
+
+def l2tp_local_ip(uplink):
+    if not isinstance(uplink,str) or not re.fullmatch(r"en[0-9]{1,3}",uplink):
+        raise ValueError("KS_UPLINK_INTERFACE_INVALID")
+    result=run("/sbin/ifconfig",uplink)
+    addresses=re.findall(r"(?m)^\s*inet ([0-9.]+)\s",result.stdout)
+    if result.returncode or len(addresses)!=1:
+        raise ValueError("KS_L2TP_UPLINK_ADDRESS_UNVERIFIED")
+    return str(ipaddress.IPv4Address(addresses[0]))
+
+
+def l2tp_esp_pair(sad,spd,local,peer):
+    """Parse only selectors, SA state and policy; never return SAD/key data."""
+    if len(sad)>262144 or len(spd)>262144:
+        return False
+    paired=set()
+    for record in re.split(r"(?m)\n(?=\S)",sad.strip()):
+        lines=record.splitlines()
+        if not lines:continue
+        m=re.fullmatch(r"([0-9.]+)(?:\[([0-9]+)\])?\s+([0-9.]+)(?:\[([0-9]+)\])?\s*",lines[0])
+        if not m:continue
+        src,sp,dst,dp=m.groups()
+        if (src,dst) not in ((local,peer),(peer,local)):continue
+        body="\n".join(lines[1:])
+        if sp or dp or re.search(r"natt|nat-t|udp.encap|esp.udp",body,re.I):
+            return False
+        if (re.search(r"(?m)^\s+esp\s",body) and re.search(r"\bmode=transport\b",body)
+                and re.search(r"\bstate=mature\b",body)):
+            paired.add((src,dst))
+    if paired!={(local,peer),(peer,local)}:return False
+    outgoing=set();incoming=set()
+    for record in re.split(r"(?m)\n(?=\S)",spd.strip()):
+        lines=record.splitlines()
+        if not lines:continue
+        m=re.fullmatch(r"([0-9.]+)\[(\d+|any)\]\s+([0-9.]+)\[(\d+|any)\]\s+udp\s*",lines[0])
+        if not m:continue
+        src,sp,dst,dp=m.groups()
+        body="\n".join(lines[1:])
+        if not re.search(r"(?m)^\s*esp/transport//(?:require|unique)\b",body):continue
+        if src==local and dst==peer and dp=="1701" and sp.isdecimal() and 0<int(sp)<=65535 and re.search(r"(?m)^\s*out ipsec\b",body):
+            outgoing.add(sp)
+        if src==peer and dst==local and sp=="1701" and dp.isdecimal() and 0<int(dp)<=65535 and re.search(r"(?m)^\s*in ipsec\b",body):
+            incoming.add(dp)
+    return len(outgoing)==1 and outgoing==incoming
+
+
+def l2tp_evidence(state,iface=None,require_full=True):
+    if not isinstance(state,dict) or state.get("mode") not in (("leased",) if require_full else ("armed","probing","activating","leased")):
+        raise ValueError("KS_L2TP_GUARD_NOT_READY")
+    deadline=state.get("deadline")
+    if type(deadline) not in (int,float) or not math.isfinite(deadline) or time.time()>=deadline:
+        raise ValueError("KS_ENGINE_LEASE_EXPIRED")
+    interface=state.get("full_interface") if require_full else iface
+    if not isinstance(interface,str) or not re.fullmatch(r"ppp[0-9]{1,4}",interface):
+        raise ValueError("KS_L2TP_INTERFACE_INVALID")
+    pid=state.get("worker_pid")
+    l2tp_worker(pid)
+    digest=state.get("profile_digest")
+    if not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest):
+        raise ValueError("KS_L2TP_PROFILE_UNVERIFIED")
+    uplink=state.get("interface");peer=state.get("endpoint")
+    local=l2tp_local_ip(uplink)
+    endpoint=Transport(peer,500,"udp")
+    if route_interface(peer)!=uplink:
+        raise ValueError("KS_L2TP_ENDPOINT_ROUTE_UNVERIFIED")
+    native=run(L2TP_NATIVE,"status")
+    if native.returncode or json.loads(native.stdout).get("reason")!="L2TP_NATIVE_LINK_CONNECTED_UNROUTED":
+        raise ValueError("KS_L2TP_NATIVE_LINK_UNVERIFIED")
+    pp=run("/sbin/ifconfig",interface)
+    if pp.returncode or not re.search(r"(?m)^\s*inet [0-9.]+\s+-->\s+[0-9.]+",pp.stdout):
+        raise ValueError("KS_L2TP_PPP_UNVERIFIED")
+    sad=run("/usr/sbin/setkey","-D")
+    spd=run("/usr/sbin/setkey","-DP")
+    if sad.returncode or spd.returncode or not l2tp_esp_pair(sad.stdout,spd.stdout,local,peer):
+        raise ValueError("KS_L2TP_ESP_NOT_ATTESTED")
+    if require_full and any(route_interface(ip)!=interface for ip in ("9.9.9.9","129.0.0.1","1.1.1.1","8.8.8.8")):
+        raise ValueError("KS_L2TP_ROUTE_UNVERIFIED")
+    return Evidence("l2tp",interface,uplink,(endpoint,),pid,local)
+
+
 def read_guard(directory):
     try:
         return root_private_json(directory/"state.json")
@@ -515,6 +613,7 @@ def collect(require_tun_live=True):
         if name=="wireguard": return wireguard_evidence(state)
         if name=="cisco": return cisco_evidence(state)
         if name=="openvpn": return openvpn_evidence(state)
+        if name=="l2tp": return l2tp_evidence(state)
         raise ValueError("KS_"+name.upper()+"_TRANSPORT_NOT_ATTESTED")
     return tun_evidence(observed_tun_processes(),require_tun_live)
 

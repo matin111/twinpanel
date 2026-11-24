@@ -68,6 +68,30 @@ def render_policy(tunnel: str | None = None, uplink: str | None = None,
     return "\n".join(rules) + "\n"
 
 
+def render_l2tp_policy(tunnel, uplink, local, peer):
+    """ESP-only IPv4 IPsec. Kernel ESP has no TCP/UDP socket owner.
+    Exact local/peer addresses, exact interface, no state on ESP, no
+    plaintext L2TP/UDP1701, no NAT-T until separately attested.
+    """
+    if tunnel is not None and not re.fullmatch(r"ppp[0-9]{1,4}",tunnel):
+        raise ValueError("KS_L2TP_INTERFACE_INVALID")
+    if not isinstance(uplink,str) or not re.fullmatch(r"en[0-9]{1,3}",uplink):
+        raise ValueError("KS_UPLINK_INTERFACE_INVALID")
+    src=ipaddress.IPv4Address(local)
+    dst=ipaddress.IPv4Address(peer)
+    if not dst.is_global or src==dst or src.is_loopback or src.is_unspecified or src.is_multicast:
+        raise ValueError("KS_L2TP_ENDPOINT_INVALID")
+    rules=["pass quick on lo0 all no state"]
+    if tunnel is not None:
+        rules.append(f"pass quick on {tunnel} all no state")
+    rules.extend((
+        f"pass out quick on {uplink} inet proto udp from {src} port = 500 to {dst} port = 500 user = root keep state (if-bound)",
+        f"pass out quick on {uplink} inet proto esp from {src} to {dst} no state",
+        f"pass in quick on {uplink} inet proto esp from {dst} to {src} no state",
+        "block drop quick all"))
+    return "\n".join(rules)+"\n"
+
+
 def validate_kernel_syntax(rules: str) -> bool:
     """Ask Apple's real PF parser to validate, WITHOUT loading any rules."""
     with tempfile.TemporaryDirectory(prefix="twinconnect-ks-check-") as directory:

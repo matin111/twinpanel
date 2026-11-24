@@ -59,11 +59,11 @@ class OpenVPNProtectionTests(unittest.TestCase):
             close.assert_not_called()
             c.before_openvpn_disconnect(123,"utun15")
             close.assert_called_once_with(self.lease)
-    def test_unintegrated_engines_do_not_claim_ready(self):
-        self.assertEqual(c.SUPPORTED_PROTOCOLS,{"wireguard","amneziawg","openvpn","cisco"}|a.TUN_PROTOCOLS)
+    def test_integrated_engines_require_authorized_reconnect(self):
+        self.assertEqual(c.SUPPORTED_PROTOCOLS,{"wireguard","amneziawg","openvpn","cisco","l2tp"}|a.TUN_PROTOCOLS)
         for file in ("l2tp_native_system.py","l2tp_management_route_guard.py"):
             text=Path(__file__).with_name(file).read_text()
-            self.assertIn("twinconnect-killswitch-control/lease.json",text)
+            self.assertIn("twinconnect-killswitch-control",text)
             self.assertIn("KS_RECONNECT_NOT_AUTHORIZED",text)
 
 if __name__=="__main__": unittest.main()

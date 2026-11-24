@@ -29,8 +29,8 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence, TUN_PROTOCOLS, tun_session_identity, cisco_tcp_transport
-from unsigned_killswitch_policy import Transport, render_policy
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence, TUN_PROTOCOLS, tun_session_identity, cisco_tcp_transport, l2tp_evidence, l2tp_local_ip, L2TP_ROOT
+from unsigned_killswitch_policy import Transport, render_policy, render_l2tp_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
 SCRIPT=ROOT/"unsigned_killswitch_console_control.py"
@@ -47,7 +47,7 @@ RECONNECT_SECONDS=60
 ARMING_TIMEOUT=30
 SESSION_MODE='until_reset'
 WG_PROTOCOLS={'wireguard':WG_BIN,'amneziawg':AWG_BIN}
-SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn','cisco'}|TUN_PROTOCOLS
+SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn','cisco','l2tp'}|TUN_PROTOCOLS
 
 
 def run(*args, input=None, timeout=4):
@@ -224,6 +224,17 @@ def reconnect_identity(evidence):
         if evidence.protocol in TUN_PROTOCOLS:
             actual,identity=tun_session_identity(False)
             return identity if actual==evidence else None
+        if evidence.protocol=="l2tp":
+            state=root_private_json(L2TP_ROOT/"state.json")
+            digest=state.get("profile_digest")
+            baseline=state.get("baseline_exit")
+            if (l2tp_evidence(state)!=evidence or
+                    not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest) or
+                    not isinstance(baseline,str) or not ipaddress.IPv4Address(baseline).is_global):
+                return None
+            return {"protocol":"l2tp","digest":digest,"ip":evidence.transports[0].ip,
+                    "port":500,"transport":"udp","uplink":evidence.uplink,"gateway":state["gateway"],
+                    "baseline_ip":baseline,"local_ip":evidence.local_ip}
         if evidence.protocol=="cisco":
             state=root_private_json(Path("/private/var/run/twinconnect-cisco-route-guard/state.json"))
             digest=state.get("profile_digest")
@@ -270,6 +281,12 @@ def reconnect_identity(evidence):
 
 
 def bootstrap_rules(identity, tunnel=None):
+    if identity.get("protocol")=="l2tp":
+        if identity.get("port")!=500 or identity.get("transport")!="udp":
+            raise ValueError("KS_L2TP_TRANSPORT_INVALID")
+        if l2tp_local_ip(identity["uplink"])!=identity["local_ip"]:
+            raise ValueError("KS_L2TP_UPLINK_CHANGED")
+        return render_l2tp_policy(tunnel,identity["uplink"],identity["local_ip"],identity["ip"])
     transport=Transport(identity["ip"],identity["port"],identity.get("transport","udp"))
     uplink=identity["uplink"]
     if not re.fullmatch(r"en[0-9]{1,3}",uplink) or ipaddress.ip_address(transport.ip).version!=4:
@@ -424,6 +441,65 @@ def tun_matches_lease(lease,require_live=False):
                 ("protocol","digest","ip","port","transport","uplink")))
 
 
+def l2tp_matches_lease(lease,require_full=True):
+    state=root_private_json(L2TP_ROOT/"state.json")
+    identity=lease["reconnect_identity"]
+    evidence=l2tp_evidence(state,lease["interface"],require_full)
+    return (evidence.pid==lease["pid"] and evidence.interface==lease["interface"] and
+            state.get("profile_digest")==identity["digest"] and
+            evidence.local_ip==identity["local_ip"] and evidence.uplink==identity["uplink"] and
+            evidence.transports==(Transport(identity["ip"],500,"udp"),))
+
+
+def attach_l2tp_reconnect(pid,iface,digest):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="handshake":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        identity=lease["reconnect_identity"]
+        session_deadline(lease)
+        state=root_private_json(L2TP_ROOT/"state.json")
+        evidence=l2tp_evidence(state,iface,False)
+        if (identity.get("protocol")!="l2tp" or identity["digest"]!=digest or
+                state.get("profile_digest")!=digest or evidence.pid!=pid or
+                evidence.local_ip!=identity["local_ip"] or evidence.uplink!=identity["uplink"] or
+                evidence.transports!=(Transport(identity["ip"],500,"udp"),) or
+                time.time()>=lease.get("reconnect_until",0)):
+            raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
+        replace_owned_policy(lease,bootstrap_rules(identity,iface),
+                             pid=pid,interface=iface,reconnect_stage="route")
+
+
+def before_l2tp_disconnect(pid,iface,digest):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease:
+            return
+        identity=lease.get("reconnect_identity",{})
+        if identity.get("protocol")!="l2tp" or identity.get("digest")!=digest:
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if lease.get("locked") and not lease.get("reconnect_stage"):
+            if anchor_rules()!=lines(RULES) or not pf_enabled():
+                raise RuntimeError("KS_CLOSED_POLICY_UNVERIFIED")
+            return
+        if lease.get("reconnect_stage")!="handshake" and (lease.get("pid")!=pid or lease.get("interface")!=iface):
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        close_lease(lease)
+
+
+def l2tp_guard_recovery(pid,digest):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_identity",{}).get("protocol")!="l2tp" or lease["reconnect_identity"].get("digest")!=digest:
+            return False
+        session_deadline(lease)
+        if not pf_enabled() or anchor_rules()!=tuple(lease["canonical"]):
+            return False
+        if lease.get("reconnect_stage"):
+            return time.time()<lease.get("reconnect_until",0) and (lease["reconnect_stage"]=="handshake" or (lease["pid"]==pid and l2tp_matches_lease(lease,False)))
+        return not lease.get("locked") and lease["pid"]==pid and l2tp_matches_lease(lease)
+
+
 def attach_cisco_reconnect(pid,iface,digest):
     with lock():
         lease=read_json("lease.json")
@@ -561,6 +637,8 @@ def complete_reconnect(pid,iface):
                 evidence.transports!=(Transport(identity["ip"],identity["port"],identity.get("transport","udp")),) or
                 anchor_rules()!=tuple(lease["canonical"]) or not pf_enabled()):
             raise RuntimeError("KS_RECONNECT_ROUTE_UNVERIFIED")
+        if identity.get("protocol")=="l2tp" and not l2tp_matches_lease(lease):
+            raise RuntimeError("KS_L2TP_RECONNECT_UNVERIFIED")
         if identity.get("protocol") in TUN_PROTOCOLS and (
                 not tun_network_verified(lease) or
                 time.time()>=lease.get("reconnect_until",0) or
@@ -597,6 +675,8 @@ def monitor_lease(lease):
                 iface=lease["interface"]
                 if identity.get("protocol") in TUN_PROTOCOLS:
                     expired=not tun_matches_lease(lease)
+                elif identity.get("protocol")=="l2tp":
+                    expired=not l2tp_matches_lease(lease,False)
                 elif identity.get("protocol")=="cisco":
                     expired=(cisco_tcp_transport(lease["pid"],identity["ip"])!=
                              Transport(identity["ip"],identity["port"],"tcp") or
@@ -628,6 +708,8 @@ def monitor_lease(lease):
         protocol=identity.get("protocol") if isinstance(identity,dict) else None
         if protocol in TUN_PROTOCOLS:
             valid=tun_matches_lease(lease)
+        elif protocol=="l2tp":
+            valid=l2tp_matches_lease(lease)
         elif protocol in ("openvpn","cisco"):
             evidence=collect()
             valid=(evidence is not None and evidence.protocol==protocol and
@@ -788,7 +870,7 @@ def enable():
             ready=read_json("ready.json")
             if session_deadline(lease)!=0:
                 raise RuntimeError("KS_SESSION_NOT_AUTHORIZED")
-            if evidence.protocol=="cisco":
+            if evidence.protocol in ("cisco","l2tp"):
                 try:
                     probe=run("/usr/bin/curl","--interface","if!"+evidence.interface,
                               "--noproxy","*","-4","-fsS","--connect-timeout","3",

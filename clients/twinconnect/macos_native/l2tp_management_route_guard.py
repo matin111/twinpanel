@@ -193,9 +193,54 @@ def ppp_interface() -> str | None:
     return live[0] if len(live) == 1 else None
 
 
+def kill_switch_control():
+    import importlib.util
+    import stat
+    state=Path("/private/var/run/twinconnect-killswitch-control")
+    try:
+        state_info=state.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid!=0 or state_info.st_mode & 0o077:
+        raise ValueError("KS_STATE_UNTRUSTED")
+    try:
+        lease=(state/"lease.json").lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(lease.st_mode) or lease.st_uid!=0 or lease.st_mode & 0o077:
+        raise ValueError("KS_LEASE_UNTRUSTED")
+    root=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+    script=root/"unsigned_killswitch_console_control.py"
+    for path,kind in ((root,stat.S_ISDIR),(script,stat.S_ISREG)):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or not kind(info.st_mode):
+            raise ValueError("KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def protected_recovery(state):
+    try:
+        control=kill_switch_control()
+        return bool(control and control.l2tp_guard_recovery(state.get("worker_pid"),state.get("profile_digest")))
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return False
+
+
 def preflight() -> tuple[str, dict]:
+    protected=None
     if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
-        return "L2TP_KS_RECONNECT_NOT_AUTHORIZED", {}
+        try:
+            control=kill_switch_control()
+            protected=control.reconnect_context("handshake") if control else None
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            pass
+        if not protected or protected.get("protocol")!="l2tp":
+            return "L2TP_KS_RECONNECT_NOT_AUTHORIZED", {}
     if any(path.exists() for path in PROTECT_VPNS):
         return "L2TP_OTHER_SYSTEM_VPN_ACTIVE", {}
     if STATE.exists():
@@ -205,10 +250,15 @@ def preflight() -> tuple[str, dict]:
     if (not public_ip(gateway) or
             not interface or not re.fullmatch(r"en[0-9]{1,3}", interface)):
         return "L2TP_ORIGINAL_ROUTE_UNVERIFIED", {}
-    peers = sorted(set(connector_peers() + ssh_peers()))
-    controls = connector_peers()
-    if not controls or not peers:
-        return "L2TP_MANAGEMENT_CONTROL_MISSING", {}
+    if protected:
+        if protected["gateway"]!=gateway or protected["uplink"]!=interface:
+            return "L2TP_KS_UPLINK_CHANGED", {}
+        peers=[]
+    else:
+        peers = sorted(set(connector_peers() + ssh_peers()))
+        controls = connector_peers()
+        if not controls or not peers:
+            return "L2TP_MANAGEMENT_CONTROL_MISSING", {}
     existing = exact_hosts()
     if existing is None:
         return "L2TP_ROUTE_OBSERVATION_FAILED", {}
@@ -232,7 +282,7 @@ def preflight() -> tuple[str, dict]:
         "dns_before": previous, "peers": peers}
 
 
-def arm(endpoint: str) -> str:
+def arm(endpoint: str, worker=None, digest=None) -> str:
     ip = public_ip(endpoint)
     if not ip:
         return "L2TP_ENDPOINT_NOT_PUBLIC"
@@ -246,15 +296,28 @@ def arm(endpoint: str) -> str:
     if (route_to_server.get("gateway") != info["gateway"] or
             route_to_server.get("interface") != info["interface"]):
         return "L2TP_ENDPOINT_NOT_ON_ORIGINAL_UPLINK"
-    baseline_trace = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
-                         "--connect-timeout", "3", "--max-time", "8",
-                         "https://1.1.1.1/cdn-cgi/trace", timeout=10)
-    match = re.search(r"(?m)^ip=([0-9.]+)$", baseline_trace.stdout)
-    if baseline_trace.returncode or not match or not public_ip(match.group(1)):
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        try:
+            control=kill_switch_control()
+            context=control.reconnect_context("handshake") if control else None
+            if (not context or context.get("protocol")!="l2tp" or context.get("ip")!=ip or
+                    context.get("digest")!=digest):
+                return "L2TP_KS_RECONNECT_NOT_AUTHORIZED"
+            baseline=public_ip(context["baseline_ip"])
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "L2TP_KS_RECONNECT_NOT_AUTHORIZED"
+    else:
+        baseline_trace = run("/usr/bin/curl", "-4", "--noproxy", "*", "-fsS",
+                             "--connect-timeout", "3", "--max-time", "8",
+                             "https://1.1.1.1/cdn-cgi/trace", timeout=10)
+        match = re.search(r"(?m)^ip=([0-9.]+)$", baseline_trace.stdout)
+        baseline=public_ip(match.group(1)) if not baseline_trace.returncode and match else None
+    if not baseline:
         return "L2TP_BASELINE_EGRESS_UNAVAILABLE"
     pinned = sorted(set(info["peers"] + [ip]))
     state = {**info, "mode": "arming", "endpoint": ip,
-             "baseline_exit": match.group(1), "verified_probes": [],
+             "baseline_exit": baseline, "verified_probes": [],
+             "worker_pid":worker,"profile_digest":digest,
              "owned_pins": [], "full_interface": None,
              "probe_destination": None, "deadline": time.time() + INITIAL_TTL}
     # Store intent before every mutation. Watchdog always sees a recoverable
@@ -283,8 +346,8 @@ def verified_state() -> dict | None:
         if (current.get("gateway") != state.get("gateway") or
                 current.get("interface") != state.get("interface")):
             return None
-    if not connector_peers() or not set(connector_peers()).issubset(
-            set(state.get("peers", []))):
+    if (not connector_peers() or not set(connector_peers()).issubset(
+            set(state.get("peers", [])))) and not protected_recovery(state):
         return None
     return state
 
@@ -475,6 +538,14 @@ def rollback() -> str:
     state = load()
     if not state:
         return "L2TP_MANAGEMENT_PIN_IDLE"
+    if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
+        try:
+            control=kill_switch_control()
+            if not control:
+                return "L2TP_KS_CLOSE_BEFORE_ROLLBACK_FAILED"
+            control.before_l2tp_disconnect(state.get("worker_pid"),state.get("full_interface"),state.get("profile_digest"))
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+            return "L2TP_KS_CLOSE_BEFORE_ROLLBACK_FAILED"
     if state.get("mode") == "probing":
         outcome = rollback_probe()
         if outcome != "L2TP_PROBE_ROLLBACK_VERIFIED":
@@ -525,6 +596,8 @@ def stop() -> str:
     # stop PPP, and retry rollback after the physical gateway is restored.
     current = load()
     result = rollback()
+    if result == "L2TP_KS_CLOSE_BEFORE_ROLLBACK_FAILED":
+        return result
     if result == "L2TP_PHYSICAL_DEFAULT_NOT_RESTORED" and current:
         run(NATIVE, "stop", timeout=8)
         result = rollback()
@@ -563,7 +636,7 @@ def service() -> None:
             fcntl.flock(stream, fcntl.LOCK_EX)
             state = load()
             if state and (time.time() >= state.get("deadline", 0) or
-                          not connector_peers() or (
+                          (not connector_peers() and not protected_recovery(state)) or (
                             state.get("mode") == "leased" and
                             native_status() != "L2TP_NATIVE_LINK_CONNECTED_UNROUTED")):
                 stop()
@@ -592,6 +665,11 @@ def main() -> int:
             return 0
         elif args == ["preflight"]:
             answer = preflight()[0]
+        elif len(args)==4 and args[0]=="arm":
+            if not args[2].isdecimal() or not re.fullmatch(r"[0-9a-f]{64}",args[3]):
+                answer="L2TP_WORKER_IDENTITY_INVALID"
+            else:
+                answer=arm(args[1],int(args[2]),args[3])
         elif len(args) == 2 and args[0] == "arm":
             answer = arm(args[1])
         elif len(args) == 3 and args[0] == "probe-host":

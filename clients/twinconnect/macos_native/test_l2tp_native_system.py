@@ -61,7 +61,8 @@ class NativeSystemTests(unittest.TestCase):
         self.assertIn("kSCPropNetPPPCommRemoteAddress",start)
 
     def test_no_full_connect_without_preflight(self):
-        with patch.object(module, "guard", return_value="L2TP_OTHER_SYSTEM_VPN_ACTIVE"), \
+        with patch.object(module, "kill_switch_control", return_value=None), \
+             patch.object(module, "guard", return_value="L2TP_OTHER_SYSTEM_VPN_ACTIVE"), \
              patch.object(module, "native") as native:
             with self.assertRaisesRegex(ValueError, "L2TP_PREFLIGHT_FAILED"):
                 module.full_connection({"server": "vpn.example.com"})

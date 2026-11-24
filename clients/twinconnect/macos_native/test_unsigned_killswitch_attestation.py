@@ -53,11 +53,11 @@ class AttestationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"KS_MULTIPLE_ENGINE_GUARDS"):
                 a.collect()
 
-    def test_unimplemented_guard_is_never_promoted(self):
+    def test_invalid_l2tp_guard_is_never_promoted(self):
         states=[None]*4
         states[3]=lease()
         with patch.object(a,"read_guard",side_effect=states):
-            with self.assertRaisesRegex(ValueError,"KS_L2TP_TRANSPORT_NOT_ATTESTED"): a.collect()
+            with self.assertRaisesRegex(ValueError,"KS_L2TP_INTERFACE_INVALID"): a.collect()
 
     def test_openvpn_guard_requires_actual_session(self):
         with patch.object(a,"openvpn_session_evidence",side_effect=ValueError("KS_OPENVPN_SOCKET_UNVERIFIED")):

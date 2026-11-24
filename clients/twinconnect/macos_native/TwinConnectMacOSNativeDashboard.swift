@@ -635,6 +635,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var l2tpBusy = false
     private var l2tpStatus = ""
     private var l2tpTask: Process?
+    private var l2tpReconnectProfile: Data?
+    private var l2tpReconnectAccount: String?
+    private var l2tpReconnectOrigin: URL?
+    private var l2tpReconnectServer: String?
     private var l2tpGeneration = 0
     private var l2tpSystemRouteVerified = false
     private var l2tpConnectedAt: Date?
@@ -3083,7 +3087,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let on = state == "active" || state == "locked"
         toggle.state = on ? .on : .off
         let protectedConnectionReady = (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
-            ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
+            l2tpSystemRouteVerified || ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
             (wireGuardSystemRouteVerified &&
              ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol))
         toggle.isEnabled = !nativeKillSwitchActionBusy &&
@@ -3114,7 +3118,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let enable = sender.state == .on
         if enable {
             guard (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
-                  ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
+                  l2tpSystemRouteVerified || ciscoSystemRouteVerified || openVPNSystemRouteVerified ||
                   (wireGuardSystemRouteVerified &&
                    ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)) else {
                 updateNativeKillSwitchControls()
@@ -3699,6 +3703,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpBusy = false
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
+        l2tpReconnectProfile = nil
+        l2tpReconnectAccount = nil
+        l2tpReconnectOrigin = nil
+        l2tpReconnectServer = nil
         ciscoReconnectProfile = nil
         ciscoReconnectAccount = nil
         ciscoReconnectOrigin = nil
@@ -6089,7 +6097,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // network recovery watchdog. The UI only trusts verified status-uptime.
     private func requestL2TPPreflight() {
         if l2tpTask != nil || l2tpSystemRouteVerified {
-            l2tpGeneration += 1
             l2tpBusy = true
             view = build()
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -6099,12 +6106,24 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     "/Library/PrivilegedHelperTools/TwinConnectL2TP/l2tp_management_route_guard.py",
                     "stop"]
                 stop.standardInput = FileHandle.nullDevice
-                stop.standardOutput = FileHandle.nullDevice
+                let output = Pipe()
+                stop.standardOutput = output
                 stop.standardError = FileHandle.nullDevice
-                if (try? stop.run()) != nil { stop.waitUntilExit() }
+                let started = (try? stop.run()) != nil
+                let data = started ? output.fileHandleForReading.readDataToEndOfFile() : Data()
+                if started { stop.waitUntilExit() }
+                let stopped = started && stop.terminationStatus == 0 &&
+                    (String(data: data, encoding: .utf8) ?? "").contains("L2TP_SYSTEM_DISCONNECTED")
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
-                    self.l2tpTask?.terminate()
+                    guard stopped else {
+                        self.l2tpBusy = false
+                        self.l2tpStatus = "L2TP_DISCONNECT_NOT_CONFIRMED"
+                        self.view = self.build()
+                        return
+                    }
+                    self.l2tpGeneration += 1
+                    if self.l2tpTask?.isRunning == true { self.l2tpTask?.terminate() }
                     self.l2tpTask = nil
                     self.l2tpBusy = false
                     self.l2tpSystemRouteVerified = false
@@ -6140,7 +6159,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let generation = l2tpGeneration
         l2tpStatus = ""
         view = build()
-        directory.prepareL2TPProfile(session, serverID: serverID) { [weak self] result in
+        let complete: (Result<Data, Error>) -> Void = { [weak self] result in
             guard let self = self, self.l2tpGeneration == generation,
                   self.accountSession?.accessToken == session.accessToken else { return }
             switch result {
@@ -6152,6 +6171,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     reason : "L2TP_PROFILE_UNAVAILABLE"
                 self.view = self.build()
             case .success(let profile):
+                self.l2tpReconnectProfile = profile
+                self.l2tpReconnectAccount = session.namespace
+                self.l2tpReconnectOrigin = session.apiOrigin
+                self.l2tpReconnectServer = serverID
                 DispatchQueue.global(qos: .userInitiated).async {
                     let task = Process()
                     task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
@@ -6207,6 +6230,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 }
             }
         }
+        let ks = nativeKillSwitchControlStatus()
+        if ks?["state"] as? String == "locked" {
+            guard l2tpReconnectAccount == session.namespace,
+                  l2tpReconnectOrigin == session.apiOrigin,
+                  l2tpReconnectServer == serverID,
+                  let cached = l2tpReconnectProfile else {
+                l2tpBusy = false
+                l2tpStatus = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            complete(.success(cached))
+        } else if let ks = ks, (ks["state"] as? String) != "off" {
+            l2tpBusy = false
+            l2tpStatus = "Kill Switch is not ready."
+            view = build()
+        } else {
+            directory.prepareL2TPProfile(session, serverID: serverID, completion: complete)
+        }
     }
 
     @objc private func requestVPNConnection(_ sender: NSButton) {
@@ -6231,7 +6273,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let ks = nativeKillSwitchControlStatus(),
            let state = ks["state"] as? String, state != "off" {
-            if ciscoTunnelTask != nil || (state == "locked" && activeProtocol == "cisco") {
+            if l2tpTask != nil || l2tpSystemRouteVerified || (state == "locked" && activeProtocol == "l2tp") {
+                requestL2TPPreflight()
+            } else if ciscoTunnelTask != nil || (state == "locked" && activeProtocol == "cisco") {
                 requestCiscoTunnel(sender)
             } else if fullTunActive {
                 stopFullTun()
