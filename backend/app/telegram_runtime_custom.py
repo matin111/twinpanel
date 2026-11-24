@@ -167,7 +167,7 @@ def _styled_main_keyboard() -> ReplyKeyboardMarkup:
                 keyboard_button("💰 کیف پول", styles.wallet),
             ],
             [
-                keyboard_button("📚 آموزش", styles.learning),
+                keyboard_button("📚 آموزش و دانلود", styles.learning),
             ],
             [
                 keyboard_button("🎫 پشتیبانی", styles.support),
