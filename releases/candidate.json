@@ -1,8 +1,8 @@
 {
-  "version": "1.1.12",
-  "source_sha": "00c6a652a87ad77199247592cc1038c9fa3a27c7",
+  "version": "1.1.13",
+  "source_sha": "0bd0a894b4070b5ddb2195a5bf003ebd1c813feb",
   "notes": {
-    "fa": "رفع نهایی مشکل تاریخ‌سازی هنگام تعیین اعتبار اکانت‌های فعال‌نشده: ویرایش مدت زمان بدون ثبت اولین اتصال واقعی، تاریخ شروع و انقضا تولید نمی‌کند. اصلاح موردی اشتراک mstr500571 روی سرور انجام شده است.",
-    "en": "Harden first-use subscription admin editing: setting a finite duration without an actual activation start no longer fabricates an expiry, including legacy expiry-only rows."
+    "fa": "اضافه‌شدن لینک دانلود کانکشن هوشمند TwinConnect نسخه macOS (Intel) به منوی ربات ادمین و نماینده و بخش آموزش و دانلود؛ همراه با راهنمای نصب و اجرای اولیه.",
+    "en": "Add the TwinConnect macOS Intel download link to the admin and reseller Telegram bot menus and the shared macOS learning/download catalog, with installation guidance."
   }
 }
