@@ -51,3 +51,15 @@ TrustTunnel/Sudoku transports; validate PF reference readback format and
 effective rule/state/interface behavior under live local-console tests;
 then expose the actual verified control in Settings. Do not interpret
 rules_readback as proof of leak protection. No release readiness claim.
+
+
+## Phase 4: live read-only service
+
+The launchd status service is deliberately incapable of enabling PF. It
+observes the current kernel PF status and privately attests known engines,
+including separate Sudoku and TrustTunnel transport children. It publishes
+only a root-owned, bounded, non-secret status file every ten seconds.
+The native Settings connection report validates owner, mode and freshness
+before displaying it. No activation toggle is presented until live
+enforcement and recovery are tested. On the development VPS the service
+reports KS_REMOTE_RECOVERY_REQUIRED. No firewall rules are loaded.

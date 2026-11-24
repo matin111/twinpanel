@@ -6257,12 +6257,50 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let url = accountSession?.websiteURL { NSWorkspace.shared.open(url) }
     }
 
+    private func nativeKillSwitchReport() -> String {
+        // Read only a fresh root-owned public status snapshot. This
+        // is not a preference, a connection badge or leak attestation.
+        let path = "/private/var/run/twinconnect-killswitch-status/status.json"
+        let manager = FileManager.default
+        let directory = (path as NSString).deletingLastPathComponent
+        guard let dir = try? manager.attributesOfItem(atPath: directory),
+              dir[.type] as? FileAttributeType == .typeDirectory,
+              (dir[.ownerAccountID] as? NSNumber)?.intValue == 0,
+              let dirMode = (dir[.posixPermissions] as? NSNumber)?.intValue,
+              dirMode & 0o022 == 0,
+              let attributes = try? manager.attributesOfItem(atPath: path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.intValue == 0,
+              let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue,
+              mode & 0o022 == 0,
+              let size = (attributes[.size] as? NSNumber)?.intValue,
+              (1...4096).contains(size),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              data.count <= 4096,
+              let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              row["version"] as? Int == 1,
+              let timestamp = row["timestamp"] as? TimeInterval,
+              abs(Date().timeIntervalSince1970 - timestamp) < 45,
+              row["activation_available"] as? Bool == false,
+              row["leak_verified"] as? Bool == false else {
+            return "Status unavailable; protection not verified"
+        }
+        if row["state"] as? String == "off" {
+            if row["reason"] as? String == "KS_REMOTE_RECOVERY_REQUIRED" {
+                return "Off — independent recovery required on remote Mac"
+            }
+            return "Off — live acceptance test required"
+        }
+        return "Unknown — protection not verified"
+    }
+
     @objc private func copyDiagnostics(_ sender: NSButton) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let report = [
             "TwinConnect macOS connection report",
             "App version: " + version,
             "Connection: " + verifiedNetworkConnectionLabel,
+            "Kill Switch: " + nativeKillSwitchReport(),
             "Account: " + (accountSession == nil ? "signed out" : "signed in"),
             "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
             "Protocol selected: " + (activeProtocol ?? "none"),

@@ -83,9 +83,26 @@ class AttestationTests(unittest.TestCase):
         with patch.object(a,"run",return_value=Mock(returncode=0,stdout="pid = 10")), patch.object(a,"root_private_json",return_value=config), patch.object(a,"route_interface",side_effect=route), patch.object(a,"live_peers",return_value=set()):
             with self.assertRaisesRegex(ValueError,"KS_TUN_TRANSPORT_UNATTESTED"):
                 a.tun_evidence(processes)
-        config["outbounds"][0].update(type="socks",server="127.0.0.1")
+        config["outbounds"][0].update(type="socks",server="127.0.0.1",network="tcp")
         with patch.object(a,"run",return_value=Mock(returncode=0,stdout="pid = 10")), patch.object(a,"root_private_json",return_value=config), patch.object(a,"route_interface",side_effect=route):
             with self.assertRaisesRegex(ValueError,"KS_SECONDARY_TRANSPORT_NOT_ATTESTED"):
                 a.tun_evidence(processes)
+
+    def test_secondary_sudoku_matches_root_child_and_pinned_tcp_peer(self):
+        path=a.TUN_ROOT/"active-0123456789abcdef0123456789abcdef.json"
+        processes={12:(10,str(a.TUN_ROOT/"sudoku")+" -c "+str(path.with_suffix(".sudoku.json")))}
+        profile={"mode":"client","transport":"tcp","local_address":"127.0.0.1","server_address":"1.2.3.4:443"}
+        with patch.object(a,"root_private_json",return_value=profile), patch.object(a,"route_interface",side_effect=route), patch.object(a,"live_peers",side_effect=[{a.Transport("1.2.3.4",443,"tcp")},set()]):
+            self.assertEqual(a.secondary_evidence(processes,10,11,path,"utun15").protocol,"sudoku")
+        with patch.object(a,"root_private_json",return_value=profile), patch.object(a,"live_peers",return_value={a.Transport("8.8.8.8",443,"tcp")}):
+            with self.assertRaises(ValueError):
+                a.secondary_evidence(processes,10,11,path,"utun15")
+
+    def test_secondary_trusttunnel_uses_only_verified_http2_profile(self):
+        path=a.TUN_ROOT/"active-0123456789abcdef0123456789abcdef.json"
+        processes={12:(10,str(a.TUN_ROOT/"trusttunnel_client")+" --config "+str(path.with_suffix(".tt.toml"))+" --loglevel error")}
+        raw=b'[endpoint]\naddresses = ["1.2.3.4:443"]\nskip_verification = false\nupstream_protocol = "http2"\n[listener.socks]\n'
+        with patch.object(a,"root_private_bytes",return_value=raw), patch.object(a,"route_interface",side_effect=route), patch.object(a,"live_peers",side_effect=[{a.Transport("1.2.3.4",443,"tcp")},set()]):
+            self.assertEqual(a.secondary_evidence(processes,10,11,path,"utun15").protocol,"trusttunnel")
 
 if __name__=="__main__": unittest.main()

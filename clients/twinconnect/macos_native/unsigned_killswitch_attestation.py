@@ -47,7 +47,7 @@ def run(*args, timeout=4):
                                             "LC_ALL":"C"})
 
 
-def root_private_json(path: Path):
+def root_private_bytes(path: Path):
     # Open without following links, check the descriptor, and read bounded
     # bytes. An untrusted pathname must not become a root-read primitive.
     info = path.parent.lstat()
@@ -60,7 +60,11 @@ def root_private_json(path: Path):
         raw=stream.read(262145)
     if len(raw)>262144:
         raise ValueError("KS_GUARD_STATE_TOO_LARGE")
-    data=json.loads(raw)
+    return raw
+
+
+def root_private_json(path: Path):
+    data=json.loads(root_private_bytes(path))
     if not isinstance(data,dict):
         raise ValueError("KS_GUARD_STATE_INVALID")
     return data
@@ -238,6 +242,65 @@ def modern_outbound(config):
     return protocol,row,transport
 
 
+def secondary_evidence(processes, daemon_pid, primary_pid, path, iface):
+    """Identify the real supervised TrustTunnel or Sudoku outer connection.
+
+    This is evidence only, never proof that a PF policy is active.
+    """
+    candidates=[]
+    for pid,(parent,cmd) in processes.items():
+        if parent!=daemon_pid:
+            continue
+        sdk=path.with_suffix(".sudoku.json")
+        tt=path.with_suffix(".tt.toml")
+        if cmd==str(TUN_ROOT/"sudoku")+" -c "+str(sdk):
+            candidates.append(("sudoku",pid,sdk))
+        elif cmd==str(TUN_ROOT/"trusttunnel_client")+" --config "+str(tt)+" --loglevel error":
+            candidates.append(("trusttunnel",pid,tt))
+    if len(candidates)!=1:
+        raise ValueError("KS_SECONDARY_TRANSPORT_NOT_ATTESTED")
+    protocol,pid,profile=candidates[0]
+    if protocol=="sudoku":
+        row=root_private_json(profile)
+        if (row.get("mode")!="client" or row.get("transport")!="tcp" or
+                row.get("local_address")!="127.0.0.1"):
+            raise ValueError("KS_SECONDARY_PROFILE_INVALID")
+        addresses=[row.get("server_address")]
+    else:
+        # The root converter emits one JSON-compatible addresses array in
+        # the endpoint section, and an explicit HTTP/2 transport. Never
+        # parse or log credential/certificate fields.
+        raw=root_private_bytes(profile).decode("utf-8")
+        if raw.count("[endpoint]")!=1:
+            raise ValueError("KS_SECONDARY_PROFILE_INVALID")
+        endpoint=raw.split("[endpoint]",1)[1].split("\n[",1)[0]
+        rows=re.findall(r"(?m)^addresses = (\[[^\r\n]+\])$",endpoint)
+        if (len(rows)!=1 or
+                re.findall(r'(?m)^upstream_protocol = "([^"]+)"$',endpoint)!=["http2"] or
+                re.findall(r"(?m)^skip_verification = (\w+)$",endpoint)!=["false"]):
+            raise ValueError("KS_SECONDARY_PROFILE_INVALID")
+        addresses=json.loads(rows[0])
+    if not isinstance(addresses,list) or not 1<=len(addresses)<=8:
+        raise ValueError("KS_SECONDARY_PROFILE_INVALID")
+    allowed=set()
+    for value in addresses:
+        if not isinstance(value,str) or not re.fullmatch(r"[0-9.]+:[0-9]{1,5}",value):
+            raise ValueError("KS_SECONDARY_ENDPOINT_UNPINNED")
+        host,port=value.rsplit(":",1)
+        allowed.add(Transport(host,int(port),"tcp"))
+    observed=live_peers(pid)
+    if not observed or not observed.issubset(allowed) or live_peers(primary_pid):
+        raise ValueError("KS_SECONDARY_TRANSPORT_NOT_ATTESTED")
+    uplinks={route_interface(t.ip) for t in observed}
+    if len(uplinks)!=1:
+        raise ValueError("KS_TRANSPORT_ROUTE_UNVERIFIED")
+    uplink=next(iter(uplinks))
+    if not isinstance(uplink,str) or not re.fullmatch(r"en[0-9]{1,3}",uplink):
+        raise ValueError("KS_TRANSPORT_ROUTE_UNVERIFIED")
+    return Evidence(protocol,iface,uplink,
+                    tuple(sorted(observed,key=lambda t:(t.ip,t.port,t.proto))),pid)
+
+
 def tun_evidence(processes):
     # Use exact root-owned known process paths and a single live daemon
     # child. Never derive identity from a generic SOCKS picker or a filename
@@ -285,9 +348,9 @@ def tun_evidence(processes):
     if (engine=="mbox")!=(protocol=="mieru"):
         raise ValueError("KS_TUN_ENGINE_IDENTITY_UNVERIFIED")
     if outbound.get("server")=="127.0.0.1":
-        # Two-process engines need their independently attested endpoint
-        # config and exact second child. Do not treat local SOCKS as egress.
-        raise ValueError("KS_SECONDARY_TRANSPORT_NOT_ATTESTED")
+        if protocol!="socks5" or outbound.get("network")!="tcp":
+            raise ValueError("KS_SECONDARY_PROFILE_INVALID")
+        return secondary_evidence(processes,daemon_pid,pid,path,iface)
     if protocol=="socks5" and outbound.get("network")!="tcp":
         raise ValueError("KS_SOCKS_UDP_POLICY_NOT_ATTESTED")
     # For now, never resolve an unpinned domain while deriving an exception.
