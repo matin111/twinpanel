@@ -38,3 +38,13 @@ WireGuard dependencies, and an independently installed iOS Simulator runtime.
   exists. No mock VPN success should appear in the production application.
 - Actual signed Network Extension behavior, background transitions and
   system-level leak prevention require final device testing.
+
+## Linked device extension laboratory
+
+Run bash tool/link_ios_wireguard_device_lab.sh after the ARM64 Go archive
+build. It builds the pinned WireGuardKit Swift/C sources, adds the original
+upstream wg-quick parser, and links the real adapter branch into a standalone
+unsigned iOS ARM64 PacketTunnel.appex under build/ios-wireguard-lab/iphoneos.
+The lab bundle is not embedded in Runner and has no Apple provisioning.
+The capability marker stays false. Go runtime patch compatibility and
+on-device packet delivery still require validation.
