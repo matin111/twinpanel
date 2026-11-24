@@ -33,6 +33,25 @@ class FullTunPendingIndicatorTests(unittest.TestCase):
         self.assertIn('self.attestedFullTunProtocol(observed.1)', UI)
         self.assertIn('self.attestedFullTunProtocol(result.1)', UI)
 
+    def test_connect_is_clickable_even_when_old_other_protocol_busy(self):
+        home = UI.split('private func connectPage() -> NSView {', 1)[1].split(
+            'private func networkMetric(', 1)[0]
+        self.assertIn('connect.isEnabled = accountSession != nil && !fullTunBusy &&', home)
+        self.assertNotIn('connect.isEnabled = accountSession != nil && !localProxyBusy', home)
+        handler = UI.split('@objc private func requestVPNConnection(', 1)[1].split(
+            '@objc ', 1)[0]
+        self.assertIn('NSLog("TwinConnect AppKit: Connect button action received")',
+                      handler)
+        self.assertIn('if localProxyBusy || ciscoTunnelBusy ||', handler)
+        self.assertIn('Connection unavailable: A previous connection operation', handler)
+        self.assertIn('view = build()', handler)
+
+    def test_network_card_exposes_selected_protocol(self):
+        network = UI.split('private func networkStatusPage() -> NSView {', 1)[1]
+        network = network.split('private func pingText(', 1)[0]
+        self.assertIn('location + "  ·  " + activeCode', network)
+        self.assertIn('connectionAttemptNotice', network)
+
     def test_button_shows_progress_without_faking_connected(self):
         self.assertIn('let connect = button(fullTunStatusUncertain ? "Checking…" :', UI)
         self.assertIn('fullTunBusy && activeProtocol != "openvpn" ?', UI)

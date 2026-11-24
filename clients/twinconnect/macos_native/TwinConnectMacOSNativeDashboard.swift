@@ -1653,9 +1653,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                              (localProxyActive || fullTunActive || openVPNAppSessionActive ?
                                "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
-        connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
-            !fullTunStatusUncertain && !ciscoTunnelBusy &&
-            !wireGuardProbeBusy && !l2tpBusy
+        // A stale busy flag from another transport must never leave a
+        // visually active "Connect" button silently disabled. The action
+        // handler reports a blocking operation explicitly and does not
+        // launch concurrent tunnels.
+        connect.isEnabled = accountSession != nil && !fullTunBusy &&
+            !fullTunStatusUncertain
         let l2tpHasDiagnostic = activeProtocol == "l2tp" &&
             !l2tpStatus.isEmpty
         let openVPNHasDiagnostic = activeProtocol == "openvpn" &&
@@ -1905,8 +1908,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let location = selected.map {
             flag($0.country) + "  " + countryName($0.country)
         } ?? "Select location"
+        let activeCode = snapshot?.protocols.first {
+            $0.code == activeProtocol
+        }?.name ?? (activeProtocol ?? "Choose protocol")
         let locationRow = stack(.horizontal, spacing: 9)
-        locationRow.addArrangedSubview(text(location, size: 13, weight: .semibold))
+        locationRow.addArrangedSubview(text(
+            location + "  ·  " + activeCode,
+            size: 12, weight: .semibold))
         let locationSpacer = NSView()
         locationSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         locationRow.addArrangedSubview(locationSpacer)
@@ -5812,8 +5820,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func requestVPNConnection(_ sender: NSButton) {
-        guard accountSession != nil, !localProxyBusy, !fullTunBusy,
-              !wireGuardProbeBusy else { return }
+        // This callback must remain observable independently of the tunnel.
+        // Never log account identifiers, node IDs, tt:// links or passwords.
+        NSLog("TwinConnect AppKit: Connect button action received")
+        guard accountSession != nil else {
+            status = "Connection unavailable: Sign in to continue."
+            view = build()
+            return
+        }
+        if fullTunBusy || fullTunStatusUncertain {
+            status = "Connection unavailable: TUN request is still being checked."
+            view = build()
+            return
+        }
+        if localProxyBusy || ciscoTunnelBusy ||
+           wireGuardProbeBusy || l2tpBusy {
+            status = "Connection unavailable: A previous connection operation is still in progress."
+            view = build()
+            return
+        }
         if activeProtocol == "l2tp" {
             requestL2TPPreflight()
             return
