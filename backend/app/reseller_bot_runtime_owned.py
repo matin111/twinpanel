@@ -83,18 +83,8 @@ def reseller_main_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="📚 آموزش",
+                    text="📚 آموزش و دانلود",
                     callback_data="rlearn:g:root",
-                ),
-                InlineKeyboardButton(
-                    text="⬇️ دانلود برنامه",
-                    callback_data="rlearn:d:root",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="💻 کانکشن هوشمند مک (Intel)",
-                    url="https://t.me/twin_connect1/8",
                 ),
             ],
             [
