@@ -65,3 +65,19 @@ wgTurnOff and wgGetConfig in the device binary. For simulator, verify that
 the device-only symbols are absent. This is build validation, not proof of
 a working VPN on an iPhone. Runner remains fail-closed until a complete
 signed-device runtime test verifies the actual transport.
+
+## Debug-only CocoaPods recovery
+
+If the iOS debug engine is present but profile/release downloads are blocked,
+the generated SwiftPM FlutterFramework placeholder may leave plugins unable
+to import Flutter on target-only builds. The generated project also needs
+CocoaPods for flutter_secure_storage. The opt-in script
+tool/prepare_ios_debug_cocoapods_lab.sh switches only the generated lab iOS
+plugin integration to CocoaPods, with Debug settings using the real cached
+Flutter engine. It does not patch the global Flutter SDK or the macOS project.
+Run only after Flutter has generated its package metadata and Podfile.
+Build the Pods-Runner target for the device Debug SDK without signing.
+Do not use these generated settings for Release/Profile; restore the normal
+Flutter-generated integration when the full SDK cache is available.
+The full Runner still needs its Dart asset build and the simulator needs
+its own installed runtime; native module compilation alone is not a full app.
