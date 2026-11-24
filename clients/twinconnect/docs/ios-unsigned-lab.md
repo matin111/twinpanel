@@ -48,3 +48,20 @@ unsigned iOS ARM64 PacketTunnel.appex under build/ios-wireguard-lab/iphoneos.
 The lab bundle is not embedded in Runner and has no Apple provisioning.
 The capability marker stays false. Go runtime patch compatibility and
 on-device packet delivery still require validation.
+
+## Generated Xcode target integration
+
+After the device library link succeeds, run
+ruby tool/install_ios_wireguard_xcode_lab.rb in the isolated checkout.
+It configures the existing PacketTunnel target in Runner.xcodeproj to link
+the tested device archives and upstream profile parser for iphoneos only.
+The simulator target retains the explicit no-engine fallback.
+The generated project is machine-local and must not be committed with
+absolute developer paths, cache artifacts or signing identities.
+
+Validation: build the PacketTunnel target for iphoneos and iphonesimulator
+with CODE_SIGNING_ALLOWED=NO and CODE_SIGNING_REQUIRED=NO; check wgTurnOn,
+wgTurnOff and wgGetConfig in the device binary. For simulator, verify that
+the device-only symbols are absent. This is build validation, not proof of
+a working VPN on an iPhone. Runner remains fail-closed until a complete
+signed-device runtime test verifies the actual transport.
