@@ -53,5 +53,17 @@ class WatchdogTests(unittest.TestCase):
         self.assertIn("unsigned_tun_watchdog.py", installer)
 
 
+
+class TwoEngineWatchdogTests(unittest.TestCase):
+    def test_refuses_duplicate_and_invalid_secondary_pids(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_SECONDARY_PID"):
+            module.watch(100, 200, 60, secondary_engine=200)
+        with self.assertRaisesRegex(ValueError, "INVALID_SECONDARY_PID"):
+            module.watch(100, 200, 60, secondary_engine=1)
+
+    def test_secondary_is_optional_and_backwards_compatible(self):
+        self.assertEqual(module.watch.__defaults__, (0,))
+
+
 if __name__ == "__main__":
     unittest.main()

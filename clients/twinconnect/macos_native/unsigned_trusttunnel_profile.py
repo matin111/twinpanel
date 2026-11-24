@@ -140,6 +140,8 @@ def decode_deeplink(link: str) -> dict:
     version = varint(fields[0][0], 0)[0] if 0 in fields else 0
     if version > 1:
         fail("TRUSTTUNNEL_VERSION_UNSUPPORTED")
+    if 4 in fields and fields[4][0] not in (b"\x00", b"\x01"):
+        fail("TRUSTTUNNEL_IPV6_FLAG_INVALID")
     if 7 in fields and fields[7][0] != b"\x00":
         fail("TRUSTTUNNEL_INSECURE_TLS_REJECTED")
     if 3 in fields:
@@ -163,14 +165,48 @@ def decode_deeplink(link: str) -> dict:
         "hostname": hostname, "addresses": addresses,
         "username": username, "password": password,
         "certificate": certificate,
-        "has_ipv6": False, "upstream_protocol": "http2",
+        "has_ipv6": fields.get(4, [b"\x01"])[0] == b"\x01",
+        "upstream_protocol": "http2",
     }
 
 
 def toml_for_socks(link: str, port: int = SOCKS_PORT) -> str:
+    return toml_from_settings(decode_deeplink(link), port)
+
+
+def trusted_unsigned_runtime(link: str) -> tuple[str, tuple[str, ...]]:
+    """Pin the entitled TrustTunnel endpoint before activating system TUN.
+
+    Use only the reviewed tt:// address, never the Exit probe IP as a
+    substitute for an Iran tunnel ingress. Returns root-private TOML and
+    public endpoint addresses to exclude from the system route.
+    """
+    from unsigned_mieru_profile import resolve_authenticated_ingress_domain
+
+    settings = decode_deeplink(link)
+    pinned = []
+    ips = []
+    for address in settings["addresses"]:
+        name, port = address.rsplit(":", 1)
+        try:
+            ip = ipaddress.IPv4Address(name)
+            if not ip.is_global:
+                fail("TRUSTTUNNEL_ENDPOINT_PUBLIC_IPV4_REQUIRED")
+            value = str(ip)
+        except ipaddress.AddressValueError:
+            value = resolve_authenticated_ingress_domain(name)
+        pinned.append(value + ":" + port)
+        ips.append(value)
+    if not 1 <= len(set(ips)) <= 8:
+        fail("TRUSTTUNNEL_ENDPOINT_IPV4_INVALID")
+    settings["addresses"] = list(dict.fromkeys(pinned))
+    return toml_from_settings(settings, SOCKS_PORT), tuple(sorted(set(ips)))
+
+
+def toml_from_settings(settings: dict, port: int = SOCKS_PORT) -> str:
+    """Private TOML: loopback listener only, no privileged route management."""
     if type(port) is not int or not 1024 <= port <= 65535:
         fail("TRUSTTUNNEL_SOCKS_PORT_INVALID")
-    settings = decode_deeplink(link)
     literal = lambda x: json.dumps(x, ensure_ascii=True)
     return "\n".join([
         'loglevel = "error"',
@@ -180,7 +216,7 @@ def toml_for_socks(link: str, port: int = SOCKS_PORT) -> str:
         '[endpoint]',
         'hostname = ' + literal(settings["hostname"]),
         'addresses = [' + ','.join(literal(x) for x in settings["addresses"]) + ']',
-        'has_ipv6 = false',
+        'has_ipv6 = ' + ('true' if settings["has_ipv6"] else 'false'),
         'username = ' + literal(settings["username"]),
         'password = ' + literal(settings["password"]),
         'certificate = ' + literal(settings["certificate"]),
@@ -191,6 +227,27 @@ def toml_for_socks(link: str, port: int = SOCKS_PORT) -> str:
         'address = ' + literal("127.0.0.1:" + str(port)),
         '',
     ])
+
+
+def trusttunnel_singbox_tun() -> dict:
+    """Single outbound; no arbitrary direct path or proxy settings allowed."""
+    return {
+        "log": {"level": "error"},
+        "inbounds": [{
+            "type": "tun", "tag": "twinconnect-tun",
+            "address": ["172.19.0.1/30"], "auto_route": True,
+            "auto_redirect": False, "strict_route": False,
+            "stack": "system",
+        }],
+        "outbounds": [{
+            "type": "socks", "tag": "proxy",
+            "server": "127.0.0.1", "server_port": SOCKS_PORT,
+            "version": "5", "network": "tcp",
+            # Explicit loopback overrules global auto physical-NIC binding.
+            "bind_interface": "lo0",
+        }],
+        "route": {"final": "proxy", "auto_detect_interface": True},
+    }
 
 
 def main() -> int:

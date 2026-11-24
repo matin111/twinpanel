@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from unsigned_trusttunnel_profile import (
     ProfileRejected, decode_deeplink, toml_for_socks,
     public_endpoint, der_chain_to_pem,
+    trusted_unsigned_runtime, trusttunnel_singbox_tun,
 )
 
 def varint(value):
@@ -62,6 +63,8 @@ class TrustTunnelProfileTests(unittest.TestCase):
         doc = decode_deeplink(self.example)
         self.assertEqual(doc["addresses"], ["1.1.1.1:443"])
         self.assertEqual(doc["hostname"], "fixture.example.org")
+        self.assertTrue(doc["has_ipv6"])
+        self.assertIn("has_ipv6 = true", toml_for_socks(self.example))
         self.assertTrue(doc["certificate"].startswith(
             "-----BEGIN CERTIFICATE-----"))
         config = toml_for_socks(self.example)
@@ -70,6 +73,14 @@ class TrustTunnelProfileTests(unittest.TestCase):
         self.assertIn('127.0.0.1:17121', config)
         self.assertNotIn('[listener.tun]', config)
         self.assertNotIn('0.0.0.0:17121', config)
+
+    def test_explicit_ipv6_disabled_is_preserved(self):
+        profile = link(self.certificate, additional=[(4, b"\x00")])
+        self.assertFalse(decode_deeplink(profile)["has_ipv6"])
+        self.assertIn('has_ipv6 = false', toml_for_socks(profile))
+        for bad in (b"", b"\x02", b"\x00\x01"):
+            with self.assertRaises(ProfileRejected):
+                decode_deeplink(link(self.certificate, additional=[(4, bad)]))
 
     def test_insecure_tls_and_missing_credentials_rejected(self):
         for unsafe in (
@@ -115,11 +126,41 @@ class TrustTunnelProfileTests(unittest.TestCase):
         self.assertFalse(output["system_tun_started"])
         self.assertNotIn("fake-secret", p.stdout + p.stderr)
 
-    def test_no_root_tun_integration_until_https_verified(self):
+    def test_root_candidate_pins_entitled_endpoint(self):
+        with patch('unsigned_mieru_profile.resolve_authenticated_ingress_domain',
+                   return_value='185.211.58.224') as resolver:
+            profile = link(self.certificate, omit={2}, additional=[
+                (2, b'tunel8.in88.sbs:36031')
+            ])
+            toml, endpoints = trusted_unsigned_runtime(profile)
+        self.assertEqual(endpoints, ('185.211.58.224',))
+        self.assertIn('185.211.58.224:36031', toml)
+        self.assertNotIn('tunel8.in88.sbs:36031', toml)
+        self.assertIn('skip_verification = false', toml)
+        self.assertNotIn('[listener.tun]', toml)
+        resolver.assert_called_once_with('tunel8.in88.sbs')
+
+    def test_tun_candidate_is_socks_to_loopback_only(self):
+        config = trusttunnel_singbox_tun()
+        self.assertEqual(config['outbounds'][0]['server'], '127.0.0.1')
+        self.assertEqual(config['outbounds'][0]['server_port'], 17121)
+        self.assertEqual(config['outbounds'][0]['bind_interface'], 'lo0')
+        self.assertEqual(config['route']['final'], 'proxy')
+        self.assertNotIn('route_exclude_address', config['inbounds'][0])
+
+    def test_root_tun_requires_https_then_route_proof(self):
         dashboard = (ROOT / "TwinConnectMacOSNativeDashboard.swift").read_text()
-        policy = (ROOT / "unsigned_tun_daemon.py").read_text()
-        self.assertNotIn('protocolCode == "trusttunnel"', dashboard)
-        self.assertNotIn('TRUSTTUNNEL_ENGINE', policy)
+        directory = (ROOT / "TwinConnectMacOSNativeDirectory.swift").read_text()
+        daemon = (ROOT / "unsigned_tun_daemon.py").read_text()
+        self.assertIn('directory.prepareTrustTunnelDeeplink(', dashboard)
+        self.assertIn('"trusttunnel-deeplink"', directory)
+        self.assertIn('"mode": "trusttunnel"', directory)
+        self.assertIn('selected[0]["selected"] as? Bool == true', directory)
+        self.assertIn('trusttunnel_verified_socks_exit(transport.pid)', daemon)
+        self.assertIn('TRUSTTUNNEL_SOCKS_HTTPS_NOT_VERIFIED', daemon)
+        self.assertIn('if observe_route()["route_state"]', daemon)
+        self.assertIn('fullTunHTTPSConnected', dashboard)
+        self.assertNotIn('TRUSTTUNNEL_ENGINE', daemon)
 
 
 if __name__ == "__main__":

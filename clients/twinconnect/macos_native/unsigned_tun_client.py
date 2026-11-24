@@ -44,7 +44,7 @@ def query(action: str, config: object = None,
         raise ValueError("TUN_SERVICE_UNTRUSTED")
     data = encode_request(action, config)
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-        client.settimeout(30 if action == "start" else 6)
+        client.settimeout(60 if action == "start" else 6)
         client.connect(str(socket_path))
         client.sendall(data)
         answer = bytearray()

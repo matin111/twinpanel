@@ -40,15 +40,21 @@ def terminate_group(pid: int) -> None:
         return
 
 
-def watch(parent: int, engine: int, lifetime: int) -> None:
+def watch(parent: int, engine: int, lifetime: int,
+          secondary_engine: int = 0) -> None:
     if not valid_pid(parent) or not valid_pid(engine) or parent == engine:
         raise ValueError("INVALID_PID")
+    if secondary_engine and (not valid_pid(secondary_engine) or
+                             secondary_engine in (parent, engine)):
+        raise ValueError("INVALID_SECONDARY_PID")
     if not 1 <= lifetime <= MAX_SECONDS:
         raise ValueError("INVALID_WATCHDOG_DURATION")
     if os.geteuid() != 0 or sys.platform != "darwin":
         raise ValueError("LOCAL_ROOT_MAC_REQUIRED")
     if os.getppid() != parent or os.getpgid(engine) != engine:
         raise ValueError("WATCHDOG_NOT_CHILD_OF_DAEMON")
+    if secondary_engine and os.getpgid(secondary_engine) != secondary_engine:
+        raise ValueError("WATCHDOG_SECONDARY_NOT_GROUP_LEADER")
 
     # Darwin kqueue delivers NOTE_EXIT for the watched daemon, avoiding
     # a kill(pid,0) PID-reuse race. Check deadline independently.
@@ -61,6 +67,8 @@ def watch(parent: int, engine: int, lifetime: int) -> None:
         print("WATCHDOG_READY", flush=True)
         deadline = time.monotonic() + lifetime
         while process_alive(engine):
+            if secondary_engine and not process_alive(secondary_engine):
+                break
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 break
@@ -69,6 +77,8 @@ def watch(parent: int, engine: int, lifetime: int) -> None:
     finally:
         queue.close()
         terminate_group(engine)
+        if secondary_engine:
+            terminate_group(secondary_engine)
 
 
 def main() -> int:
@@ -76,9 +86,11 @@ def main() -> int:
     parser.add_argument("--parent", type=int, required=True)
     parser.add_argument("--engine", type=int, required=True)
     parser.add_argument("--seconds", type=int, default=MAX_SECONDS)
+    parser.add_argument("--secondary-engine", type=int, default=0)
     args = parser.parse_args()
     try:
-        watch(args.parent, args.engine, args.seconds)
+        watch(args.parent, args.engine, args.seconds,
+              secondary_engine=args.secondary_engine)
     except (ValueError, OSError):
         # Watchdog failure is fatal for the invoking daemon's start path.
         return 1

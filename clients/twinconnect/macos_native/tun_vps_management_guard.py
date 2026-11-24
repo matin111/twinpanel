@@ -77,7 +77,8 @@ def system_dns_resolvers(path: Path = Path("/var/run/resolv.conf")) -> tuple[str
 
 
 def guard_candidate(config: dict, peers: tuple[str, ...] | None = None,
-                    dns_servers: tuple[str, ...] = ()) -> dict:
+                    dns_servers: tuple[str, ...] = (),
+                    endpoint_ips: tuple[str, ...] = ()) -> dict:
     """Modify only an already reviewed sing-box candidate; fail without peers."""
     peers = control_peers() if peers is None else peers
     if not peers or len(peers) > 8:
@@ -104,6 +105,19 @@ def guard_candidate(config: dict, peers: tuple[str, ...] | None = None,
             raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED") from None
         if not ip.is_global:
             raise ValueError("VPS_DNS_RESOLVER_UNTRUSTED")
+        normalized.append(str(ip) + "/32")
+    # For two-engine transports (e.g. TrustTunnel SOCKS + sing-box TUN),
+    # explicitly exclude ONLY server IPs pinned by the ROOT-reviewed link.
+    # Otherwise the TLS connection to its own endpoint would loop into TUN.
+    if len(endpoint_ips) > 8:
+        raise ValueError("VPS_ENDPOINT_EXCLUSIONS_TOO_MANY")
+    for value in endpoint_ips:
+        try:
+            ip = ipaddress.IPv4Address(value)
+        except ipaddress.AddressValueError:
+            raise ValueError("VPS_ENDPOINT_IP_INVALID") from None
+        if not ip.is_global:
+            raise ValueError("VPS_ENDPOINT_IP_UNTRUSTED")
         normalized.append(str(ip) + "/32")
     inbounds[0]["route_exclude_address"] = sorted(set(normalized))
     return config

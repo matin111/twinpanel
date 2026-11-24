@@ -32,10 +32,13 @@ from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
 from openvpn_profile_review import review as review_openvpn
 from tun_vps_management_guard import guard_candidate, system_dns_resolvers
 from unsigned_mieru_profile import validate_mbox_tun_config
+from unsigned_trusttunnel_profile import (
+    trusted_unsigned_runtime, trusttunnel_singbox_tun, SOCKS_PORT)
 
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
 MIERU_ENGINE = TRUSTED_ROOT / "mbox"
+TRUSTTUNNEL_CLIENT = TRUSTED_ROOT / "trusttunnel_client"
 APPROVAL = TRUSTED_ROOT / "local-console-approval"
 WATCHDOG = TRUSTED_ROOT / "unsigned_tun_watchdog.py"
 OPENVPN = TRUSTED_ROOT / "openvpn/bin/openvpn"
@@ -231,6 +234,56 @@ def classify_engine_stderr(raw: bytes) -> str:
     return "TUN_ENGINE_EXITED_BEFORE_ROUTE"
 
 
+def trusttunnel_verified_socks_exit(pid: int, port: int = SOCKS_PORT) -> str:
+    """Fail closed until HTTPS proves the official SOCKS endpoint is usable.
+
+    A local LISTEN socket is NOT evidence of an authenticated VPN session.
+    Curl verifies the public TLS target certificate; no insecure flag,
+    proxy env, secret arguments, arbitrary URLs, or local direct fallback.
+    """
+    import ipaddress
+    # The official CLI may listen before the upstream HTTP/2 connection
+    # authenticates. Retry bounded SOCKS HTTPS; never promote LISTEN alone.
+    deadline = time.monotonic() + 25.0
+    for _ in range(20):
+        if time.monotonic() >= deadline:
+            break
+        try:
+            if os.getpgid(pid) != pid:
+                raise ValueError("TRUSTTUNNEL_CLIENT_EXITED")
+        except ProcessLookupError:
+            raise ValueError("TRUSTTUNNEL_CLIENT_EXITED") from None
+        # Only accept a proxy listener owned by the root-started transport,
+        # never a random existing unprivileged process bound to loopback.
+        try:
+            port_owner = subprocess.run(
+                ["/usr/sbin/lsof", "-nP", "-a", "-p", str(pid),
+                 f"-iTCP:{port}", "-sTCP:LISTEN"],
+                capture_output=True, timeout=3, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            port_owner = None
+        if port_owner is not None and port_owner.returncode == 0:
+            try:
+                trace = subprocess.run(
+                    ["/usr/bin/curl", "--silent", "--show-error", "--fail",
+                     "--max-time", "4", "--connect-timeout", "2",
+                     "--socks5-hostname", f"127.0.0.1:{port}",
+                     "https://1.1.1.1/cdn-cgi/trace"],
+                    capture_output=True, timeout=7, check=False)
+                if trace.returncode == 0 and len(trace.stdout) <= 8192:
+                    for line in trace.stdout.decode(
+                            "utf-8", errors="strict").splitlines():
+                        if line.startswith("ip="):
+                            address = ipaddress.ip_address(line[3:])
+                            if address.is_global:
+                                return str(address)
+            except (OSError, ValueError, UnicodeError,
+                    subprocess.TimeoutExpired):
+                pass
+        time.sleep(0.35)
+    raise ValueError("TRUSTTUNNEL_SOCKS_HTTPS_NOT_VERIFIED")
+
+
 class Session:
     def __init__(self) -> None:
         self.lock = threading.RLock()
@@ -240,6 +293,9 @@ class Session:
         self.owner: int | None = None
         self.started: float | None = None
         self.engine_stderr = None
+        self.transport_process: subprocess.Popen | None = None
+        self.transport_config: Path | None = None
+        self.transport_stderr = None
 
     def console_owner_present(self) -> bool:
         """Kill the tunnel when console ownership changes or user logs out."""
@@ -267,6 +323,23 @@ class Session:
             finally:
                 if self.config is not None:
                     self.config.unlink(missing_ok=True)
+                transport = self.transport_process
+                if transport is not None and transport.poll() is None:
+                    try:
+                        os.killpg(transport.pid, signal.SIGTERM)
+                        transport.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(transport.pid, signal.SIGKILL)
+                        transport.wait(timeout=5)
+                    except ProcessLookupError:
+                        pass
+                if self.transport_config is not None:
+                    self.transport_config.unlink(missing_ok=True)
+                self.transport_process = None
+                self.transport_config = None
+                if self.transport_stderr is not None:
+                    self.transport_stderr.close()
+                    self.transport_stderr = None
                 self.process = None
                 self.watchdog = None
                 self.config = None
@@ -279,7 +352,10 @@ class Session:
     def status(self) -> dict:
         with self.lock:
             if self.process is not None:
-                if self.process.poll() is not None or (
+                if (self.transport_process is not None and
+                        self.transport_process.poll() is not None) or (
+                    self.process.poll() is not None
+                ) or (
                     self.watchdog is not None and self.watchdog.poll() is not None
                 ) or (
                     self.started is not None and
@@ -302,6 +378,21 @@ class Session:
                 raise ValueError("TUN_ALREADY_RUNNING")
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
+            use_trusttunnel = profile.get("mode") == "trusttunnel"
+            trust_toml = ""
+            pinned_trust_endpoint_ips: tuple[str, ...] = ()
+            if use_trusttunnel:
+                if (set(profile) != {"mode", "deeplink"} or
+                        not isinstance(profile["deeplink"], str) or
+                        len(profile["deeplink"]) > 16384):
+                    raise ValueError("TRUSTTUNNEL_REQUEST_INVALID")
+                if (not trusted_root_file(TRUSTTUNNEL_CLIENT) or
+                        not os.access(TRUSTTUNNEL_CLIENT, os.X_OK)):
+                    raise ValueError("TRUSTTUNNEL_ROOT_CLIENT_NOT_INSTALLED")
+                trust_toml, pinned_trust_endpoint_ips = (
+                    trusted_unsigned_runtime(profile["deeplink"]))
+                # The supplied link is never an arbitrary sing-box profile.
+                profile = trusttunnel_singbox_tun()
             use_openvpn = profile.get("mode") == "openvpn"
             # Only a single, tightly-reviewed Mieru outbound can select the
             # separately staged mbox build. All existing VPNs keep sing-box.
@@ -344,6 +435,28 @@ class Session:
             try:
                 with os.fdopen(fd, "wb") as output:
                     output.write(encoded)
+                if use_trusttunnel:
+                    # Keep private username/password and pinned TLS cert in
+                    # ROOT-owned 0600 TOML; never argv, logs or process env.
+                    tt_path = path.with_suffix(".tt.toml")
+                    tt_fd = os.open(tt_path, os.O_CREAT | os.O_EXCL |
+                                    os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+                    self.transport_config = tt_path
+                    with os.fdopen(tt_fd, "w", encoding="utf-8") as tt_file:
+                        tt_file.write(trust_toml)
+                    self.transport_stderr = tempfile.TemporaryFile(mode="w+b")
+                    transport = subprocess.Popen(
+                        [str(TRUSTTUNNEL_CLIENT), "--config", str(tt_path),
+                         "--loglevel", "error"],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=self.transport_stderr,
+                        start_new_session=True)
+                    self.transport_process = transport
+                    # The initial SOCKS listener appears before the HTTPS
+                    # session is authenticated. Never start system TUN on
+                    # this listener alone: require a verified remote exit.
+                    trusttunnel_verified_socks_exit(transport.pid)
                 if use_openvpn:
                     command = [str(engine), "--config", str(path),
                                "--script-security", "1", "--auth-nocache",
@@ -360,7 +473,16 @@ class Session:
                         profile = guard_candidate(
                             profile,
                             dns_servers=system_dns_resolvers()
-                            if approval_mode() == VPS_EXTENDED_APPROVAL else ())
+                            if approval_mode() == VPS_EXTENDED_APPROVAL else (),
+                            endpoint_ips=pinned_trust_endpoint_ips)
+                        path.write_text(json.dumps(profile, separators=(",", ":")),
+                                        encoding="utf-8")
+                        validate_full_tun_config(path)
+                    elif use_trusttunnel:
+                        # Console-local mode still needs the root-pinned
+                        # upstream to bypass the system-wide TUN itself.
+                        profile = guard_candidate(
+                            profile, peers=pinned_trust_endpoint_ips)
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
                         validate_full_tun_config(path)
@@ -389,10 +511,16 @@ class Session:
                 # Engine must never run without independent daemon-death
                 # supervision. Wait for the watchdog to install its Darwin
                 # NOTE_EXIT kqueue filter before replying success.
+                watcher_args = [
+                    sys.executable, str(WATCHDOG), "--parent",
+                    str(os.getpid()), "--engine", str(child.pid),
+                    "--seconds", str(session_limit())]
+                if use_trusttunnel and self.transport_process is not None:
+                    watcher_args.extend([
+                        "--secondary-engine",
+                        str(self.transport_process.pid)])
                 watcher = subprocess.Popen(
-                    [sys.executable, str(WATCHDOG), "--parent",
-                     str(os.getpid()), "--engine", str(child.pid),
-                     "--seconds", str(session_limit())],
+                    watcher_args,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,

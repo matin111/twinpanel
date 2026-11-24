@@ -2031,6 +2031,93 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Fetch one entitlement-scoped TrustTunnel deep-link for the selected
+    // account and node. Do not expose credentials in logs or command arguments.
+    // The privileged helper performs the full TLV/certificate/endpoint review.
+    func prepareTrustTunnelDeeplink(_ session: TwinMacNativeSession,
+                                    serverID: String,
+                                    completion: @escaping (Result<Data, Error>) -> Void) {
+        guard serverID.range(of: "^[0-9]{1,20}$",
+                             options: .regularExpression) != nil else {
+            completion(.failure(TwinMacNativeError.failure("SERVER_ID_INVALID")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] response in
+            guard let self = self else { return }
+            guard case .success(let catalog) = response,
+                  self.validEnvelope(catalog, session.namespace),
+                  let rows = catalog["protocols"] as? [[String: Any]],
+                  rows.count <= 16 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "TRUSTTUNNEL_CATALOG_UNAVAILABLE")))
+                return
+            }
+            let selected = rows.filter { ($0["code"] as? String) == "trusttunnel" }
+            guard selected.count == 1,
+                  selected[0]["selected"] as? Bool == true,
+                  selected[0]["config_record_present"] as? Bool == true else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "TRUSTTUNNEL_NOT_ENTITLED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventory in
+                guard case .success(let nodes) = inventory,
+                      self.validEnvelope(nodes, session.namespace),
+                      let servers = nodes["servers"] as? [[String: Any]],
+                      servers.count <= 200,
+                      servers.filter({
+                          ($0["id"] as? String) == serverID ||
+                          ($0["id"] as? Int).map(String.init) == serverID
+                      }).count == 1 else {
+                    completion(.failure(TwinMacNativeError.failure(
+                        "TRUSTTUNNEL_SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": "trusttunnel"], bearer: token,
+                             maxBytes: 1048576) { result in
+                    guard case .success(let payload) = result,
+                          self.validEnvelope(payload, session.namespace),
+                          payload["protocol"] as? String == "trusttunnel",
+                          let items = payload["items"] as? [[String: Any]],
+                          items.count <= 200 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "TRUSTTUNNEL_PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let matching = items.filter { item in
+                        (item["node_id"] as? String) == serverID ||
+                        (item["node_id"] as? Int).map(String.init) == serverID
+                    }
+                    guard matching.count == 1,
+                          matching[0]["config_format"] as? String ==
+                              "trusttunnel-deeplink",
+                          let link = matching[0]["config"] as? String,
+                          link.hasPrefix("tt://?"), link.utf8.count <= 16384,
+                          link.utf8.count >= 12,
+                          link.dropFirst(6).utf8.allSatisfy({
+                              ($0 >= 65 && $0 <= 90) ||
+                              ($0 >= 97 && $0 <= 122) ||
+                              ($0 >= 48 && $0 <= 57) ||
+                              $0 == 45 || $0 == 95
+                          }),
+                          let envelope = try? JSONSerialization.data(
+                              withJSONObject: ["mode": "trusttunnel",
+                                               "deeplink": link]) else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "TRUSTTUNNEL_LINK_INVALID")))
+                        return
+                    }
+                    completion(.success(envelope))
+                }
+            }
+        }
+    }
+
     // Prepare a full-TUN candidate from the current tenant's reviewed
     // sing-box profile. This DOES NOT launch TUN or touch system networking.
     // A separately installed, authorized and recoverable privileged helper

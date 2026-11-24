@@ -64,3 +64,22 @@ class VPSManagementGuardTests(unittest.TestCase):
         with mock.patch("tun_vps_management_guard.subprocess.run",
                         return_value=mock.Mock(returncode=1, stdout="")):
             self.assertEqual(control_peers(), ())
+
+
+class TrustTunnelEndpointGuardTests(unittest.TestCase):
+    def test_root_pinned_endpoint_kept_on_physical_interface(self):
+        profile = {
+            "inbounds": [{"type": "tun", "auto_route": True}],
+            "outbounds": [{"type": "socks", "tag": "proxy",
+                           "server": "127.0.0.1"}],
+            "route": {"final": "proxy", "auto_detect_interface": True},
+        }
+        checked = guard_candidate(profile, peers=("1.1.1.1",),
+                                  endpoint_ips=("185.206.170.5",))
+        self.assertEqual(checked["inbounds"][0]["route_exclude_address"],
+                         ["1.1.1.1/32", "185.206.170.5/32"])
+        for bad in ("127.0.0.1", "10.0.0.5", "bad.example"):
+            profile["inbounds"][0].pop("route_exclude_address", None)
+            with self.assertRaises(ValueError):
+                guard_candidate(profile, peers=("1.1.1.1",),
+                                endpoint_ips=(bad,))

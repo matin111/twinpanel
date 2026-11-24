@@ -1460,6 +1460,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "naive": return "NaiveProxy"
         case "shadowtls": return "ShadowTLS"
         case "mieru": return "Mieru"
+        case "trusttunnel": return "TrustTunnel"
         default: return nil
         }
     }
@@ -5187,7 +5188,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 }
             }
         }
-        if protocolCode == "mieru" {
+        if protocolCode == "trusttunnel" {
+            directory.prepareTrustTunnelDeeplink(session, serverID: serverID,
+                                                 completion: completion)
+        } else if protocolCode == "mieru" {
             directory.prepareLocalSingBox(session, serverID: serverID,
                                           protocolCode: "mieru",
                                           completion: completion)
@@ -5819,7 +5823,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         let enabled: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
-            "snell", "naive", "shadowtls", "v2ray", "mieru"
+            "snell", "naive", "shadowtls", "v2ray", "mieru",
+            "trusttunnel"
         ]
         guard let selectedProtocol = activeProtocol,
               enabled.contains(selectedProtocol),
@@ -5842,6 +5847,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // On remote VPS or without that daemon the existing proxy path remains.
         if fullTunServicePresent() {
             startFullTun(session, serverID: serverID, protocolCode: selectedProtocol)
+            return
+        }
+        // Do not feed a tt:// deep-link into sing-box when no audited
+        // local TUN helper is installed, or claim a false VPN connection.
+        if selectedProtocol == "trusttunnel" {
+            status = "TrustTunnel TUN helper not installed; VPN not connected."
+            recordProxyAttempt(selectedProtocol, "TRUSTTUNNEL_TUN_NOT_INSTALLED")
+            view = build()
             return
         }
         localProxyBusy = true

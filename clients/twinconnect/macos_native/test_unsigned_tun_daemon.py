@@ -26,6 +26,45 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def test_trusttunnel_retry_after_socks5_failure_then_https_succeeds(self):
+        checks = [
+            mock.Mock(returncode=0),
+            mock.Mock(returncode=97, stdout=b""),
+            mock.Mock(returncode=0),
+            mock.Mock(returncode=0, stdout=b"fl=123\nip=45.13.226.145\n"),
+        ]
+        with (mock.patch.object(server.os, "getpgid", return_value=4418),
+              mock.patch.object(server.time, "sleep"),
+              mock.patch.object(server.subprocess, "run",
+                                side_effect=checks) as run):
+            observed = server.trusttunnel_verified_socks_exit(4418)
+        self.assertEqual(observed, "45.13.226.145")
+        self.assertEqual(run.call_count, 4)
+        for call in (run.call_args_list[1], run.call_args_list[3]):
+            args = call.args[0]
+            self.assertIn("--socks5-hostname", args)
+            self.assertIn("127.0.0.1:17121", args)
+            self.assertNotIn("--insecure", args)
+
+    def test_trusttunnel_socket_open_is_never_marked_verified(self):
+        with (mock.patch.object(server.os, "getpgid", return_value=4418),
+              mock.patch.object(server.time, "sleep"),
+              mock.patch.object(server.subprocess, "run",
+                                side_effect=lambda args, **kwargs:
+                                mock.Mock(returncode=0, stdout=b"")
+                                if "lsof" in args[0] else
+                                mock.Mock(returncode=97, stdout=b""))):
+            with self.assertRaisesRegex(
+                    ValueError, "TRUSTTUNNEL_SOCKS_HTTPS_NOT_VERIFIED"):
+                server.trusttunnel_verified_socks_exit(4418)
+
+    def test_trusttunnel_dead_transport_never_verifies(self):
+        with mock.patch.object(server.os, "getpgid",
+                               side_effect=ProcessLookupError):
+            with self.assertRaisesRegex(
+                    ValueError, "TRUSTTUNNEL_CLIENT_EXITED"):
+                server.trusttunnel_verified_socks_exit(4418)
+
     def test_engine_stderr_redacts_secret_bearing_error_details(self):
         cases = (
             (b'FATAL create tun: operation not permitted endpoint=secret',
@@ -234,7 +273,7 @@ class TUNDaemonControlTests(unittest.TestCase):
 
     def test_start_has_longer_timeout_than_status(self):
         source = (DIR / "unsigned_tun_client.py").read_text()
-        self.assertIn('client.settimeout(30 if action == "start" else 6)', source)
+        self.assertIn('client.settimeout(60 if action == "start" else 6)', source)
 
     def test_client_fail_closed_without_service(self):
         with tempfile.TemporaryDirectory() as folder:
