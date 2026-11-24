@@ -26,6 +26,12 @@ DASHBOARD = (DIR / "TwinConnectMacOSNativeDashboard.swift").read_text()
 
 
 class TUNDaemonControlTests(unittest.TestCase):
+    def setUp(self):
+        # These offline tests must never inspect the live root-owned lease.
+        patch=mock.patch.object(server,"kill_switch_control",return_value=None)
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def test_root_attests_trusttunnel_only_when_both_engines_alive(self):
         session = server.Session()
         session.process = mock.Mock(poll=mock.Mock(return_value=None))

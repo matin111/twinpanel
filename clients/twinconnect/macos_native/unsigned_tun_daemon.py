@@ -10,6 +10,10 @@ general release. The daemon does not claim a verified VPN connection.
 from __future__ import annotations
 
 import ctypes
+import copy
+import hashlib
+import ipaddress
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -160,7 +164,7 @@ def observe_route() -> dict:
     return {"route_state": "not_utun_route"}
 
 
-def probe_system_https() -> dict:
+def probe_system_https(require_named=False) -> dict:
     """Verify actual HTTPS exit through macOS' observed utun route.
 
     First try DNS+HTTPS. A second, certificate-verified numeric HTTPS target
@@ -195,10 +199,10 @@ def probe_system_https() -> dict:
 
     # The local socket's probe timeout is six seconds. Bound both HTTPS
     # attempts below that, including a small margin for IPC overhead.
-    for url, timeout in (
-        ("https://www.cloudflare.com/cdn-cgi/trace", 2.7),
-        ("https://1.1.1.1/cdn-cgi/trace", 2.0),
-    ):
+    targets=(("https://www.cloudflare.com/cdn-cgi/trace",2.7),)
+    if not require_named:
+        targets+=(("https://1.1.1.1/cdn-cgi/trace",2.0),)
+    for url, timeout in targets:
         # Do not promote an interface-only route. Re-confirm the kernel
         # route immediately before each authenticated HTTPS probe.
         if observe_route().get("route_state") != "utun_route_observed_unverified":
@@ -287,6 +291,79 @@ def trusttunnel_verified_socks_exit(pid: int, port: int = SOCKS_PORT) -> str:
     raise ValueError("TRUSTTUNNEL_SOCKS_HTTPS_NOT_VERIFIED")
 
 
+KS_LEASE=Path("/private/var/run/twinconnect-killswitch-control/lease.json")
+KS_ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+
+
+def kill_switch_control():
+    try:
+        info=KS_LEASE.lstat()
+    except FileNotFoundError:
+        return None
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode&0o077):
+        raise ValueError("TUN_KS_LEASE_UNTRUSTED")
+    return load_kill_switch_runtime()
+
+
+def load_kill_switch_runtime():
+    script=KS_ROOT/"unsigned_killswitch_console_control.py"
+    if not trusted_root_file(script,KS_ROOT):
+        raise ValueError("TUN_KS_CONTROL_UNTRUSTED")
+    spec=importlib.util.spec_from_file_location("tc_installed_tun_ks_control",script)
+    if spec is None or spec.loader is None:
+        raise ValueError("TUN_KS_CONTROL_UNAVAILABLE")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def request_identity(profile):
+    return json.dumps(profile,sort_keys=True,separators=(",",":"),ensure_ascii=True)
+
+
+def candidate_protocol(profile):
+    mode=profile.get("mode")
+    if mode in ("trusttunnel","sudoku"):
+        return mode
+    if mode is not None:
+        return None
+    rows=profile.get("outbounds")
+    if not isinstance(rows,list) or any(not isinstance(row,dict) for row in rows):
+        return None
+    if len(rows)==2 and {row.get("type") for row in rows}=={"shadowsocks","shadowtls"}:
+        return "shadowtls"
+    if len(rows)!=1:
+        return None
+    return {"vless":"v2ray","hysteria2":"hysteria2","tuic":"tuic","anytls":"anytls",
+            "socks":"socks5","snell":"snell","naive":"naive","mieru":"mieru"}.get(rows[0].get("type"))
+
+
+def write_session_meta(path,uid,primary,digest,secondary=None):
+    meta={"owner":uid,"primary_pid":primary,"digest":digest,
+          "config_sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
+    if secondary:
+        meta["secondary_sha256"]=hashlib.sha256(secondary.read_bytes()).hexdigest()
+    target=path.with_suffix(".meta")
+    fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,"w") as out:
+        json.dump(meta,out,separators=(",",":"));out.flush();os.fsync(out.fileno())
+    return target
+
+
+def pinned_reconnect_profile(profile,identity):
+    # The root daemon reuses its previously reviewed runtime, never the app's
+    # proposed bypasses. Only the single attested outer endpoint is excluded.
+    candidate=copy.deepcopy(profile)
+    peer=str(ipaddress.IPv4Address(identity["ip"]))
+    if not ipaddress.IPv4Address(peer).is_global:
+        raise ValueError("TUN_KS_ENDPOINT_INVALID")
+    inbounds=candidate.get("inbounds")
+    if not isinstance(inbounds,list) or len(inbounds)!=1 or inbounds[0].get("type")!="tun":
+        raise ValueError("TUN_KS_CONFIG_INVALID")
+    inbounds[0].pop("route_exclude_address",None)
+    return guard_candidate(candidate,peers=(peer,))
+
+
 class Session:
     def __init__(self) -> None:
         self.lock = threading.RLock()
@@ -300,6 +377,9 @@ class Session:
         self.transport_config: Path | None = None
         self.transport_stderr = None
         self.transport_protocol = "trusttunnel"
+        self.ks_cache = None
+        self.ks_meta = None
+        self.ks_candidate = False
 
     def console_owner_present(self) -> bool:
         """Kill the tunnel when console ownership changes or user logs out."""
@@ -313,6 +393,17 @@ class Session:
     def cleanup(self) -> None:
         with self.lock:
             child = self.process
+            control=kill_switch_control() if child is not None else None
+            if control:
+                try:
+                    control.before_tun_disconnect(child.pid)
+                except (ValueError,RuntimeError,subprocess.SubprocessError) as exc:
+                    # The previously verified kernel policy is left in place.
+                    # Do not claim that a manual disconnect was confirmed.
+                    raise ValueError("TUN_KS_CLOSE_UNVERIFIED") from exc
+            else:
+                self.ks_cache=None
+            self.ks_candidate=False
             # Clear state even if kill fails; do not leave credential files.
             try:
                 if child is not None and child.poll() is None:
@@ -325,6 +416,9 @@ class Session:
                     except ProcessLookupError:
                         pass
             finally:
+                if self.ks_meta is not None:
+                    self.ks_meta.unlink(missing_ok=True)
+                    self.ks_meta=None
                 if self.config is not None:
                     self.config.unlink(missing_ok=True)
                 transport = self.transport_process
@@ -355,6 +449,9 @@ class Session:
 
     def status(self) -> dict:
         with self.lock:
+            if self.ks_cache and (self.ks_cache["uid"]!=os.stat("/dev/console").st_uid or
+                    (self.process is None and not KS_LEASE.exists())):
+                self.ks_cache=None
             if self.process is not None:
                 if (self.transport_process is not None and
                         self.transport_process.poll() is not None) or (
@@ -374,6 +471,9 @@ class Session:
             }
             if self.process is not None:
                 status.update(observe_route())
+                status["killswitch_candidate"]=self.ks_candidate
+                if self.ks_candidate and self.ks_cache:
+                    status["protocol_code"]=self.ks_cache["protocol"]
                 # Only the root daemon knows whether this sing-box SOCKS
                 # outbound belongs to the separately supervised official
                 # TrustTunnel client. Never mislabel it as generic SOCKS5.
@@ -389,8 +489,17 @@ class Session:
                 raise ValueError("TUN_ALREADY_RUNNING")
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
-            if os.path.lexists("/private/var/run/twinconnect-killswitch-control/lease.json"):
-                raise ValueError("TUN_KS_RECONNECT_NOT_AUTHORIZED")
+            raw_identity=request_identity(profile)
+            digest=hashlib.sha256(raw_identity.encode("utf-8")).hexdigest()
+            protocol=candidate_protocol(profile)
+            control=kill_switch_control()
+            protected=None
+            cached=self.ks_cache
+            if control:
+                if (not cached or cached["uid"]!=uid or cached["digest"]!=digest or
+                        cached["protocol"]!=protocol):
+                    raise ValueError("TUN_KS_RECONNECT_NOT_AUTHORIZED")
+                protected=True
             use_trusttunnel = profile.get("mode") == "trusttunnel"
             use_sudoku = profile.get("mode") == "sudoku"
             trust_toml = ""
@@ -405,6 +514,7 @@ class Session:
                         not os.access(TRUSTTUNNEL_CLIENT, os.X_OK)):
                     raise ValueError("TRUSTTUNNEL_ROOT_CLIENT_NOT_INSTALLED")
                 trust_toml, pinned_trust_endpoint_ips = (
+                    (cached["trust_toml"],cached["endpoint_ips"]) if protected else
                     trusted_unsigned_runtime(profile["deeplink"]))
                 # The supplied link is never an arbitrary sing-box profile.
                 profile = trusttunnel_singbox_tun()
@@ -413,8 +523,13 @@ class Session:
                     raise ValueError("SUDOKU_REQUEST_INVALID")
                 if not trusted_root_file(SUDOKU_CLIENT) or not os.access(SUDOKU_CLIENT, os.X_OK):
                     raise ValueError("SUDOKU_ROOT_CLIENT_NOT_INSTALLED")
-                sudoku_json, pinned_trust_endpoint_ips = sudoku_runtime(profile["profile"])
+                sudoku_json, pinned_trust_endpoint_ips = (
+                    (cached["sudoku_json"],cached["endpoint_ips"]) if protected else
+                    sudoku_runtime(profile["profile"]))
                 profile = sudoku_singbox_tun()
+            if protected:
+                profile=copy.deepcopy(cached["profile"])
+            prepared_profile=copy.deepcopy(profile)
             use_openvpn = profile.get("mode") == "openvpn"
             # Only a single, tightly-reviewed Mieru outbound can select the
             # separately staged mbox build. All existing VPNs keep sing-box.
@@ -457,6 +572,14 @@ class Session:
             try:
                 with os.fdopen(fd, "wb") as output:
                     output.write(encoded)
+                if protected:
+                    try:
+                        protected=control.begin_reconnect(raw_identity,protocol)
+                    except (RuntimeError,ValueError,OSError,subprocess.SubprocessError):
+                        protected=None
+                        raise ValueError("TUN_KS_RECONNECT_NOT_AUTHORIZED") from None
+                    if not protected:
+                        raise ValueError("TUN_KS_RECONNECT_NOT_AUTHORIZED")
                 if use_sudoku:
                     sdk_path = path.with_suffix(".sudoku.json")
                     sdk_fd = os.open(sdk_path, os.O_CREAT | os.O_EXCL |
@@ -512,7 +635,11 @@ class Session:
                                "--route-nopull"]
                 else:
                     validate_full_tun_config(path)
-                    if vps_mode():
+                    if protected:
+                        profile=pinned_reconnect_profile(profile,protected)
+                        path.write_text(json.dumps(profile,separators=(",",":")),encoding="utf-8")
+                        validate_full_tun_config(path)
+                    elif vps_mode():
                         # Preserve the independent Termalin control transport
                         # outside sing-box routing in BOTH VPS modes.
                         # Fail closed if there is no validated active peer.
@@ -598,8 +725,36 @@ class Session:
                     time.sleep(0.25)
                 if not route_observed:
                     raise ValueError("TUN_ROUTE_NOT_ESTABLISHED")
+                if protocol is not None and not use_openvpn:
+                    self.ks_meta=write_session_meta(path,uid,child.pid,digest,self.transport_config)
+                    # The local service retains only the reviewed candidate in
+                    # memory, scoped to this console owner and exact digest.
+                    self.ks_cache={"uid":uid,"digest":digest,"protocol":protocol,
+                                   "profile":prepared_profile,"trust_toml":trust_toml,
+                                   "sudoku_json":sudoku_json,"endpoint_ips":pinned_trust_endpoint_ips}
+                    try:
+                        runtime=control if protected else load_kill_switch_runtime()
+                        _,identity=runtime.tun_session_identity(False)
+                        self.ks_candidate=(identity.get("digest")==digest and
+                                           identity.get("primary_pid")==child.pid)
+                    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+                        self.ks_candidate=False
+                if protected:
+                    try:
+                        pid,iface=control.attach_tun_reconnect(child.pid)
+                        # The root controller verifies named HTTPS and DNS
+                        # under its own live policy before publishing Active.
+                        control.complete_reconnect(pid,iface)
+                    except (OSError,RuntimeError,ValueError,subprocess.SubprocessError):
+                        control.abort_reconnect(protocol)
+                        raise ValueError("TUN_KS_RECONNECT_UNVERIFIED") from None
                 return self.status()
             except BaseException:
+                if protected:
+                    try:
+                        control.abort_reconnect(protocol)
+                    except (OSError,RuntimeError,ValueError,subprocess.SubprocessError):
+                        pass
                 self.cleanup()
                 path.unlink(missing_ok=True)
                 raise

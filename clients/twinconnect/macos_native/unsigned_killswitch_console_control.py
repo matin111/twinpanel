@@ -29,7 +29,7 @@ if os.geteuid()==0:
         if info.st_uid!=0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
             raise RuntimeError("ATTESTATION_RUNTIME_UNTRUSTED")
 sys.path.insert(0,str(DEPENDENCY))
-from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence
+from unsigned_killswitch_attestation import collect, route_interface, process_command, WG_BIN, AWG_BIN, wg_uapi, root_private_json, openvpn_session_evidence, TUN_PROTOCOLS, tun_session_identity
 from unsigned_killswitch_policy import Transport, render_policy
 
 ROOT=Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
@@ -47,7 +47,7 @@ RECONNECT_SECONDS=60
 ARMING_TIMEOUT=30
 SESSION_MODE='until_reset'
 WG_PROTOCOLS={'wireguard':WG_BIN,'amneziawg':AWG_BIN}
-SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn'}
+SUPPORTED_PROTOCOLS=frozenset(WG_PROTOCOLS)|{'openvpn'}|TUN_PROTOCOLS
 
 
 def run(*args, input=None, timeout=4):
@@ -134,7 +134,7 @@ def preflight():
         raise RuntimeError("EXISTING_PF_REFERENCES")
     canonical=lines(checked(PF,"-n","-v","-a",ANCHOR,"-f","-",input=RULES))
     if canonical!=lines(RULES): raise RuntimeError("RULE_SYNTAX_READBACK_FAILED")
-    evidence=collect()
+    evidence=collect(require_tun_live=False)
     if evidence is None or evidence.protocol not in SUPPORTED_PROTOCOLS:
         raise RuntimeError("CONNECT_SUPPORTED_VPN_FIRST")
     if route_interface("1.1.1.1")!=evidence.interface:
@@ -221,6 +221,9 @@ WG_META=WG_STATE.with_name("tunnel-dns.json")
 
 def reconnect_identity(evidence):
     try:
+        if evidence.protocol in TUN_PROTOCOLS:
+            actual,identity=tun_session_identity(False)
+            return identity if actual==evidence else None
         if evidence.protocol=="openvpn":
             current,worker,digest=openvpn_session_evidence()
             state=root_private_json(Path("/private/var/run/twinconnect-full-route-guard/state.json"))
@@ -361,6 +364,54 @@ def reconnect_context(stage=None):
         return identity
 
 
+def attach_tun_reconnect(primary):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease or lease.get("reconnect_stage")!="handshake":
+            raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
+        identity=lease["reconnect_identity"]
+        session_deadline(lease)
+        evidence,actual=tun_session_identity(False)
+        keys=("protocol","digest","ip","port","transport","uplink")
+        if (identity.get("protocol") not in TUN_PROTOCOLS or
+                actual.get("primary_pid")!=primary or
+                any(actual.get(k)!=identity.get(k) for k in keys) or
+                time.time()>=lease.get("reconnect_until",0)):
+            raise RuntimeError("KS_RECONNECT_PEER_UNVERIFIED")
+        replace_owned_policy(lease,bootstrap_rules(identity,evidence.interface),
+                             pid=evidence.pid,interface=evidence.interface,
+                             route_worker=primary,reconnect_stage="route")
+        return evidence.pid,evidence.interface
+
+
+def before_tun_disconnect(primary):
+    with lock():
+        lease=read_json("lease.json")
+        if not lease:
+            return
+        if lease.get("reconnect_identity",{}).get("protocol") not in TUN_PROTOCOLS:
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        if lease.get("reconnect_stage")=="handshake":
+            close_lease(lease)
+            return
+        if lease.get("locked") and not lease.get("reconnect_stage"):
+            if anchor_rules()!=lines(RULES) or not pf_enabled():
+                raise RuntimeError("KS_CLOSED_POLICY_UNVERIFIED")
+            return
+        if lease.get("route_worker")!=primary:
+            raise RuntimeError("KS_DISCONNECT_LEASE_MISMATCH")
+        close_lease(lease)
+
+
+def tun_matches_lease(lease,require_live=False):
+    evidence,actual=tun_session_identity(require_live)
+    identity=lease["reconnect_identity"]
+    return (evidence.pid==lease["pid"] and evidence.interface==lease["interface"] and
+            actual["primary_pid"]==lease.get("route_worker") and
+            all(actual.get(k)==identity.get(k) for k in
+                ("protocol","digest","ip","port","transport","uplink")))
+
+
 def attach_openvpn_reconnect(worker,iface):
     with lock():
         lease=read_json("lease.json")
@@ -423,20 +474,43 @@ def attach_reconnect(pid,iface):
                              pid=pid,interface=iface,reconnect_stage="route")
 
 
+def tun_network_verified(lease):
+    if not tun_matches_lease(lease):
+        return False
+    try:
+        # Do not accept a numeric-only result or a cached hostname as proof
+        # of usable DNS. The existing exact PF policy remains active.
+        dns=run("/usr/bin/dig","+time=2","+tries=1","example.com","A","+short",timeout=5)
+        if dns.returncode or not dns.stdout.strip():
+            return False
+        https=run("/usr/bin/curl","--interface","if!"+lease["interface"],"--noproxy","*",
+                  "-4","-fsS","--connect-timeout","3","--max-time","7","-o","/dev/null",
+                  "https://example.com",timeout=9)
+        return https.returncode==0 and tun_matches_lease(lease)
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
+        return False
+
+
 def complete_reconnect(pid,iface):
     with lock():
         lease=read_json("lease.json")
         if not lease or lease.get("reconnect_stage")!="route":
             raise RuntimeError("KS_RECONNECT_STAGE_INVALID")
         deadline=session_deadline(lease)
-        evidence=collect()
         identity=lease["reconnect_identity"]
+        evidence=collect(require_tun_live=identity.get("protocol") not in TUN_PROTOCOLS)
         if (time.time()>=lease.get("reconnect_until",0) or evidence is None or
                 evidence.protocol!=identity.get("protocol") or evidence.pid!=pid or evidence.interface!=iface or
                 evidence.uplink!=identity["uplink"] or
                 evidence.transports!=(Transport(identity["ip"],identity["port"],identity.get("transport","udp")),) or
                 anchor_rules()!=tuple(lease["canonical"]) or not pf_enabled()):
             raise RuntimeError("KS_RECONNECT_ROUTE_UNVERIFIED")
+        if identity.get("protocol") in TUN_PROTOCOLS and (
+                not tun_network_verified(lease) or
+                time.time()>=lease.get("reconnect_until",0) or
+                not pf_enabled() or anchor_rules()!=tuple(lease["canonical"])):
+            raise RuntimeError("KS_TUN_DNS_OR_HTTPS_UNVERIFIED")
+        lease.pop("lock_reason",None)
         lease.update(locked=False,reconnect_stage=None,reconnect_until=0)
         write_json("lease.json",lease)
         publish("active","KS_WG_ACTIVE",deadline)
@@ -465,7 +539,9 @@ def monitor_lease(lease):
             try:
                 identity=lease["reconnect_identity"]
                 iface=lease["interface"]
-                if identity.get("protocol")=="openvpn":
+                if identity.get("protocol") in TUN_PROTOCOLS:
+                    expired=not tun_matches_lease(lease)
+                elif identity.get("protocol")=="openvpn":
                     evidence,worker,digest=openvpn_session_evidence()
                     expired=(evidence.pid!=lease["pid"] or worker!=lease.get("route_worker") or
                              evidence.interface!=iface or digest!=identity["digest"] or
@@ -490,7 +566,9 @@ def monitor_lease(lease):
     try:
         identity=lease.get("reconnect_identity")
         protocol=identity.get("protocol") if isinstance(identity,dict) else None
-        if protocol=="openvpn":
+        if protocol in TUN_PROTOCOLS:
+            valid=tun_matches_lease(lease)
+        elif protocol=="openvpn":
             evidence=collect()
             valid=(evidence is not None and evidence.protocol=="openvpn" and
                    evidence.pid==pid and evidence.interface==iface and
@@ -529,7 +607,7 @@ def watchdog_tick(nonce,restarted=False):
                 state=monitor_lease(lease)
             reason=("KS_WG_ACTIVE" if state=="active" else
                     "KS_RECONNECTING" if lease.get("reconnect_stage") else
-                    "KS_TUNNEL_LOST_LOCKED")
+                    lease.get("lock_reason","KS_TUNNEL_LOST_LOCKED"))
             publish(state,reason)
         elif lease.get("phase")=="prepared":
             # No kernel change happened yet. This is the only timed cleanup
@@ -605,7 +683,7 @@ def enable():
         if read_json("lease.json") is None and not anchor_rules():
             cleanup_job()
         preflight()
-        evidence=collect()
+        evidence=collect(require_tun_live=False)
         if evidence is None or evidence.protocol not in SUPPORTED_PROTOCOLS:
             raise RuntimeError("CONNECT_SUPPORTED_VPN_FIRST")
         rules=evidence.rules()
@@ -624,11 +702,13 @@ def enable():
         if evidence.protocol=="openvpn":
             _,worker,_=openvpn_session_evidence()
             lease["route_worker"]=worker
+        elif evidence.protocol in TUN_PROTOCOLS:
+            lease["route_worker"]=identity["primary_pid"]
         write_json("lease.json",lease)
         publish("arming","KS_ARMING")
         try:
             start_watchdog(nonce)
-            if collect()!=evidence:
+            if collect(require_tun_live=evidence.protocol not in TUN_PROTOCOLS)!=evidence:
                 raise RuntimeError("WG_EVIDENCE_CHANGED")
             lease["phase"]="loading"
             write_json("lease.json",lease)
@@ -648,6 +728,15 @@ def enable():
             ready=read_json("ready.json")
             if session_deadline(lease)!=0:
                 raise RuntimeError("KS_SESSION_NOT_AUTHORIZED")
+            if evidence.protocol in TUN_PROTOCOLS and not tun_network_verified(lease):
+                # A previous VPS DNS bypass is not permitted through PF.
+                # Keep the lock; a protected reconnect may restore DNS.
+                close_lease(lease)
+                lease["lock_reason"]="KS_DNS_RECONNECT_REQUIRED"
+                write_json("lease.json",lease)
+                publish("locked","KS_DNS_RECONNECT_REQUIRED")
+                print("KS_ENABLED_LOCKED_RECONNECT_REQUIRED",flush=True)
+                return
             publish("active","KS_WG_ACTIVE")
             print("KS_ENABLED_UNTIL_RESET",flush=True)
         except BaseException:

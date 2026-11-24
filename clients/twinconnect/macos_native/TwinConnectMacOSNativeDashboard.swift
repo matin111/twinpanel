@@ -684,6 +684,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Experimental, separately installed root-owned local-console TUN service.
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
+    private var fullTunKillSwitchCandidate = false
+    private var fullTunReconnectProfile: Data?
+    private var fullTunReconnectProtocol: String?
+    private var fullTunReconnectAccount: String?
+    private var fullTunReconnectOrigin: URL?
+    private var fullTunReconnectServer: String?
     // Attested by the root-owned engine's ACTIVE configuration, never the
     // current protocol picker (which can change while VPN is running).
     private var fullTunConnectedProtocol: String?
@@ -3072,7 +3078,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let state = row?["state"] as? String ?? "fault"
         let on = state == "active" || state == "locked"
         toggle.state = on ? .on : .off
-        let protectedConnectionReady = openVPNSystemRouteVerified ||
+        let protectedConnectionReady = (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
+            openVPNSystemRouteVerified ||
             (wireGuardSystemRouteVerified &&
              ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol))
         toggle.isEnabled = !nativeKillSwitchActionBusy &&
@@ -3082,11 +3089,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if nativeKillSwitchActionBusy {
             caption = "Authorizing…"
         } else if on {
+            let reason = row?["reason"] as? String
             caption = state == "locked" ?
-                (row?["reason"] as? String == "KS_RECONNECTING" ? "Reconnecting…" : "Internet blocked") :
+                (reason == "KS_RECONNECTING" ? "Reconnecting…" :
+                 (reason == "KS_DNS_RECONNECT_REQUIRED" ? "Reconnect VPN" : "Internet blocked")) :
                 "Active"
         } else if state == "off" {
-            caption = protectedConnectionReady ? "Off" : "Connect supported VPN"
+            caption = protectedConnectionReady ? "Off" :
+                (fullTunHTTPSConnected ? "Protection unavailable for this connection" : "Connect VPN")
         } else if state == "arming" {
             caption = "Starting…"
         } else {
@@ -3099,7 +3109,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func changeNativeKillSwitch(_ sender: NSSwitch) {
         let enable = sender.state == .on
         if enable {
-            guard openVPNSystemRouteVerified ||
+            guard (fullTunHTTPSConnected && fullTunKillSwitchCandidate) ||
+                  openVPNSystemRouteVerified ||
                   (wireGuardSystemRouteVerified &&
                    ["wireguard", "amneziawg"].contains(wireGuardConnectionProtocol)) else {
                 updateNativeKillSwitchControls()
@@ -3684,6 +3695,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         l2tpBusy = false
         l2tpSystemRouteVerified = false
         l2tpConnectedAt = nil
+        fullTunReconnectProfile = nil
+        fullTunReconnectProtocol = nil
+        fullTunReconnectAccount = nil
+        fullTunReconnectOrigin = nil
+        fullTunReconnectServer = nil
+        fullTunKillSwitchCandidate = false
         openVPNReconnectProfile = nil
         openVPNReconnectAccount = nil
         openVPNReconnectOrigin = nil
@@ -4949,7 +4966,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if object["protocol_code"] as? String == "sudoku" {
             return "sudoku"
         }
+        if object["killswitch_candidate"] as? Bool == true,
+           let code = object["protocol_code"] as? String,
+           ["v2ray", "hysteria2", "tuic", "anytls", "socks5", "snell",
+            "naive", "shadowtls", "mieru"].contains(code) {
+            return code
+        }
         return readActiveFullTunProtocol()
+    }
+
+    private func tunKillSwitchCandidate(_ raw: String) -> Bool {
+        guard tunRouteIsRunning(raw), let data = raw.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return false
+        }
+        return object["killswitch_candidate"] as? Bool == true
     }
 
     private func tunRouteIsRunning(_ raw: String) -> Bool {
@@ -5348,12 +5379,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func startFullTun(_ session: TwinMacNativeSession,
                               serverID: String, protocolCode: String) {
+        let protectedReconnect = nativeKillSwitchControlStatus()?["state"] as? String == "locked"
+        fullTunKillSwitchCandidate = false
         fullTunObservedExitIP = nil
         fullTunEgressConfirmedAt = nil
         fullTunTrafficInterface = nil
         fullTunStartedAt = nil
         // Do not issue a doomed privileged start for an unsupported transport.
-        if protocolCode == "v2ray" &&
+        if !protectedReconnect && protocolCode == "v2ray" &&
            !v2rayTunInboundSupported(activeV2RayInbound) {
             status = "Choose WebSocket TLS in Locations; XHTTP Reality is not supported."
             recordProxyAttempt(protocolCode, "VLESS_TRANSPORT_UNSUPPORTED")
@@ -5393,7 +5426,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
                     let conversion: (Data?, String)
-                    if protocolCode == "v2ray" {
+                    if protectedReconnect {
+                        conversion = (profile, "")
+                    } else if protocolCode == "v2ray" {
                         conversion = self.reviewedV2RayTunCandidate(profile)
                     } else if protocolCode == "mieru" {
                         conversion = self.reviewedMieruTunCandidate(profile)
@@ -5428,6 +5463,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             self.tunRouteIsRunning(observed.1)
                         self.fullTunConnectedProtocol = self.fullTunActive ?
                             realProtocol : nil
+                        self.fullTunKillSwitchCandidate = self.fullTunActive &&
+                            self.tunKillSwitchCandidate(observed.1)
+                        if self.fullTunActive && response.0 == 0 && realProtocol == protocolCode {
+                            self.fullTunReconnectProfile = reviewed
+                            self.fullTunReconnectProtocol = protocolCode
+                            self.fullTunReconnectAccount = session.namespace
+                            self.fullTunReconnectOrigin = session.apiOrigin
+                            self.fullTunReconnectServer = self.activeServer
+                        }
                         if self.fullTunActive {
                             self.fullTunStartedAt = Date()
                             self.fullTunProbeLastAt = .distantPast
@@ -5460,7 +5504,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 }
             }
         }
-        if protocolCode == "trusttunnel" {
+        if protectedReconnect {
+            guard fullTunReconnectAccount == session.namespace,
+                  fullTunReconnectOrigin == session.apiOrigin,
+                  fullTunReconnectProtocol == protocolCode,
+                  fullTunReconnectServer == serverID,
+                  let cached = fullTunReconnectProfile else {
+                fullTunBusy = false
+                status = "Reconnect the same VPN or turn off Kill Switch."
+                view = build()
+                return
+            }
+            completion(.success(cached))
+        } else if protocolCode == "trusttunnel" {
             directory.prepareTrustTunnelDeeplink(session, serverID: serverID,
                                                  completion: completion)
         } else if protocolCode == "sudoku" {
@@ -5683,6 +5739,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 let observed = observedRoute
                 let confirmedStopped = result.0 == 0 &&
                     self.tunResponseIs(result.1, state: "stopped")
+                self.fullTunKillSwitchCandidate = observed &&
+                    self.tunKillSwitchCandidate(result.1)
                 if observed {
                     let wasUncertain = self.fullTunStatusUncertain
                     let protocolChanged =
@@ -6126,7 +6184,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if let ks = nativeKillSwitchControlStatus(),
            let state = ks["state"] as? String, state != "off" {
-            if openVPNAppSessionActive || openVPNSystemRouteVerified {
+            if fullTunActive {
+                stopFullTun()
+            } else if openVPNAppSessionActive || openVPNSystemRouteVerified {
                 stopPersistentOpenVPN()
             } else if wireGuardProbeTask != nil || wireGuardSystemRouteVerified ||
                (state == "locked" && selectedWireGuardFamily) {
@@ -6135,6 +6195,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       let session = accountSession, let serverID = activeServer,
                       openVPNAppSessionInstalled() {
                 startPersistentOpenVPN(session, serverID: serverID)
+            } else if state == "locked",
+                      let protocolCode = activeProtocol,
+                      protocolCode == fullTunReconnectProtocol,
+                      let session = accountSession, let serverID = activeServer,
+                      fullTunServicePresent() {
+                startFullTun(session, serverID: serverID, protocolCode: protocolCode)
             } else {
                 status = "Kill Switch is locked. Reconnect the same VPN or turn off Kill Switch."
                 wireGuardProbeStatus = "WG_KS_ORIGINAL_PROFILE_REQUIRED"

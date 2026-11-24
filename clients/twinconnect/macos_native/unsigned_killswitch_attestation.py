@@ -7,6 +7,7 @@ The command-line report exposes protocol/readiness, not keys or endpoints.
 from __future__ import annotations
 from dataclasses import dataclass
 import ipaddress
+import hashlib
 import json
 import math
 import os
@@ -28,6 +29,7 @@ WG_BIN = "/Library/PrivilegedHelperTools/TwinConnectWireGuard/wireguard-go"
 AWG_BIN = "/Library/PrivilegedHelperTools/TwinConnectWireGuard/amneziawg-go"
 CISCO_BIN = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/bin/openconnect"
 TUN_ROOT = Path("/Library/PrivilegedHelperTools/TwinConnectTUN")
+TUN_PROTOCOLS=frozenset(('v2ray','hysteria2','tuic','anytls','socks5','snell','naive','shadowtls','mieru','trusttunnel','sudoku'))
 
 @dataclass(frozen=True)
 class Evidence:
@@ -302,7 +304,7 @@ def modern_outbound(config):
     return protocol,row,transport
 
 
-def secondary_evidence(processes, daemon_pid, primary_pid, path, iface):
+def secondary_evidence(processes, daemon_pid, primary_pid, path, iface, require_live=True):
     """Identify the real supervised TrustTunnel or Sudoku outer connection.
 
     This is evidence only, never proof that a PF policy is active.
@@ -349,8 +351,12 @@ def secondary_evidence(processes, daemon_pid, primary_pid, path, iface):
         host,port=value.rsplit(":",1)
         allowed.add(Transport(host,int(port),"tcp"))
     observed=live_peers(pid)
-    if not observed or not observed.issubset(allowed) or live_peers(primary_pid):
+    if (require_live and not observed) or not observed.issubset(allowed) or live_peers(primary_pid):
         raise ValueError("KS_SECONDARY_TRANSPORT_NOT_ATTESTED")
+    if not require_live:
+        if len(allowed)!=1:
+            raise ValueError("KS_SECONDARY_ENDPOINT_AMBIGUOUS")
+        observed=allowed
     uplinks={route_interface(t.ip) for t in observed}
     if len(uplinks)!=1:
         raise ValueError("KS_TRANSPORT_ROUTE_UNVERIFIED")
@@ -361,7 +367,7 @@ def secondary_evidence(processes, daemon_pid, primary_pid, path, iface):
                     tuple(sorted(observed,key=lambda t:(t.ip,t.port,t.proto))),pid)
 
 
-def tun_evidence(processes):
+def tun_evidence(processes, require_live=True, with_path=False):
     # Use exact root-owned known process paths and a single live daemon
     # child. Never derive identity from a generic SOCKS picker or a filename
     # alone. Unknown endpoint or route evidence must fail closed.
@@ -410,7 +416,8 @@ def tun_evidence(processes):
     if outbound.get("server")=="127.0.0.1":
         if protocol!="socks5" or outbound.get("network")!="tcp":
             raise ValueError("KS_SECONDARY_PROFILE_INVALID")
-        return secondary_evidence(processes,daemon_pid,pid,path,iface)
+        evidence=secondary_evidence(processes,daemon_pid,pid,path,iface,require_live)
+        return (evidence,path,pid) if with_path else evidence
     if protocol=="socks5" and outbound.get("network")!="tcp":
         raise ValueError("KS_SOCKS_UDP_POLICY_NOT_ATTESTED")
     # For now, never resolve an unpinned domain while deriving an exception.
@@ -423,12 +430,43 @@ def tun_evidence(processes):
     except (TypeError,ValueError):
         raise ValueError("KS_TUN_ENDPOINT_NOT_PINNED") from None
     observed=live_peers(pid)
-    if observed!={expected}:
+    if (require_live and observed!={expected}) or not observed.issubset({expected}):
         raise ValueError("KS_TUN_TRANSPORT_UNATTESTED")
     uplink=route_interface(expected.ip)
     if not isinstance(uplink,str) or not re.fullmatch(r"en[0-9]{1,3}",uplink):
         raise ValueError("KS_TRANSPORT_ROUTE_UNVERIFIED")
-    return Evidence(protocol,iface,uplink,(expected,),pid)
+    evidence=Evidence(protocol,iface,uplink,(expected,),pid)
+    return (evidence,path,pid) if with_path else evidence
+
+
+def tun_session_identity(require_live=True):
+    # The daemon writes metadata only after spawning its verified, root-owned
+    # engine. Bind the exact runtime and console UID, not the selected UI row.
+    item=tun_evidence(observed_tun_processes(),require_live,True)
+    if item is None:
+        raise ValueError("KS_TUN_SESSION_MISSING")
+    evidence,path,primary=item
+    meta=root_private_json(path.with_suffix(".meta"))
+    digest=meta.get("digest")
+    if (evidence.protocol not in TUN_PROTOCOLS or len(evidence.transports)!=1 or
+            meta.get("primary_pid")!=primary or
+            meta.get("owner")!=os.stat("/dev/console").st_uid or
+            meta.get("config_sha256")!=hashlib.sha256(root_private_bytes(path)).hexdigest() or
+            not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest)):
+        raise ValueError("KS_TUN_PROFILE_UNVERIFIED")
+    if evidence.protocol in ("trusttunnel","sudoku"):
+        secondary=path.with_suffix(".tt.toml" if evidence.protocol=="trusttunnel" else ".sudoku.json")
+        if meta.get("secondary_sha256")!=hashlib.sha256(root_private_bytes(secondary)).hexdigest():
+            raise ValueError("KS_TUN_SECONDARY_PROFILE_UNVERIFIED")
+    # Even an idle connection must still have the exact pinned transport.
+    if require_live:
+        static=tun_evidence(observed_tun_processes(),False)
+        if static!=evidence:
+            raise ValueError("KS_TUN_ENDPOINT_AMBIGUOUS")
+    peer=evidence.transports[0]
+    return evidence,{"protocol":evidence.protocol,"digest":digest,
+                     "ip":peer.ip,"port":peer.port,"transport":peer.proto,
+                     "uplink":evidence.uplink,"primary_pid":primary}
 
 
 def read_guard(directory):
@@ -438,7 +476,7 @@ def read_guard(directory):
         return None
 
 
-def collect():
+def collect(require_tun_live=True):
     # A second active route guard invalidates ownership; never select a
     # winner by process enumeration order or a user's protocol preference.
     found=[]
@@ -455,7 +493,7 @@ def collect():
         if name=="cisco": return cisco_evidence(state)
         if name=="openvpn": return openvpn_evidence(state)
         raise ValueError("KS_"+name.upper()+"_TRANSPORT_NOT_ATTESTED")
-    return tun_evidence(observed_tun_processes())
+    return tun_evidence(observed_tun_processes(),require_tun_live)
 
 
 def report():
