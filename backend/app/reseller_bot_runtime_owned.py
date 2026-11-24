@@ -93,6 +93,12 @@ def reseller_main_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="💻 کانکشن هوشمند مک (Intel)",
+                    url="https://t.me/twin_connect1/8",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="🎫 پشتیبانی",
                     callback_data="rmenu:support",
                 ),

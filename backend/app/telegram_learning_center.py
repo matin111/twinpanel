@@ -504,7 +504,7 @@ APPS["android"].insert(0, {
     "image": None,
     "download": "https://t.me/twin_connect1/4",
 })
-# Windows smart client uses the already published channel message.
+# Windows and macOS smart clients use their official public channel posts.
 APPS["windows"].insert(0, {
     "key": "twinconnect_windows",
     "title": "TwinConnect",
@@ -512,10 +512,25 @@ APPS["windows"].insert(0, {
     "image": None,
     "download": "https://t.me/twin_connect1/3",
 })
+APPS["macos"].insert(0, {
+    "key": "twinconnect_macos",
+    "title": "TwinConnect",
+    "protocol": "کانکشن هوشمند (Intel)",
+    "image": None,
+    "download": "https://t.me/twin_connect1/8",
+})
 _group_apps_by_title()
 
-def _app_guide(item) -> str:
+def _app_guide(item, os_key: str | None = None) -> str:
     title = item["title"]
+    if title == "TwinConnect" and os_key == "macos":
+        return (
+            "1️⃣ فایل نصب نسخه macOS مخصوص Intel را از دکمه پایین همین پیام دریافت کنید.\n"
+            "2️⃣ فایل PKG را اجرا کنید و مراحل نصب را تا انتقال برنامه به Applications کامل کنید.\n"
+            "3️⃣ برنامه TwinConnect را از پوشه Applications باز کنید.\n"
+            "4️⃣ اگر macOS اجرای برنامه را مسدود کرد، در System Settings > Privacy & Security برای همین برنامه گزینه Open Anyway را انتخاب کنید.\n"
+            "5️⃣ با نام کاربری و رمز مخصوص اپ وارد شوید، سرور را انتخاب و اتصال را فعال کنید."
+        )
     if title in _APP_TUTORIALS:
         return _APP_TUTORIALS[title]
     if title.startswith("VPN داخلی") or title.startswith("NetworkManager"):
@@ -560,7 +575,7 @@ _PRIMARY_APP_TITLES = {
     "android": ("TwinConnect", "Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
     "ios": ("Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "Cisco Secure Client", "AmneziaWG"),
     "windows": ("TwinConnect", "Hiddify", "v2rayN", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
-    "macos": ("Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
+    "macos": ("TwinConnect", "Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
     "linux": ("Hiddify", "OpenVPN", "WireGuard", "OpenConnect", "AmneziaWG"),
 }
 _UNSUPPORTED_APP_TITLES = {
@@ -581,6 +596,16 @@ def _visible_apps(os_key: str, *, more: bool = False) -> list[dict]:
     return [next(item for item in available if item["title"] == title)
             for title in primary if any(item["title"] == title for item in available)]
 
+def _twinconnect_button_label(os_key: str, *, download: bool = False) -> str:
+    platform = {
+        "android": "اندروید",
+        "windows": "ویندوز",
+        "macos": "مک (Intel)",
+    }.get(os_key, "")
+    verb = "دریافت " if download else ""
+    return f"🔴 {verb}کانکشن هوشمند {platform}".strip()
+
+
 def _apps_keyboard(
     prefix: str,
     mode: str,
@@ -594,7 +619,8 @@ def _apps_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text=(
-                    ("🔴 کانکشن هوشمند اندروید" if os_key == "android" else "🔴 کانکشن هوشمند ویندوز") if item["title"] == "TwinConnect"
+                    _twinconnect_button_label(os_key)
+                    if item["title"] == "TwinConnect"
                     else f"{item['title']}"
                 ),
                 callback_data=(
@@ -658,7 +684,8 @@ def _detail_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text=(
-                    ("🔴 دریافت کانکشن هوشمند اندروید" if os_key == "android" else "🔴 دریافت کانکشن هوشمند ویندوز") if item["title"] == "TwinConnect"
+                    _twinconnect_button_label(os_key, download=True)
+                    if item["title"] == "TwinConnect"
                     else "🔗 دریافت برنامه"
                 ),
                 url=item["download"],
@@ -698,7 +725,7 @@ def _guide_caption(
         os_key,
     )
 
-    guide = _app_guide(item)
+    guide = _app_guide(item, os_key)
 
     notice = item.get("notice")
     extra = f"\n\n💡 {notice}" if notice else ""

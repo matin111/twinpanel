@@ -1,0 +1,24 @@
+name: TwinConnect macOS Telegram Link Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/telegram_learning_center.py'
+      - 'backend/app/reseller_bot_runtime_owned.py'
+      - 'backend/app/telegram_admin_ops_v1.py'
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/app/reseller_bot_runtime.py'
+      - 'backend/scripts/telegram_twinconnect_macos_link_smoke.py'
+      - '.github/workflows/telegram-twinconnect-macos-link-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  telegram-twinconnect-macos-link:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify admin, reseller and shared learning links
+        run: python backend/scripts/telegram_twinconnect_macos_link_smoke.py

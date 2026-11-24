@@ -31,12 +31,13 @@ def _buttons(*rows):
 
 
 def _home():
-    return _buttons(
-        [("🧾 رسیدهای تأییدنشده", "adm:review")],
-        [("🔎 کاربران و اشتراک‌ها", "adm:lookup")],
-        [("📢 ارسال پیام همگانی", "adm:broadcast")],
-        [("🏠 منوی اصلی", "main:home")],
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧾 رسیدهای تأییدنشده", callback_data="adm:review")],
+        [InlineKeyboardButton(text="🔎 کاربران و اشتراک‌ها", callback_data="adm:lookup")],
+        [InlineKeyboardButton(text="📢 ارسال پیام همگانی", callback_data="adm:broadcast")],
+        [InlineKeyboardButton(text="💻 کانکشن هوشمند مک (Intel)", url="https://t.me/twin_connect1/8")],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home")],
+    ])
 
 
 def install_telegram_admin_ops(router, request_fn):
