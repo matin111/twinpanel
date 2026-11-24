@@ -1,8 +1,8 @@
 {
-  "version": "1.1.13",
-  "source_sha": "0bd0a894b4070b5ddb2195a5bf003ebd1c813feb",
+  "version": "1.1.14",
+  "source_sha": "72d304bdece7277a50ccd3874263838d73a106be",
   "notes": {
-    "fa": "اضافه‌شدن لینک دانلود کانکشن هوشمند TwinConnect نسخه macOS (Intel) به منوی ربات ادمین و نماینده و بخش آموزش و دانلود؛ همراه با راهنمای نصب و اجرای اولیه.",
-    "en": "Add the TwinConnect macOS Intel download link to the admin and reseller Telegram bot menus and the shared macOS learning/download catalog, with installation guidance."
+    "fa": "بازگشت منوی تلگرام به یک دکمه واحد «آموزش و دانلود»؛ لینک دانلود هر برنامه، از جمله TwinConnect مک (Intel)، داخل صفحه همان برنامه قرار دارد.",
+    "en": "Restore one unified Telegram Learning & Download button; each app download, including TwinConnect macOS Intel, remains inside its app detail."
   }
 }
