@@ -5259,7 +5259,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                                  completion: completion)
         } else if protocolCode == "sudoku" {
             directory.prepareSudokuProfile(session, serverID: serverID,
-                                           completion: completion)
+                resolvedServer: { [weak self] actualID in
+                    guard let self = self,
+                          self.localProxyGeneration == generation,
+                          self.accountSession?.accessToken == session.accessToken else { return }
+                    self.activeServer = actualID
+                    self.persistCurrentSelection()
+                }, completion: completion)
         } else if protocolCode == "mieru" {
             directory.prepareLocalSingBox(session, serverID: serverID,
                                           protocolCode: "mieru",

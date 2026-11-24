@@ -2124,6 +2124,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
 
     func prepareSudokuProfile(_ session: TwinMacNativeSession,
                                     serverID: String,
+                                    resolvedServer: @escaping (String) -> Void,
                                     completion: @escaping (Result<Data, Error>) -> Void) {
         guard serverID.range(of: "^[0-9]{1,20}$",
                              options: .regularExpression) != nil else {
@@ -2177,20 +2178,96 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             "SUDOKU_PROFILE_UNAVAILABLE")))
                         return
                     }
-                    let matching = items.filter { item in
-                        (item["node_id"] as? String) == serverID ||
-                        (item["node_id"] as? Int).map(String.init) == serverID
+                    // A legacy Exit can be listed without an issued Sudoku
+                    // profile. Match the Windows client: never cross countries,
+                    // never replace a malformed or duplicated direct profile.
+                    func id(_ row: [String: Any], _ field: String) -> String? {
+                        return (row[field] as? String) ??
+                            (row[field] as? Int).map(String.init)
                     }
-                    guard matching.count == 1,
-                          matching[0]["config_format"] as? String == "sudoku-json",
-                          let raw = matching[0]["config"] as? String,
-                          (1...16384).contains(raw.utf8.count),
+                    func validProfile(_ item: [String: Any]) -> String? {
+                        guard item["config_format"] as? String == "sudoku-json",
+                              let raw = item["config"] as? String,
+                              (1...16384).contains(raw.utf8.count),
+                              let data = raw.data(using: .utf8),
+                              let config = (try? JSONSerialization.jsonObject(with: data))
+                                as? [String: Any],
+                              config["mode"] as? String == "client",
+                              config["transport"] as? String == "tcp",
+                              let key = config["key"] as? String,
+                              key.range(of: "^(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{128})$",
+                                        options: .regularExpression) != nil,
+                              let endpoint = config["server_address"] as? String,
+                              endpoint.range(of: "^[A-Za-z0-9.-]{1,253}:[0-9]{1,5}$",
+                                             options: .regularExpression) != nil,
+                              let cipher = config["aead"] as? String,
+                              ["chacha20-poly1305", "aes-128-gcm"].contains(cipher),
+                              config["enable_pure_downlink"] as? Bool == true,
+                              config["multiplex"] as? String == "off",
+                              let ascii = config["ascii"] as? String,
+                              ["prefer_entropy", "prefer_ascii"].contains(ascii),
+                              let low = config["padding_min"] as? Int,
+                              let high = config["padding_max"] as? Int,
+                              low >= 0, high >= low, high <= 100,
+                              let mask = config["httpmask"] as? [String: Any],
+                              mask["disable"] as? Bool == false,
+                              mask["mode"] as? String == "auto" else { return nil }
+                        return raw
+                    }
+                    let matching = items.filter { id($0, "node_id") == serverID }
+                    var actualID = serverID
+                    var raw: String?
+                    if !matching.isEmpty {
+                        guard matching.count == 1 else {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "SUDOKU_DUPLICATE_SERVER_PROFILE")))
+                            return
+                        }
+                        raw = validProfile(matching[0])
+                        if raw == nil {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "SUDOKU_SERVER_PROFILE_INVALID")))
+                            return
+                        }
+                    } else if let requested = servers.first(where: { id($0, "id") == serverID }),
+                              let country = requested["country_code"] as? String,
+                              !country.isEmpty {
+                        let alternatives = servers.filter { row in
+                            guard let candidate = id(row, "id"),
+                                  candidate != serverID,
+                                  candidate.range(of: "^[0-9]{1,20}$",
+                                                  options: .regularExpression) != nil,
+                                  row["node_online"] as? Bool == true,
+                                  let candidateCountry = row["country_code"] as? String
+                            else { return false }
+                            return candidateCountry.uppercased() == country.uppercased()
+                        }.sorted { lhs, rhs in
+                            let a = lhs["latency_ms"] as? Int ?? 1000000
+                            let b = rhs["latency_ms"] as? Int ?? 1000000
+                            return a == b ? (id(lhs, "id") ?? "") < (id(rhs, "id") ?? "") : a < b
+                        }
+                        for candidate in alternatives {
+                            guard let candidateID = id(candidate, "id"),
+                                  servers.filter({ id($0, "id") == candidateID }).count == 1
+                            else { continue }
+                            let delivered = items.filter { id($0, "node_id") == candidateID }
+                            if delivered.count == 1, let validated = validProfile(delivered[0]) {
+                                actualID = candidateID
+                                raw = validated
+                                break
+                            }
+                        }
+                    }
+                    NSLog("TwinConnect AppKit: Sudoku profile rows=%d direct matches=%d resolved=%@",
+                          items.count, matching.count, raw == nil ? "NO" : "YES")
+                    guard let raw = raw,
                           let envelope = try? JSONSerialization.data(
                               withJSONObject: ["mode": "sudoku", "profile": raw]) else {
                         completion(.failure(TwinMacNativeError.failure(
-                            "SUDOKU_LINK_INVALID")))
+                            "SUDOKU_SERVER_PROFILE_MISSING")))
                         return
                     }
+                    resolvedServer(actualID)
                     completion(.success(envelope))
                 }
             }
