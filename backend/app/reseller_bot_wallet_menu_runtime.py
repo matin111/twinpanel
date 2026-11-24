@@ -49,10 +49,9 @@ def wallet_main_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="👛 کیف پول من"),
-                KeyboardButton(text="📚 آموزش"),
+                KeyboardButton(text="📚 آموزش و دانلود"),
             ],
             [
-                KeyboardButton(text="⬇️ دانلود برنامه"),
                 KeyboardButton(text="🎫 پشتیبانی"),
             ],
         ],
