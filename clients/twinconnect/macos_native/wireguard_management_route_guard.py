@@ -642,6 +642,97 @@ def activate_full(interface: str, pid: int) -> str:
     return "WG_SYSTEM_IPV4_CONNECTED"
 
 
+# The strictly bounded console test owns its own root launchd recovery.
+# While that test deliberately blocks the management connector, it can
+# supply the recovery proof instead of an established Termalin socket.
+# Never add a firewall exception or accept a persistent/expired session.
+KS_CONTROL_STATE = Path("/private/var/run/twinconnect-killswitch-control")
+KS_CONTROL_ROOT = Path("/Library/PrivilegedHelperTools/TwinConnectKillSwitchControl")
+KS_RECOVERY_LABEL = "system/com.twinconnect.killswitch-session-recovery"
+
+
+def read_trusted_ks_json(path: Path, private: bool) -> dict:
+    import stat
+    parent = path.parent.lstat()
+    if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or
+            parent.st_mode & (0o077 if private else 0o022)):
+        raise ValueError("KS_DIRECTORY_UNTRUSTED")
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
+                info.st_nlink != 1 or
+                info.st_mode & (0o077 if private else 0o022) or
+                not 0 < info.st_size <= 4096):
+            raise ValueError("KS_FILE_UNTRUSTED")
+        value = json.loads(stream.read(4097))
+    if not isinstance(value, dict):
+        raise ValueError("KS_FILE_INVALID")
+    return value
+
+
+def ks_recovery_command(*args: str) -> str:
+    result = subprocess.run(args, capture_output=True, text=True,
+                            timeout=1.5, check=False,
+                            env={"PATH":"/usr/bin:/bin:/usr/sbin:/sbin",
+                                 "LC_ALL":"C"})
+    if result.returncode:
+        raise ValueError("KS_RECOVERY_OBSERVATION_FAILED")
+    return result.stdout
+
+
+def bounded_killswitch_recovery(current: dict) -> bool:
+    if current.get("protocol_code", "wireguard") != "wireguard":
+        return False
+    try:
+        lease = read_trusted_ks_json(KS_CONTROL_STATE / "lease.json", True)
+        ready = read_trusted_ks_json(KS_CONTROL_STATE / "ready.json", True)
+        status = read_trusted_ks_json(KS_CONTROL_ROOT / "status.json", False)
+        nonce = lease.get("nonce")
+        now = time.time()
+        deadline = ready.get("deadline")
+        stamp = status.get("timestamp")
+        iface = current.get("full_interface", "")
+        rules = lease.get("canonical")
+        if (not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce) or
+                lease.get("phase") != "owned" or lease.get("locked") is not False or
+                lease.get("pid") != current.get("worker_pid") or
+                lease.get("interface") != iface or
+                not re.fullmatch(r"utun[0-9]{1,4}", iface) or
+                not isinstance(lease.get("token"), str) or
+                not re.fullmatch(r"[0-9]{1,20}", lease["token"]) or
+                ready.get("nonce") != nonce or
+                type(deadline) not in (int, float) or
+                not now < deadline <= now + 120 or
+                status.get("version") != 1 or status.get("persistent") is not False or
+                status.get("session_limit") != 120 or status.get("state") != "active" or
+                status.get("expires_at") != deadline or
+                type(stamp) not in (int, float) or abs(now - stamp) > 8 or
+                not isinstance(rules, list) or not 3 <= len(rules) <= 20 or
+                not all(isinstance(line, str) for line in rules) or
+                "pass quick on " + iface + " all no state" not in rules or
+                rules[-1] != "block drop quick all"):
+            return False
+        # Read back the live owned PF rules and recovery job, not only the
+        # status file. Other route/endpoint/worker checks remain unchanged.
+        info = ks_recovery_command("/sbin/pfctl", "-s", "info")
+        if not re.search(r"(?m)^Status:\s+Enabled\b", info):
+            return False
+        live = ks_recovery_command("/sbin/pfctl", "-a",
+                                    "com.apple/twinconnect-killswitch", "-sr")
+        if [line.strip() for line in live.splitlines() if line.strip()] != rules:
+            return False
+        job = ks_recovery_command("/bin/launchctl", "print", KS_RECOVERY_LABEL)
+        if ("state = running" not in job or
+                str(KS_CONTROL_ROOT / "unsigned_killswitch_console_control.py") not in job or
+                "--watchdog" not in job or nonce not in job):
+            return False
+        # A concurrent Reset/expiry must not grant a new recovery exception.
+        return (time.time() < deadline and
+                read_trusted_ks_json(KS_CONTROL_STATE / "lease.json", True) == lease)
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return False
+
+
 def heartbeat(pid: int) -> str:
     current = load()
     if current.get("mode") != "leased" or current.get("worker_pid") != pid:
@@ -665,7 +756,8 @@ def heartbeat(pid: int) -> str:
         return "WG_MANAGEMENT_BYPASS_LOST"
     connector = connector_peers()
     if not connector or not set(connector).issubset(set(current.get("peers", []))):
-        return "WG_MANAGEMENT_PEER_CHANGED"
+        if not bounded_killswitch_recovery(current):
+            return "WG_MANAGEMENT_PEER_CHANGED"
     current["deadline"] = time.time() + LEASE_SECONDS
     store(current)
     return "WG_SYSTEM_IPV4_CONNECTED"
