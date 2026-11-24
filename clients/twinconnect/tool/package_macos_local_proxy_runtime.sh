@@ -23,7 +23,7 @@ if [[ -e "$destination" &&
       ! -f "$destination/macos_native/standalone_connection_manager.py" ]]; then
   echo "UNRECOGNIZED_EXISTING_RUNTIME_REFUSED" >&2; exit 2
 fi
-for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/unsigned_tun_telemetry.py macos_native/unsigned_tun_policy.py macos_native/unsigned_mieru_profile.py macos_native/unsigned_trusttunnel_profile.py macos_native/xray_unsigned_tun_candidate.py macos_native/l2tp_native_preflight.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
+for source in macos_native/standalone_connection_manager.py macos_native/cisco_openconnect_auth.py macos_native/unsigned_tun_client.py macos_native/unsigned_tun_telemetry.py macos_native/unsigned_tun_policy.py macos_native/unsigned_mieru_profile.py macos_native/unsigned_trusttunnel_profile.py macos_native/unsigned_sudoku_profile.py macos_native/xray_unsigned_tun_candidate.py macos_native/l2tp_native_preflight.py macos_native/openvpn_profile_review.py macos_native/openvpn_traffic_telemetry.py; do
   if [[ ! -f "$source" || -L "$source" ]]; then
     echo "MISSING_OR_UNSAFE_RUNTIME_SOURCE: $source" >&2; exit 2
   fi
@@ -48,6 +48,7 @@ install -m 0644 macos_native/unsigned_tun_policy.py \
   "$stage/macos_native/unsigned_tun_policy.py"
 install -m 0755 macos_native/unsigned_mieru_profile.py   "$stage/macos_native/unsigned_mieru_profile.py"
 install -m 0755 macos_native/unsigned_trusttunnel_profile.py   "$stage/macos_native/unsigned_trusttunnel_profile.py"
+install -m 0644 macos_native/unsigned_sudoku_profile.py "$stage/macos_native/unsigned_sudoku_profile.py"
 install -m 0755 macos_native/xray_unsigned_tun_candidate.py \
   "$stage/macos_native/xray_unsigned_tun_candidate.py"
 install -m 0755 macos_native/l2tp_native_preflight.py \
@@ -88,6 +89,18 @@ if [[ -f "$mbox_source" && ! -L "$mbox_source" && -x "$mbox_source" ]]; then
 fi
 # Official TrustTunnel CLI is an unprivileged, optional loopback-only test
 # engine. Do not route macOS system traffic through it until HTTPS proof works.
+sudoku_source="macos_native/build/sudoku/$arch/sudoku"
+if [[ -e "$sudoku_source" ]]; then
+  [[ -f "$sudoku_source" && ! -L "$sudoku_source" && -x "$sudoku_source" ]] ||
+    { echo "SUDOKU_ENGINE_INVALID" >&2; exit 3; }
+  /usr/bin/lipo -archs "$sudoku_source" | tr ' ' '\n' | grep -Fxq "$host_arch" ||
+    { echo "SUDOKU_ARCH_MISMATCH" >&2; exit 3; }
+  mkdir -p "$stage/macos_native/build/sudoku/$arch"
+  install -m 0755 "$sudoku_source" "$stage/macos_native/build/sudoku/$arch/sudoku"
+  install -m 0644 licenses/SUDOKU-LICENSE.txt "$stage/macos_native/build/sudoku/$arch/LICENSE.txt"
+  install -m 0644 licenses/GPL-3.0.txt "$stage/macos_native/build/sudoku/$arch/GPL-3.0.txt"
+  echo "SUDOKU_OFFICIAL_CORE_PACKAGED"
+fi
 trust_source="macos_native/build/trusttunnel/$arch/trusttunnel_client"
 if [[ -f "$trust_source" && ! -L "$trust_source" && -x "$trust_source" ]]; then
   /usr/bin/lipo -archs "$trust_source" | tr ' ' '\n' |

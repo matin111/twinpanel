@@ -1468,6 +1468,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "shadowtls": return "ShadowTLS"
         case "mieru": return "Mieru"
         case "trusttunnel": return "TrustTunnel"
+        case "sudoku": return "Sudoku"
         default: return nil
         }
     }
@@ -4543,7 +4544,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let allowed: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
             "snell", "naive", "shadowtls", "v2ray", "mieru",
-            "trusttunnel"
+            "trusttunnel", "sudoku"
         ]
         guard allowed.contains(protocolCode) else { return }
         let safeCode = reason.range(
@@ -4761,6 +4762,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                   as? [String: Any] else { return nil }
         if object["protocol_code"] as? String == "trusttunnel" {
             return "trusttunnel"
+        }
+        if object["protocol_code"] as? String == "sudoku" {
+            return "sudoku"
         }
         return readActiveFullTunProtocol()
     }
@@ -5253,6 +5257,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if protocolCode == "trusttunnel" {
             directory.prepareTrustTunnelDeeplink(session, serverID: serverID,
                                                  completion: completion)
+        } else if protocolCode == "sudoku" {
+            directory.prepareSudokuProfile(session, serverID: serverID,
+                                           completion: completion)
         } else if protocolCode == "mieru" {
             directory.prepareLocalSingBox(session, serverID: serverID,
                                           protocolCode: "mieru",
@@ -5914,7 +5921,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let enabled: Set<String> = [
             "hysteria2", "tuic", "anytls", "socks5",
             "snell", "naive", "shadowtls", "v2ray", "mieru",
-            "trusttunnel"
+            "trusttunnel", "sudoku"
         ]
         guard let selectedProtocol = activeProtocol,
               enabled.contains(selectedProtocol),
@@ -5942,9 +5949,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         // Do not feed a tt:// deep-link into sing-box when no audited
         // local TUN helper is installed, or claim a false VPN connection.
-        if selectedProtocol == "trusttunnel" {
-            status = "TrustTunnel TUN helper not installed; VPN not connected."
-            recordProxyAttempt(selectedProtocol, "TRUSTTUNNEL_TUN_NOT_INSTALLED")
+        if selectedProtocol == "trusttunnel" || selectedProtocol == "sudoku" {
+            status = "Connection unavailable: privileged TUN helper not installed."
+            recordProxyAttempt(selectedProtocol, selectedProtocol.uppercased() + "_TUN_NOT_INSTALLED")
             view = build()
             return
         }

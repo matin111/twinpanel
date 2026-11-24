@@ -35,10 +35,13 @@ from unsigned_mieru_profile import validate_mbox_tun_config
 from unsigned_trusttunnel_profile import (
     trusted_unsigned_runtime, trusttunnel_singbox_tun, SOCKS_PORT)
 
+from unsigned_sudoku_profile import sudoku_runtime, sudoku_singbox_tun
+
 SOCKET_PATH = Path("/var/run/twinconnect-tun.sock")
 ENGINE = TRUSTED_ROOT / "sing-box"
 MIERU_ENGINE = TRUSTED_ROOT / "mbox"
 TRUSTTUNNEL_CLIENT = TRUSTED_ROOT / "trusttunnel_client"
+SUDOKU_CLIENT = TRUSTED_ROOT / "sudoku"
 APPROVAL = TRUSTED_ROOT / "local-console-approval"
 WATCHDOG = TRUSTED_ROOT / "unsigned_tun_watchdog.py"
 OPENVPN = TRUSTED_ROOT / "openvpn/bin/openvpn"
@@ -296,6 +299,7 @@ class Session:
         self.transport_process: subprocess.Popen | None = None
         self.transport_config: Path | None = None
         self.transport_stderr = None
+        self.transport_protocol = "trusttunnel"
 
     def console_owner_present(self) -> bool:
         """Kill the tunnel when console ownership changes or user logs out."""
@@ -376,7 +380,7 @@ class Session:
                 if (self.transport_process is not None and
                         self.transport_process.poll() is None and
                         self.owner is not None):
-                    status["protocol_code"] = "trusttunnel"
+                    status["protocol_code"] = self.transport_protocol
             return status
 
     def start(self, uid: int, profile: object) -> dict:
@@ -386,7 +390,9 @@ class Session:
             if not isinstance(profile, dict):
                 raise ValueError("TUN_CONFIG_NOT_OBJECT")
             use_trusttunnel = profile.get("mode") == "trusttunnel"
+            use_sudoku = profile.get("mode") == "sudoku"
             trust_toml = ""
+            sudoku_json = ""
             pinned_trust_endpoint_ips: tuple[str, ...] = ()
             if use_trusttunnel:
                 if (set(profile) != {"mode", "deeplink"} or
@@ -400,6 +406,13 @@ class Session:
                     trusted_unsigned_runtime(profile["deeplink"]))
                 # The supplied link is never an arbitrary sing-box profile.
                 profile = trusttunnel_singbox_tun()
+            if use_sudoku:
+                if set(profile) != {"mode", "profile"}:
+                    raise ValueError("SUDOKU_REQUEST_INVALID")
+                if not trusted_root_file(SUDOKU_CLIENT) or not os.access(SUDOKU_CLIENT, os.X_OK):
+                    raise ValueError("SUDOKU_ROOT_CLIENT_NOT_INSTALLED")
+                sudoku_json, pinned_trust_endpoint_ips = sudoku_runtime(profile["profile"])
+                profile = sudoku_singbox_tun()
             use_openvpn = profile.get("mode") == "openvpn"
             # Only a single, tightly-reviewed Mieru outbound can select the
             # separately staged mbox build. All existing VPNs keep sing-box.
@@ -442,7 +455,31 @@ class Session:
             try:
                 with os.fdopen(fd, "wb") as output:
                     output.write(encoded)
+                if use_sudoku:
+                    sdk_path = path.with_suffix(".sudoku.json")
+                    sdk_fd = os.open(sdk_path, os.O_CREAT | os.O_EXCL |
+                                     os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+                    self.transport_config = sdk_path
+                    with os.fdopen(sdk_fd, "w", encoding="utf-8") as sdk_file:
+                        sdk_file.write(sudoku_json)
+                    self.transport_stderr = tempfile.TemporaryFile(mode="w+b")
+                    try:
+                        subprocess.run([str(SUDOKU_CLIENT), "-c", str(sdk_path), "-test"],
+                                       check=True, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL, timeout=15)
+                    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                        raise ValueError("SUDOKU_CORE_CONFIG_REJECTED") from None
+                    self.transport_process = subprocess.Popen(
+                        [str(SUDOKU_CLIENT), "-c", str(sdk_path)],
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                        stderr=self.transport_stderr, start_new_session=True)
+                    self.transport_protocol = "sudoku"
+                    try:
+                        trusttunnel_verified_socks_exit(self.transport_process.pid)
+                    except ValueError:
+                        raise ValueError("SUDOKU_SOCKS_HTTPS_NOT_VERIFIED") from None
                 if use_trusttunnel:
+                    self.transport_protocol = "trusttunnel"
                     # Keep private username/password and pinned TLS cert in
                     # ROOT-owned 0600 TOML; never argv, logs or process env.
                     tt_path = path.with_suffix(".tt.toml")
@@ -485,7 +522,7 @@ class Session:
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
                         validate_full_tun_config(path)
-                    elif use_trusttunnel:
+                    elif use_trusttunnel or use_sudoku:
                         # Console-local mode still needs the root-pinned
                         # upstream to bypass the system-wide TUN itself.
                         profile = guard_candidate(
@@ -522,7 +559,7 @@ class Session:
                     sys.executable, str(WATCHDOG), "--parent",
                     str(os.getpid()), "--engine", str(child.pid),
                     "--seconds", str(session_limit())]
-                if use_trusttunnel and self.transport_process is not None:
+                if (use_trusttunnel or use_sudoku) and self.transport_process is not None:
                     watcher_args.extend([
                         "--secondary-engine",
                         str(self.transport_process.pid)])

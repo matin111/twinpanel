@@ -25,7 +25,7 @@ STATE = Path.home() / "Library/Application Support/TwinConnect/standalone"
 PROTOCOLS = (
     "openvpn", "openconnect", "l2tp", "wireguard", "amneziawg",
     "v2ray", "hysteria2", "tuic", "anytls", "naive", "shadowtls",
-    "snell", "socks5", "mieru", "trusttunnel",
+    "snell", "socks5", "mieru", "trusttunnel", "sudoku",
 )
 # Separate engines can be integrated later; never claim they are implemented.
 SINGBOX = {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
