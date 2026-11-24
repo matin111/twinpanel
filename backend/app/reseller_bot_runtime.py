@@ -119,10 +119,7 @@ def _main_keyboard():
             ],
             [
                 KeyboardButton(
-                    text="📚 آموزش"
-                ),
-                KeyboardButton(
-                    text="⬇️ دانلود برنامه"
+                    text="📚 آموزش و دانلود"
                 ),
             ],
             [
