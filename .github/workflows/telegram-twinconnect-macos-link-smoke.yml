@@ -1,24 +1,29 @@
-name: TwinConnect macOS Telegram Link Smoke
+name: Telegram Unified Learning Download Smoke
 
 on:
   pull_request:
     paths:
       - 'backend/app/telegram_learning_center.py'
-      - 'backend/app/reseller_bot_runtime_owned.py'
+      - 'backend/app/telegram_account_link_bot.py'
+      - 'backend/app/telegram_account_link_bot_original.py'
       - 'backend/app/telegram_admin_ops_v1.py'
-      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/app/reseller_bot_runtime_owned.py'
       - 'backend/app/reseller_bot_runtime.py'
+      - 'backend/app/reseller_bot_wallet_menu_runtime.py'
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/app/telegram_runtime_custom.py'
+      - 'backend/app/telegram_guides_bot.py'
       - 'backend/scripts/telegram_twinconnect_macos_link_smoke.py'
       - '.github/workflows/telegram-twinconnect-macos-link-smoke.yml'
   workflow_dispatch:
 
 jobs:
-  telegram-twinconnect-macos-link:
+  telegram-learning-download:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify admin, reseller and shared learning links
+      - name: Verify one combined menu button and all platform download links
         run: python backend/scripts/telegram_twinconnect_macos_link_smoke.py
