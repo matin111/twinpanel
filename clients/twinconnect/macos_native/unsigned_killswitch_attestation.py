@@ -255,20 +255,31 @@ def observed_tun_processes():
     return result
 
 
-def live_peers(pid):
+TUN_INNER=ipaddress.ip_network("172.19.0.0/30")
+
+
+def live_peers(pid, tun_interface=None):
     peers=set()
     for proto in ("TCP","UDP"):
         result=run("/usr/sbin/lsof","-nP","-a","-p",str(pid),"-i"+proto)
         if result.returncode not in (0,1):
             raise ValueError("KS_TRANSPORT_SOCKET_SCAN_FAILED")
         for line in result.stdout.splitlines():
-            match=re.search(r"\b"+proto+r"\s+[0-9.]+:[0-9]+->([0-9.]+):([0-9]+)(?:\s|$)",line)
+            match=re.search(r"\b"+proto+r"\s+([0-9.]+):[0-9]+->([0-9.]+):([0-9]+)(?:\s|$)",line)
             if match and (proto!="TCP" or line.endswith("(ESTABLISHED)")):
+                source,host,port=match.groups()
+                src,dst=ipaddress.ip_address(source),ipaddress.ip_address(host)
+                # The reviewed system-stack TUN uses a fixed /30. Only
+                # sockets with BOTH ends inside it and both routes on the
+                # attested interface are inner flows, never outer exceptions.
+                if tun_interface and src in TUN_INNER and dst in TUN_INNER:
+                    if route_interface(source)==tun_interface and route_interface(host)==tun_interface:
+                        continue
                 try:
-                    peers.add(Transport(match.group(1),int(match.group(2)),proto.lower()))
+                    peers.add(Transport(host,int(port),proto.lower()))
                 except ValueError:
                     # A loopback listener is not an outer network transport.
-                    if not ipaddress.ip_address(match.group(1)).is_loopback:
+                    if not dst.is_loopback:
                         raise
     return peers
 
@@ -304,7 +315,7 @@ def modern_outbound(config):
     return protocol,row,transport
 
 
-def secondary_evidence(processes, daemon_pid, primary_pid, path, iface, require_live=True):
+def secondary_evidence(processes, daemon_pid, primary_pid, path, iface, require_live=True, inner_iface=None):
     """Identify the real supervised TrustTunnel or Sudoku outer connection.
 
     This is evidence only, never proof that a PF policy is active.
@@ -351,7 +362,7 @@ def secondary_evidence(processes, daemon_pid, primary_pid, path, iface, require_
         host,port=value.rsplit(":",1)
         allowed.add(Transport(host,int(port),"tcp"))
     observed=live_peers(pid)
-    if (require_live and not observed) or not observed.issubset(allowed) or live_peers(primary_pid):
+    if (require_live and not observed) or not observed.issubset(allowed) or live_peers(primary_pid,inner_iface):
         raise ValueError("KS_SECONDARY_TRANSPORT_NOT_ATTESTED")
     if not require_live:
         if len(allowed)!=1:
@@ -410,13 +421,21 @@ def tun_evidence(processes, require_live=True, with_path=False):
     iface=route_interface("1.1.1.1")
     if not isinstance(iface,str) or not re.fullmatch(r"utun[0-9]{1,4}",iface) or route_interface("129.0.0.1")!=iface:
         raise ValueError("KS_TUNNEL_ROUTE_UNVERIFIED")
+    inbounds=config.get("inbounds",[])
+    inner_iface=None
+    if (len(inbounds)==1 and inbounds[0].get("type")=="tun" and
+            inbounds[0].get("address")==["172.19.0.1/30"]):
+        interface_info=run("/sbin/ifconfig",iface)
+        if (interface_info.returncode==0 and
+                re.search(r"(?m)^\s*inet 172\.19\.0\.1\s+-->\s+172\.19\.0\.1\s+netmask 0xfffffffc\b",interface_info.stdout)):
+            inner_iface=iface
     protocol,outbound,transport=modern_outbound(config)
     if (engine=="mbox")!=(protocol=="mieru"):
         raise ValueError("KS_TUN_ENGINE_IDENTITY_UNVERIFIED")
     if outbound.get("server")=="127.0.0.1":
         if protocol!="socks5" or outbound.get("network")!="tcp":
             raise ValueError("KS_SECONDARY_PROFILE_INVALID")
-        evidence=secondary_evidence(processes,daemon_pid,pid,path,iface,require_live)
+        evidence=secondary_evidence(processes,daemon_pid,pid,path,iface,require_live,inner_iface)
         return (evidence,path,pid) if with_path else evidence
     if protocol=="socks5" and outbound.get("network")!="tcp":
         raise ValueError("KS_SOCKS_UDP_POLICY_NOT_ATTESTED")
@@ -429,7 +448,7 @@ def tun_evidence(processes, require_live=True, with_path=False):
         expected=Transport(host,outbound.get("server_port"),transport)
     except (TypeError,ValueError):
         raise ValueError("KS_TUN_ENDPOINT_NOT_PINNED") from None
-    observed=live_peers(pid)
+    observed=live_peers(pid,inner_iface)
     if (require_live and observed!={expected}) or not observed.issubset({expected}):
         raise ValueError("KS_TUN_TRANSPORT_UNATTESTED")
     uplink=route_interface(expected.ip)

@@ -107,6 +107,26 @@ class TunProtectionTests(unittest.TestCase):
         with patch.object(d.socket,"getaddrinfo",return_value=[(2,1,6,"",("127.0.0.1",443))]):
             with self.assertRaisesRegex(ValueError,"TUN_KS_ENDPOINT_INVALID"):
                 d.pin_reviewed_endpoint(config,"v2ray")
+    def test_reviewed_inner_sockets_never_become_outer_exceptions(self):
+        output="TCP 172.19.0.1:1234->172.19.0.2:5678 (ESTABLISHED)\nTCP 2.3.4.5:1234->1.2.3.4:443 (ESTABLISHED)"
+        with patch.object(a,"run",side_effect=[SimpleNamespace(returncode=0,stdout=output),SimpleNamespace(returncode=1,stdout="")]),patch.object(a,"route_interface",return_value="utun16"):
+            self.assertEqual(a.live_peers(125,"utun16"),{self.peer})
+    def test_private_socket_off_tun_is_not_ignored(self):
+        output="TCP 172.19.0.1:1234->172.19.0.2:5678 (ESTABLISHED)"
+        with patch.object(a,"run",return_value=SimpleNamespace(returncode=0,stdout=output)),patch.object(a,"route_interface",return_value="en0"):
+            with self.assertRaisesRegex(ValueError,"KS_ENDPOINT_INVALID"):
+                a.live_peers(125,"utun16")
+    def test_private_socket_outside_reviewed_subnet_is_not_ignored(self):
+        output="TCP 172.19.0.1:1234->192.168.1.2:5678 (ESTABLISHED)"
+        with patch.object(a,"run",return_value=SimpleNamespace(returncode=0,stdout=output)),patch.object(a,"route_interface",return_value="utun16"):
+            with self.assertRaisesRegex(ValueError,"KS_ENDPOINT_INVALID"):
+                a.live_peers(125,"utun16")
+    def test_ordinary_tun_has_exact_endpoint_exclusion(self):
+        config={"inbounds":[{"type":"tun"}],"outbounds":[{"tag":"proxy","server":"1.2.3.4","server_port":443}]}
+        endpoints=d.reviewed_endpoint_ips(config,"v2ray")
+        self.assertEqual(endpoints,("1.2.3.4",))
+        guarded=d.guard_candidate(config,peers=("8.8.8.8",),endpoint_ips=endpoints)
+        self.assertEqual(set(guarded["inbounds"][0]["route_exclude_address"]),{"1.2.3.4/32","8.8.8.8/32"})
     def test_other_profile_refused_before_bootstrap(self):
         session=d.Session()
         session.ks_cache={"uid":501,"digest":"b"*64,"protocol":"v2ray"}

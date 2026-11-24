@@ -395,6 +395,20 @@ def pin_reviewed_endpoint(profile,protocol):
     return candidate
 
 
+def reviewed_endpoint_ips(profile,protocol):
+    if protocol is None or protocol in ("trusttunnel","sudoku"):
+        return ()
+    tag="shadowtls-transport" if protocol=="shadowtls" else "proxy"
+    rows=[row for row in profile.get("outbounds",[]) if isinstance(row,dict) and row.get("tag")==tag]
+    if len(rows)!=1:
+        return ()
+    try:
+        ip=ipaddress.IPv4Address(rows[0].get("server"))
+    except (TypeError,ValueError):
+        return ()
+    return (str(ip),) if ip.is_global else ()
+
+
 def pinned_reconnect_profile(profile,identity):
     # The root daemon reuses its previously reviewed runtime, never the app's
     # proposed bypasses. Only the single attested outer endpoint is excluded.
@@ -701,15 +715,15 @@ class Session:
                             profile,
                             dns_servers=system_dns_resolvers()
                             if approval_mode() == VPS_EXTENDED_APPROVAL else (),
-                            endpoint_ips=pinned_trust_endpoint_ips)
+                            endpoint_ips=pinned_trust_endpoint_ips or reviewed_endpoint_ips(profile,protocol))
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
                         validate_full_tun_config(path)
-                    elif use_trusttunnel or use_sudoku:
-                        # Console-local mode still needs the root-pinned
-                        # upstream to bypass the system-wide TUN itself.
+                    elif pinned_trust_endpoint_ips or reviewed_endpoint_ips(profile,protocol):
+                        # Only the reviewed VPN transport has a physical
+                        # route; firewall policy independently limits port and user.
                         profile = guard_candidate(
-                            profile, peers=pinned_trust_endpoint_ips)
+                            profile, peers=pinned_trust_endpoint_ips or reviewed_endpoint_ips(profile,protocol))
                         path.write_text(json.dumps(profile, separators=(",", ":")),
                                         encoding="utf-8")
                         validate_full_tun_config(path)
