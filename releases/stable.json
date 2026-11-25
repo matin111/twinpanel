@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.16",
+  "version": "1.1.17",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-25T14:35:11Z",
+  "released_at": "2026-11-25T18:39:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "34fbd8aead3127bd3524c0c8eb341366663aab65",
+  "source_sha": "2f9389258bc0bf3762501c8486dbd31136fd3dbd",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.16/twinpanel-1.1.16-linux-x86_64.tar.gz",
-    "sha256": "ec0442d572b3ff2cdd31947d5b92593a3020819a9b56231228043f48581d80fe",
-    "size_bytes": 31453755
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.17/twinpanel-1.1.17-linux-x86_64.tar.gz",
+    "sha256": "f8ae465e7aa10351b91cb7b7f9d34a4d50651f12c1dfee4ed0b67ccb81a01384",
+    "size_bytes": 31470490
   },
   "notes": {
-    "fa": "رفع تداخل wrapper مربوط به Naive با بازنویسی کانفیگ پروتکل‌های مدرن. اکنون آدرس، پورت و SNI داخل outbound واقعی Sing-box برای Hysteria2، TUIC و AnyTLS همگام می‌شوند؛ مسیر TLS اختصاصی Naive حفظ می‌شود. شناسه‌ها و رمزهای کاربران تغییر نمی‌کنند.",
-    "en": "Fix the Naive TLS wrapper incompatibility with modern Sing-box profile rewriting. The embedded outbound server, port and SNI are now synchronized for Hysteria2, TUIC and AnyTLS while preserving Naive's managed/custom TLS behavior. Subscriber identities and credentials remain unchanged."
+    "fa": "اصلاح ذخیره دامنه عمومی تونل هنگام افزودن و ویرایش نود، بدون تغییر دامنه اختصاصی ویتوری، UUID، رمزها یا تنظیمات موتورهای اتصال. حفظ اصلاحات قبلی نسخه 1.1.16.",
+    "en": "Persist the public tunnel domain on node creation and update while keeping the dedicated Xray domain and subscriber credentials independent. Retain all v1.1.16 fixes."
   }
 }
