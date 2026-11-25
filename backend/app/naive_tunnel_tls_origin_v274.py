@@ -110,8 +110,24 @@ def _rewrite_singbox_item_v274(
     protocol: str,
     host: str,
     port: int,
+    *,
+    tls_server_name: str | None = None,
 ) -> None:
-    _ORIGINAL_REWRITE_SINGBOX_ITEM(result, protocol, host, port)
+    protocol_key = str(protocol or "").strip().lower()
+    if protocol_key == "naive":
+        # Naive's managed-CA path must dial the Iran ingress identity below.
+        # Custom-certificate Naive keeps its previous TLS identity unchanged.
+        _ORIGINAL_REWRITE_SINGBOX_ITEM(result, protocol, host, port)
+    else:
+        # Preserve V251's full contract for Hysteria2/TUIC/AnyTLS, including
+        # rewriting the embedded sing-box outbound and its TLS SNI.
+        _ORIGINAL_REWRITE_SINGBOX_ITEM(
+            result,
+            protocol,
+            host,
+            port,
+            tls_server_name=tls_server_name,
+        )
 
     if str(protocol or "").strip().lower() != "naive":
         return
