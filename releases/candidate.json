@@ -1,8 +1,8 @@
 {
-  "version": "1.1.16",
-  "source_sha": "34fbd8aead3127bd3524c0c8eb341366663aab65",
+  "version": "1.1.17",
+  "source_sha": "2f9389258bc0bf3762501c8486dbd31136fd3dbd",
   "notes": {
-    "fa": "رفع تداخل wrapper مربوط به Naive با بازنویسی کانفیگ پروتکل‌های مدرن. اکنون آدرس، پورت و SNI داخل outbound واقعی Sing-box برای Hysteria2، TUIC و AnyTLS همگام می‌شوند؛ مسیر TLS اختصاصی Naive حفظ می‌شود. شناسه‌ها و رمزهای کاربران تغییر نمی‌کنند.",
-    "en": "Fix the Naive TLS wrapper incompatibility with modern Sing-box profile rewriting. The embedded outbound server, port and SNI are now synchronized for Hysteria2, TUIC and AnyTLS while preserving Naive's managed/custom TLS behavior. Subscriber identities and credentials remain unchanged."
+    "fa": "اصلاح ذخیره دامنه عمومی تونل هنگام افزودن و ویرایش نود، بدون تغییر دامنه اختصاصی ویتوری، UUID، رمزها یا تنظیمات موتورهای اتصال. حفظ اصلاحات قبلی نسخه 1.1.16.",
+    "en": "Persist the public tunnel domain on node creation and update while keeping the dedicated Xray domain and subscriber credentials independent. Retain all v1.1.16 fixes."
   }
 }
