@@ -1,8 +1,8 @@
 {
-  "version": "1.1.14",
-  "source_sha": "72d304bdece7277a50ccd3874263838d73a106be",
+  "version": "1.1.15",
+  "source_sha": "d3321e507367a8e43135aff2328905bf421bc32a",
   "notes": {
-    "fa": "بازگشت منوی تلگرام به یک دکمه واحد «آموزش و دانلود»؛ لینک دانلود هر برنامه، از جمله TwinConnect مک (Intel)، داخل صفحه همان برنامه قرار دارد.",
-    "en": "Restore one unified Telegram Learning & Download button; each app download, including TwinConnect macOS Intel, remains inside its app detail."
+    "fa": "همگام‌سازی خودکار گواهی TLS دامنه عمومی نود برای Hysteria2، TUIC، AnyTLS و Naive؛ به‌روزرسانی SNI کانفیگ‌های تحویلی و نمایش فوری دامنه ذخیره‌شده در پنل. دامنه اختصاصی Xray و شناسه و رمز کاربران بدون تغییر باقی می‌مانند.",
+    "en": "Synchronize managed TLS certificates with each Exit public domain for Hysteria2, TUIC, AnyTLS and Naive; refresh SNI in delivered profiles and immediately update the node-domain UI. Dedicated Xray domains and subscriber identities/credentials remain unchanged."
   }
 }
