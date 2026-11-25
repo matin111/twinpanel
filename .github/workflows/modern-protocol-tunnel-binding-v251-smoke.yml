@@ -72,8 +72,11 @@ jobs:
             backend/app/naive_tls_lifecycle_v224.py \
             backend/app/routers/account_delivery.py \
             backend/app/protocol_dataplane_desired_state_v87.py \
-            backend/tests/modern_protocol_tunnel_binding_v251_smoke.py
+            backend/tests/modern_protocol_tunnel_binding_v251_smoke.py \
+            backend/tests/public_domain_modern_tls_sync_v1_smoke.py
 
       - name: Verify ten modern protocols and preserve legacy five
         working-directory: backend
-        run: PYTHONPATH=. python tests/modern_protocol_tunnel_binding_v251_smoke.py
+        run: |
+          PYTHONPATH=. python tests/modern_protocol_tunnel_binding_v251_smoke.py
+          PYTHONPATH=. python tests/public_domain_modern_tls_sync_v1_smoke.py
