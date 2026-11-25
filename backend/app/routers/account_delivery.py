@@ -3247,7 +3247,6 @@ async def update_node_domain(node_id: int, payload: dict[str, Any], db: Session 
     if not domain or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", domain):
         raise HTTPException(status_code=422, detail="دامنه معتبر نیست")
 
-    previous_domain = node.public_domain
     node.public_domain = domain
     try:
         tls = await _sync_modern_public_domain_tls(node, db)
