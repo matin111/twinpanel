@@ -109,6 +109,8 @@ class NodeCreate(BaseModel):
     node_type: NodeType
     country_code: str = "IR"
     public_ip: str
+    # Public tunnel endpoint used by non-Xray protocols (never inferred from xray_domain).
+    public_domain: str | None = None
 
     # Filled automatically by the backend when omitted by the simple panel.
     agent_url: str | None = None
@@ -126,6 +128,8 @@ class NodeUpdate(BaseModel):
     name: str | None = None
     country_code: str | None = None
     public_ip: str | None = None
+    # Public tunnel endpoint for non-Xray protocols; independent from xray_domain.
+    public_domain: str | None = None
     capacity_users: int | None = Field(default=None, gt=0)
     status: NodeStatus | None = None
     show_to_users: bool | None = None
