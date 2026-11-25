@@ -11,6 +11,7 @@ on:
       - "backend/app/standalone_subscription_accounts.py"
       - "backend/app/singbox_subscription_accounts.py"
       - "backend/tests/modern_protocol_tunnel_binding_v251_smoke.py"
+      - "backend/tests/public_domain_modern_tls_sync_v1_smoke.py"
       - ".github/workflows/modern-protocol-tunnel-binding-v251-smoke.yml"
 
 jobs:
