@@ -342,6 +342,12 @@ chmod 644 {shlex.quote(CERT_PATH)}
 '''
     await cmd(conn, install_script, timeout=900)
 
+    # All sing-box TLS protocols share the managed CA-signed leaf. Run the
+    # SAN-aware lifecycle on every bootstrap so a later public-domain change
+    # cannot leave Hysteria2/TUIC/AnyTLS serving an IP-only certificate.
+    from .naive_tls_lifecycle_v224 import ensure_managed_naive_tls
+    await ensure_managed_naive_tls(conn, node)
+
     version = (await cmd(conn, "sing-box version | head -n1", check=False)).strip()
     pin = (
         await cmd(

@@ -12,6 +12,8 @@ def main() -> None:
     nodes = read("components/legacy-nodes-runtime-v2.tsx")
     api = read("lib/admin-api.ts")
     runtime = read("backend/app/xray_node_domain_runtime.py")
+    delivery = read("backend/app/routers/account_delivery.py")
+    modern_tls = read("backend/app/modern_protocol_runtime.py")
 
     assert 'routeKey==="admin/nodes"||routeKey==="admin/network"' in routed
     assert '<LegacyNodesRuntimePage/>' in routed
@@ -25,6 +27,16 @@ def main() -> None:
     assert 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' in nodes
     assert 'adminApi.prepareXrayDomain(selected.id,true)' in nodes
     assert 'selectedRole==="exit"' in nodes
+
+    # Public-domain saves must refresh the displayed node immediately and
+    # synchronize the managed sing-box TLS certificate on configured Exits.
+    assert 'setNodes(current=>current.map(row=>row.id===selected.id?{...row,public_domain:value}:row))' in nodes
+    assert 'result.tls_status' in nodes
+    assert 'Save and sync TLS' in nodes
+    assert 'async def _sync_modern_public_domain_tls' in delivery
+    assert 'ensure_managed_naive_tls(conn, node)' in delivery
+    assert '"tls_status": tls["status"]' in delivery
+    assert 'ensure_managed_naive_tls(conn, node)' in modern_tls
 
     # The two fields must never cross-write each other's API.
     assert 'updateNodeDomain(selected.id,xrayDomainDraft' not in nodes

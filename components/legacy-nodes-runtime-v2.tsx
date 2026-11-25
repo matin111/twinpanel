@@ -303,11 +303,17 @@ export function LegacyNodesRuntimePage(){
       const result=await legacyAdminApi.updateNodeDomain(selected.id,domainDraft.trim());
       const value=s(result.public_domain||domainDraft.trim());
       const next:RuntimeRow={id:selected.id,node_id:selected.id,public_domain:value,domain:value};
+      setNodes(current=>current.map(row=>row.id===selected.id?{...row,public_domain:value}:row));
       setDomains(current=>current.some(row=>n(row.id||row.node_id)===selected.id)
         ?current.map(row=>n(row.id||row.node_id)===selected.id?{...row,...next}:row)
         :[...current,next]);
       setModal("manage");
-      setSuccess(pick("دامنه عمومی نود ذخیره شد.","Node public domain saved."));
+      const tlsStatus=s(result.tls_status);
+      setSuccess(tlsStatus==="rotated"
+        ?pick("دامنه ذخیره شد و گواهی TLS با دامنه جدید به‌روزرسانی شد. لینک‌های جدید با SNI صحیح ساخته می‌شوند.","Domain saved and the managed TLS certificate was rotated. Newly delivered links use the current SNI.")
+        :tlsStatus==="current"
+          ?pick("دامنه ذخیره شد و گواهی TLS از قبل با آن هماهنگ بود.","Domain saved; the managed TLS certificate was already aligned.")
+          :pick("دامنه عمومی نود ذخیره شد.","Node public domain saved."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -512,8 +518,8 @@ export function LegacyNodesRuntimePage(){
         {error?<div className="runtime-error">{error}</div>:null}
         <div className="runtime-form">
           <label>{pick("دامنه عمومی","Public domain")}<input dir="ltr" value={domainDraft} onChange={event=>setDomainDraft(event.target.value)} placeholder="node.example.com"/></label>
-          <small>{pick("دامنه عمومی برای هویت کلی نود است. دامنه اختصاصی TLS مربوط به Xray / V2Ray از مدیریت همین Exit Server جداگانه تنظیم می‌شود.","The public domain is the node's general identity. Xray / V2Ray TLS domain is configured separately from this Exit server's management.")}</small>
-          <button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره","Save")}</button>
+          <small>{pick("دامنه عمومی برای هویت کلی نود است. دامنه اختصاصی TLS مربوط به Xray / V2Ray مستقل می‌ماند. با ذخیره این دامنه، گواهی TLS پروتکل‌های Hysteria2، TUIC، AnyTLS و Naive در صورت نصب، خودکار همگام می‌شود؛ لینک‌ها نیز SNI جدید را بدون ساخت مجدد اکانت دریافت می‌کنند.","The public domain is the node's general identity. The dedicated Xray / V2Ray domain remains separate. Saving this domain synchronizes installed Hysteria2, TUIC, AnyTLS and Naive TLS certificates; delivered links receive the current SNI without recreating accounts.")}</small>
+          <button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره و همگام‌سازی TLS","Save and sync TLS")}</button>
         </div>
       </Modal>:null}
 

@@ -52,9 +52,13 @@ namespace = {
     "MAX_CHROMIUM_LEAF_DAYS": 200,
     "LEAF_RENEW_BEFORE_DAYS": 30,
     "CA_VALIDITY_DAYS": 3650,
-    "_safe_cert_identity": lambda _node: (
-        "203.0.113.10",
-        ["IP:203.0.113.10"],
+    "_safe_cert_identity": lambda node: (
+        str(getattr(node, "public_domain", None) or "203.0.113.10"),
+        (
+            [f"DNS:{node.public_domain}", "IP:203.0.113.10"]
+            if getattr(node, "public_domain", None)
+            else ["IP:203.0.113.10"]
+        ),
     ),
 }
 exec(
@@ -66,7 +70,7 @@ exec(
     namespace,
 )
 
-script = namespace["_renew_script"](SimpleNamespace())
+script = namespace["_renew_script"](SimpleNamespace(public_domain="exit.example.invalid"))
 with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as handle:
     handle.write(script)
     path = handle.name
@@ -82,6 +86,8 @@ assert "LEAF_DAYS=180" in script
 assert "MAX_LEAF_SECONDS=17280000" in script
 assert "RENEW_BEFORE_SECONDS=2592000" in script
 assert "IP Address:203.0.113.10" in script
+assert "DNS:exit.example.invalid" in script
+assert "grep -Fq DNS:exit.example.invalid" in script
 assert 'subjectAltName=$SAN_TEXT' in script
 assert 'exit 30' in script
 assert 'exit 31' in script
@@ -93,4 +99,5 @@ print("LEAF_VALIDITY_DAYS=180")
 print("CHROMIUM_MAX_GUARD_DAYS=200")
 print("RENEW_BEFORE_DAYS=30")
 print("RENEW_TIMER=PRESENT")
+print("PUBLIC_DOMAIN_DNS_SAN=PRESENT")
 print("ROLLBACK_ON_RESTART_FAILURE=PRESENT")

@@ -161,6 +161,77 @@ def test_singbox_rewrite_preserves_tls_identity() -> None:
     assert outbound["tls"]["server_name"] == "exit.example.invalid"
 
 
+def test_singbox_domain_tls_sni_refreshes_without_rotating_credentials() -> None:
+    for protocol in ("hysteria2", "tuic", "anytls", "naive"):
+        outbound = {
+            "type": protocol,
+            "tag": f"twinpanel-{protocol}",
+            "server": "204.10.192.96",
+            "server_port": 8444,
+            "password": "keep-this-secret",
+            "tls": {
+                "enabled": True,
+                "server_name": "old-exit.example.invalid",
+                "insecure": False,
+                "certificate": "stable-managed-ca",
+            },
+        }
+        item = {
+            "server": "204.10.192.96",
+            "server_ip": "204.10.192.96",
+            "port": 8444,
+            "outbound": dict(outbound),
+            "config": json.dumps({"outbounds": [dict(outbound)]}),
+        }
+
+        binding._rewrite_modern_item(
+            item,
+            protocol,
+            "193.39.9.222",
+            28006,
+            tls_server_name="new-exit.example.invalid",
+        )
+
+        assert item["server"] == "193.39.9.222"
+        assert item["port"] == 28006
+        assert item["outbound"]["server"] == "193.39.9.222"
+        assert item["outbound"]["tls"]["server_name"] == "new-exit.example.invalid"
+        assert item["outbound"]["password"] == "keep-this-secret"
+        assert item["outbound"]["tls"]["certificate"] == "stable-managed-ca"
+        config = json.loads(item["config"])
+        assert config["outbounds"][0]["tls"]["server_name"] == "new-exit.example.invalid"
+        assert config["outbounds"][0]["password"] == "keep-this-secret"
+
+    # ShadowTLS uses its configured handshake identity; it must not inherit
+    # the Exit public-domain SNI rewrite used by managed domain-TLS protocols.
+    shadow = {
+        "server": "204.10.192.96",
+        "outbound": {
+            "type": "shadowtls",
+            "server": "204.10.192.96",
+            "server_port": 443,
+            "handshake": {"server": "www.microsoft.com", "server_port": 443},
+        },
+        "config": json.dumps({
+            "outbounds": [{
+                "type": "shadowtls",
+                "server": "204.10.192.96",
+                "server_port": 443,
+                "handshake": {"server": "www.microsoft.com", "server_port": 443},
+            }]
+        }),
+    }
+    binding._rewrite_modern_item(
+        shadow,
+        "shadowtls",
+        "193.39.9.222",
+        33006,
+        tls_server_name="new-exit.example.invalid",
+    )
+    assert shadow["outbound"]["handshake"]["server"] == "www.microsoft.com"
+    assert json.loads(shadow["config"])["outbounds"][0]["handshake"]["server"] == "www.microsoft.com"
+
+
 def test_socks5_tunnel_route_and_authentication() -> None:
     # SOCKS5 is supported by the normal sing-box runtime; tunnel binding
     # must forward only to an online managed listener, using a unique ingress
@@ -353,6 +424,7 @@ def main() -> None:
     test_exit_domain_over_iran_hostname()
     test_transport_normalisation()
     test_singbox_rewrite_preserves_tls_identity()
+    test_singbox_domain_tls_sni_refreshes_without_rotating_credentials()
     test_socks5_tunnel_route_and_authentication()
     test_mieru_rewrite()
     test_amneziawg_rewrite()

@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "backend/app/naive_tls_lifecycle_v224.py"
+      - "backend/app/modern_protocol_runtime.py"
+      - "backend/app/routers/account_delivery.py"
       - "backend/app/singbox_subscription_accounts.py"
       - "backend/app/routers/modern_legacy_reconcile_v1.py"
       - "backend/tests/naive_client_tls_v218_smoke.py"
@@ -11,9 +13,12 @@ on:
       - ".github/workflows/naive-tls-lifecycle-v224-smoke.yml"
   push:
     branches:
+      - main
       - fix/naive-chromium-tls-lifecycle-v224
     paths:
       - "backend/app/naive_tls_lifecycle_v224.py"
+      - "backend/app/modern_protocol_runtime.py"
+      - "backend/app/routers/account_delivery.py"
       - "backend/app/singbox_subscription_accounts.py"
       - "backend/app/routers/modern_legacy_reconcile_v1.py"
       - "backend/tests/naive_client_tls_v218_smoke.py"
@@ -36,6 +41,8 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/naive_tls_lifecycle_v224.py \
+            backend/app/modern_protocol_runtime.py \
+            backend/app/routers/account_delivery.py \
             backend/app/singbox_subscription_accounts.py \
             backend/tests/naive_client_tls_v218_smoke.py \
             backend/tests/naive_tls_lifecycle_v224_smoke.py

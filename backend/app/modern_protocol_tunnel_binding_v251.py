@@ -73,6 +73,7 @@ SINGBOX_TUNNEL_PROTOCOLS = frozenset({
     "snell",
     "socks5",
 })
+SINGBOX_DOMAIN_TLS_PROTOCOLS = frozenset({"hysteria2", "tuic", "anytls", "naive"})
 
 SUDOKU_PUBLIC_PORT_START = 40000
 SUDOKU_PUBLIC_PORT_END = 49999
@@ -412,16 +413,36 @@ def _modern_tunnel_endpoint(
     return host, int(port)
 
 
-def _rewrite_singbox_item(result: dict[str, Any], protocol: str, host: str, port: int) -> None:
+def _rewrite_singbox_item(
+    result: dict[str, Any],
+    protocol: str,
+    host: str,
+    port: int,
+    *,
+    tls_server_name: str | None = None,
+) -> None:
     # SOCKS5 is the catalog/provisioning name; sing-box outbound type is
     # `socks`. Match the actual schema or credentials keep pointing at the
     # Exit server even after the top-level endpoint is tunnel-rewritten.
     outbound_type = "socks" if protocol == "socks5" else protocol
+
+    def rewrite_tls(value: Any) -> dict[str, Any] | None:
+        if protocol not in SINGBOX_DOMAIN_TLS_PROTOCOLS or not tls_server_name:
+            return None
+        if not isinstance(value, dict):
+            return None
+        tls = dict(value)
+        tls["server_name"] = str(tls_server_name)
+        return tls
+
     outbound = result.get("outbound")
     if isinstance(outbound, dict) and _enum_value(outbound.get("type")) == outbound_type:
         updated = dict(outbound)
         updated["server"] = host
         updated["server_port"] = int(port)
+        tls = rewrite_tls(updated.get("tls"))
+        if tls is not None:
+            updated["tls"] = tls
         result["outbound"] = updated
 
     raw = result.get("config")
@@ -445,6 +466,9 @@ def _rewrite_singbox_item(result: dict[str, Any], protocol: str, host: str, port
             continue
         candidate["server"] = host
         candidate["server_port"] = int(port)
+        tls = rewrite_tls(candidate.get("tls"))
+        if tls is not None:
+            candidate["tls"] = tls
         changed = True
 
     if changed:
@@ -629,13 +653,21 @@ def _rewrite_modern_item(
     protocol: str,
     host: str,
     port: int,
+    *,
+    tls_server_name: str | None = None,
 ) -> dict[str, Any]:
     result["server"] = host
     result["server_ip"] = host
     result["port"] = int(port)
 
     if protocol in SINGBOX_TUNNEL_PROTOCOLS:
-        _rewrite_singbox_item(result, protocol, host, port)
+        _rewrite_singbox_item(
+            result,
+            protocol,
+            host,
+            port,
+            tls_server_name=tls_server_name,
+        )
     elif protocol == "mieru":
         _rewrite_mieru_item(result, host, port)
     elif protocol == "trusttunnel":
@@ -681,7 +713,16 @@ def _live_client_item_v251(db, sub: Subscription, protocol: str, item: dict[str,
         if endpoint is None:
             return result
         host, port = endpoint
-        return _rewrite_modern_item(result, protocol, host, port)
+        # The network endpoint may be the Iran ingress, while TLS identity
+        # remains the Exit's current public domain/IP. Keep these separate.
+        tls_server_name = account_delivery._node_host(node)
+        return _rewrite_modern_item(
+            result,
+            protocol,
+            host,
+            port,
+            tls_server_name=tls_server_name,
+        )
     except Exception:
         # Preserve the historical direct item instead of publishing a partially
         # rewritten credential when allocation/control-plane data is incomplete.

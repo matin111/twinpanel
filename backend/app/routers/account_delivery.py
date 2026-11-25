@@ -3190,8 +3190,51 @@ def node_domains(db: Session = Depends(get_db)):
     }
 
 
+async def _sync_modern_public_domain_tls(node: Node, db: Session) -> dict[str, Any]:
+    """Keep the Exit's managed sing-box TLS leaf aligned with public_domain.
+
+    Existing Hysteria2/TUIC/AnyTLS/Naive credentials are rewritten at read
+    time; this operation updates the server certificate and its stable CA
+    trust lifecycle without rotating any subscription identity.
+    """
+    if node.node_type != NodeType.EXIT:
+        return {"status": "not_required", "rotated": False, "protocols": []}
+
+    tls_protocols = {"hysteria2", "tuic", "anytls", "naive"}
+    rows = (
+        db.query(NodeProtocolConfig)
+        .filter(
+            NodeProtocolConfig.node_id == int(node.id),
+            NodeProtocolConfig.protocol.in_(tuple(sorted(tls_protocols))),
+        )
+        .all()
+    )
+    configured = sorted({
+        str(getattr(row.protocol, "value", row.protocol) or "").strip().lower()
+        for row in rows
+        if str(getattr(row.protocol, "value", row.protocol) or "").strip().lower()
+        in tls_protocols
+    })
+    if not configured:
+        return {"status": "not_required", "rotated": False, "protocols": []}
+
+    conn = await ssh_connect_saved(node, db)
+    try:
+        from ..naive_tls_lifecycle_v224 import ensure_managed_naive_tls
+
+        state = await ensure_managed_naive_tls(conn, node)
+        return {
+            "status": "rotated" if bool(state.get("rotated")) else "current",
+            "rotated": bool(state.get("rotated")),
+            "protocols": configured,
+        }
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
 @router.put("/node-domains/{node_id}")
-def update_node_domain(node_id: int, payload: dict[str, Any], db: Session = Depends(get_db)):
+async def update_node_domain(node_id: int, payload: dict[str, Any], db: Session = Depends(get_db)):
     node = db.query(Node).filter(Node.retired_at.is_(None), Node.id == node_id).first()
     if not node:
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
@@ -3205,6 +3248,21 @@ def update_node_domain(node_id: int, payload: dict[str, Any], db: Session = Depe
         raise HTTPException(status_code=422, detail="دامنه معتبر نیست")
 
     node.public_domain = domain
+    try:
+        tls = await _sync_modern_public_domain_tls(node, db)
+    except Exception as exc:
+        # Do not publish a new hostname in the control plane if its matching
+        # server certificate could not be installed and verified.
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "NODE_MODERN_TLS_SYNC_FAILED",
+                "message": "دامنه ذخیره نشد؛ همگام‌سازی گواهی TLS نود ناموفق بود. اتصال SSH و سرویس sing-box را بررسی کنید.",
+                "error_type": type(exc).__name__,
+            },
+        ) from exc
+
     db.commit()
     db.refresh(node)
     return {
@@ -3213,7 +3271,14 @@ def update_node_domain(node_id: int, payload: dict[str, Any], db: Session = Depe
         "name": node.name,
         "public_ip": node.public_ip,
         "public_domain": node.public_domain,
-        "message": "دامنه سرور ذخیره شد. برای اعمال روی کانفیگ‌های قبلی، اکانت را دوباره Provision کنید.",
+        "tls_status": tls["status"],
+        "tls_rotated": tls["rotated"],
+        "tls_protocols": tls["protocols"],
+        "message": (
+            "دامنه ذخیره شد و هویت TLS پروتکل‌های مدرن با آن همگام است."
+            if tls["status"] != "not_required"
+            else "دامنه عمومی نود ذخیره شد."
+        ),
     }
 
 
