@@ -8,6 +8,9 @@ on:
       - 'components/routed-page-client-v2.tsx'
       - 'lib/admin-api.ts'
       - 'backend/app/xray_node_domain_runtime.py'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/app/modern_protocol_runtime.py'
+      - 'backend/app/naive_tls_lifecycle_v224.py'
       - 'scripts/test_node_xray_domain_ui_v311.py'
       - '.github/workflows/node-xray-domain-ui-v311-smoke.yml'
   push:
