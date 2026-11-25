@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.15",
+  "version": "1.1.16",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-25T14:03:33Z",
+  "released_at": "2026-11-25T14:35:11Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d3321e507367a8e43135aff2328905bf421bc32a",
+  "source_sha": "34fbd8aead3127bd3524c0c8eb341366663aab65",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.15/twinpanel-1.1.15-linux-x86_64.tar.gz",
-    "sha256": "007bf757fb2069b5ef855948020a0d516bc5ed898e11d3a3d4726615333e968b",
-    "size_bytes": 31495262
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.16/twinpanel-1.1.16-linux-x86_64.tar.gz",
+    "sha256": "ec0442d572b3ff2cdd31947d5b92593a3020819a9b56231228043f48581d80fe",
+    "size_bytes": 31453755
   },
   "notes": {
-    "fa": "همگام‌سازی خودکار گواهی TLS دامنه عمومی نود برای Hysteria2، TUIC، AnyTLS و Naive؛ به‌روزرسانی SNI کانفیگ‌های تحویلی و نمایش فوری دامنه ذخیره‌شده در پنل. دامنه اختصاصی Xray و شناسه و رمز کاربران بدون تغییر باقی می‌مانند.",
-    "en": "Synchronize managed TLS certificates with each Exit public domain for Hysteria2, TUIC, AnyTLS and Naive; refresh SNI in delivered profiles and immediately update the node-domain UI. Dedicated Xray domains and subscriber identities/credentials remain unchanged."
+    "fa": "رفع تداخل wrapper مربوط به Naive با بازنویسی کانفیگ پروتکل‌های مدرن. اکنون آدرس، پورت و SNI داخل outbound واقعی Sing-box برای Hysteria2، TUIC و AnyTLS همگام می‌شوند؛ مسیر TLS اختصاصی Naive حفظ می‌شود. شناسه‌ها و رمزهای کاربران تغییر نمی‌کنند.",
+    "en": "Fix the Naive TLS wrapper incompatibility with modern Sing-box profile rewriting. The embedded outbound server, port and SNI are now synchronized for Hysteria2, TUIC and AnyTLS while preserving Naive's managed/custom TLS behavior. Subscriber identities and credentials remain unchanged."
   }
 }
