@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 from app import modern_protocol_tunnel_binding_v251 as binding
 from app import protocol_dataplane_desired_state_v87 as protocol_v87
+from app import naive_tunnel_tls_origin_v274 as naive_v274
+from app import naive_tls_lifecycle_v224 as naive_tls
 
 
 EXPECTED = {
@@ -232,6 +234,87 @@ def test_singbox_domain_tls_sni_refreshes_without_rotating_credentials() -> None
     assert json.loads(shadow["config"])["outbounds"][0]["handshake"]["server"] == "www.microsoft.com"
 
 
+def test_v274_wrapper_preserves_v251_rewrite_contract() -> None:
+    # V274 wraps V251's helper. It must retain V251's keyword-only SNI
+    # argument or delivery partially rewrites only the top-level port.
+    for protocol in ("hysteria2", "tuic", "anytls"):
+        outbound = {
+            "type": protocol,
+            "server": "exit.example.invalid",
+            "server_port": 8444,
+            "password": "keep-this-secret",
+            "tls": {"enabled": True, "server_name": "old.example.invalid"},
+        }
+        item = {
+            "server": "exit.example.invalid",
+            "port": 8444,
+            "outbound": dict(outbound),
+            "config": json.dumps({"outbounds": [dict(outbound)]}),
+        }
+        naive_v274._rewrite_singbox_item_v274(
+            item,
+            protocol,
+            "iran-ingress.example.invalid",
+            31006,
+            tls_server_name="exit.example.invalid",
+        )
+        assert item["outbound"]["server"] == "iran-ingress.example.invalid"
+        assert item["outbound"]["server_port"] == 31006
+        assert item["outbound"]["tls"]["server_name"] == "exit.example.invalid"
+        doc = json.loads(item["config"])
+        assert doc["outbounds"][0]["server"] == "iran-ingress.example.invalid"
+        assert doc["outbounds"][0]["server_port"] == 31006
+        assert doc["outbounds"][0]["tls"]["server_name"] == "exit.example.invalid"
+        assert doc["outbounds"][0]["password"] == "keep-this-secret"
+
+    # Managed Naive deliberately uses the Iran ingress as its Cronet origin.
+    naive = {
+        "type": "naive",
+        "server": "exit.example.invalid",
+        "server_port": 8447,
+        "password": "keep-this-secret",
+        "tls": {"enabled": True, "server_name": "exit.example.invalid"},
+    }
+    item = {
+        "tls_trust_model": naive_tls.MANAGED_NAIVE_TRUST_MODEL,
+        "outbound": dict(naive),
+        "config": json.dumps({"outbounds": [dict(naive)]}),
+    }
+    naive_v274._rewrite_singbox_item_v274(
+        item, "naive", "iran-ingress.example.invalid", 32006,
+        tls_server_name="exit.example.invalid",
+    )
+    assert item["outbound"]["server"] == "iran-ingress.example.invalid"
+    assert item["outbound"]["server_port"] == 32006
+    assert item["outbound"]["tls"]["server_name"] == "iran-ingress.example.invalid"
+    doc = json.loads(item["config"])
+    assert doc["outbounds"][0]["server"] == "iran-ingress.example.invalid"
+    assert doc["outbounds"][0]["server_port"] == 32006
+    assert doc["outbounds"][0]["tls"]["server_name"] == "iran-ingress.example.invalid"
+
+    # Operator-managed custom Naive TLS must not have its SNI overwritten.
+    custom = {
+        "type": "naive",
+        "server": "exit.example.invalid",
+        "server_port": 8447,
+        "password": "keep-this-secret",
+        "tls": {"enabled": True, "server_name": "custom.example.invalid"},
+    }
+    item = {
+        "tls_trust_model": "operator_custom",
+        "outbound": dict(custom),
+        "config": json.dumps({"outbounds": [dict(custom)]}),
+    }
+    naive_v274._rewrite_singbox_item_v274(
+        item, "naive", "iran-ingress.example.invalid", 32006,
+        tls_server_name="exit.example.invalid",
+    )
+    assert item["outbound"]["server"] == "iran-ingress.example.invalid"
+    assert item["outbound"]["server_port"] == 32006
+    assert item["outbound"]["tls"]["server_name"] == "custom.example.invalid"
+    assert json.loads(item["config"])["outbounds"][0]["tls"]["server_name"] == "custom.example.invalid"
+
+
 def test_socks5_tunnel_route_and_authentication() -> None:
     # SOCKS5 is supported by the normal sing-box runtime; tunnel binding
     # must forward only to an online managed listener, using a unique ingress
@@ -425,6 +508,7 @@ def main() -> None:
     test_transport_normalisation()
     test_singbox_rewrite_preserves_tls_identity()
     test_singbox_domain_tls_sni_refreshes_without_rotating_credentials()
+    test_v274_wrapper_preserves_v251_rewrite_contract()
     test_socks5_tunnel_route_and_authentication()
     test_mieru_rewrite()
     test_amneziawg_rewrite()
