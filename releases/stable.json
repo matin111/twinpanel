@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.14",
+  "version": "1.1.15",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-24T14:45:01Z",
+  "released_at": "2026-11-25T14:03:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "72d304bdece7277a50ccd3874263838d73a106be",
+  "source_sha": "d3321e507367a8e43135aff2328905bf421bc32a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.14/twinpanel-1.1.14-linux-x86_64.tar.gz",
-    "sha256": "18640fc251336f68ae8839e36d65688e04ef19d2c63c8577045b0cc83c93ef67",
-    "size_bytes": 31379732
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.15/twinpanel-1.1.15-linux-x86_64.tar.gz",
+    "sha256": "007bf757fb2069b5ef855948020a0d516bc5ed898e11d3a3d4726615333e968b",
+    "size_bytes": 31495262
   },
   "notes": {
-    "fa": "بازگشت منوی تلگرام به یک دکمه واحد «آموزش و دانلود»؛ لینک دانلود هر برنامه، از جمله TwinConnect مک (Intel)، داخل صفحه همان برنامه قرار دارد.",
-    "en": "Restore one unified Telegram Learning & Download button; each app download, including TwinConnect macOS Intel, remains inside its app detail."
+    "fa": "همگام‌سازی خودکار گواهی TLS دامنه عمومی نود برای Hysteria2، TUIC، AnyTLS و Naive؛ به‌روزرسانی SNI کانفیگ‌های تحویلی و نمایش فوری دامنه ذخیره‌شده در پنل. دامنه اختصاصی Xray و شناسه و رمز کاربران بدون تغییر باقی می‌مانند.",
+    "en": "Synchronize managed TLS certificates with each Exit public domain for Hysteria2, TUIC, AnyTLS and Naive; refresh SNI in delivered profiles and immediately update the node-domain UI. Dedicated Xray domains and subscriber identities/credentials remain unchanged."
   }
 }
