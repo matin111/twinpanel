@@ -10,6 +10,7 @@ from typing import Any
 
 from ..models import Node, NodeType
 from .central_runtime_ownership_v1 import is_central_node
+from .legacy_sudoku_shared_migration_v1 import is_legacy_shared_node
 
 SHARED_SUDOKU_PORT = 18553
 
@@ -33,7 +34,7 @@ def _is_active_central_shared_item(db: Any, item: dict[str, Any]) -> bool:
         or str(getattr(node.status, "value", node.status)).strip().lower() != "online"
     ):
         return False
-    return is_central_node(db, node_id)
+    return is_central_node(db, node_id) or is_legacy_shared_node(db,node_id)
 
 
 def prefer_central_sudoku_items(db: Any, items: list[Any]) -> list[Any]:
@@ -67,7 +68,7 @@ def has_published_central_sudoku_owner(db: Any, nodes: list[Any]) -> bool:
             and getattr(node, "node_type", None) == NodeType.EXIT
             and str(getattr(getattr(node, "status", None), "value",
                             getattr(node, "status", None))).strip().lower() == "online"
-            and is_central_node(db, node_id)
+            and (is_central_node(db, node_id) or is_legacy_shared_node(db,node_id))
         ):
             return True
     return False
