@@ -5,6 +5,7 @@ Uses AST isolation so CI never opens an app DB connection on import.
 from __future__ import annotations
 
 import ast
+from typing import Any
 from pathlib import Path
 from unittest import TestCase, main
 
@@ -47,7 +48,7 @@ audit = _load_functions(
     SCRIPTS / "twinpanel_central_quota_evidence_v1.py",
     {"_canonical","_protocol_totals","build_report"},
     {"ALL_PROTOCOL_KEYS":registry["ALL_PROTOCOL_KEYS"],
-     "canonical_protocol":registry["canonical_protocol"]},
+     "canonical_protocol":registry["canonical_protocol"], "Any":Any},
 )
 
 
