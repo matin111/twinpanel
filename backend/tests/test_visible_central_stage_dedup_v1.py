@@ -56,12 +56,12 @@ class DispatchDedupTests(TestCase):
         names=[]
         def run(cmd,**kwargs):
             names.append(cmd[-1])
-            return SimpleNamespace(returncode=0,stdout="active\\n")
+            return SimpleNamespace(returncode=0,stdout="active")
         ns=isolated(("_stage_unit_running",),{"subprocess":subprocess})
         with patch.object(subprocess,"run",side_effect=run):
             self.assertTrue(ns["_stage_unit_running"]("twinpanel-legacy-sudoku-shared-6.service"))
         self.assertEqual(names,["twinpanel-legacy-sudoku-shared-6.service"])
-        with patch.object(subprocess,"run",return_value=SimpleNamespace(returncode=0,stdout="inactive\\n")):
+        with patch.object(subprocess,"run",return_value=SimpleNamespace(returncode=0,stdout="inactive")):
             self.assertFalse(ns["_stage_unit_running"]("twinpanel-central-node-stage-19.service"))
         with patch.object(subprocess,"run",return_value=SimpleNamespace(returncode=1,stdout="")):
             with self.assertRaisesRegex(RuntimeError,"UNIT_STATE_UNAVAILABLE"):
