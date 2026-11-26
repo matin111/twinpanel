@@ -1,4 +1,6 @@
 from html import escape
+from time import monotonic
+import asyncio
 
 from aiogram import F
 
@@ -27,16 +29,21 @@ class AccountLinkState(StatesGroup):
     username = State()
 
 
+_brand_cache = {}
+
+
 async def _brand_name(request_fn):
     """Use the same public branding source as the web panel."""
 
+    cached = _brand_cache.get(request_fn)
+    if cached and monotonic() < cached[0]:
+        return cached[1]
     try:
-        branding = await request_fn(
-            "GET",
-            "/v1/settings/branding",
+        branding = await asyncio.wait_for(
+            request_fn("GET", "/v1/settings/branding"), timeout=2.0
         )
     except Exception:
-        return DEFAULT_BRAND_NAME
+        return cached[1] if cached else DEFAULT_BRAND_NAME
 
     if not isinstance(branding, dict):
         return DEFAULT_BRAND_NAME
@@ -44,6 +51,7 @@ async def _brand_name(request_fn):
     for field in ("brand_name", "site_title"):
         value = str(branding.get(field) or "").strip()
         if value:
+            _brand_cache[request_fn] = (monotonic() + 30, value)
             return value
 
     return DEFAULT_BRAND_NAME
