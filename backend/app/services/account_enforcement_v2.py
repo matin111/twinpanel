@@ -522,12 +522,14 @@ async def _classic_v2ray(
     command_type: str,
 ) -> str:
     email = f"mv-{int(subscription_id)}@twinpanel"
-    client_id = _stored_v2ray_uuid(credential, node_id)
-    restore = command_type == "restore_subscription"
     if command_type not in {"revoke_subscription", "restore_subscription"}:
         raise RuntimeError(f"unsupported command type: {command_type}")
+    restore = command_type == "restore_subscription"
+    # Revocation targets the account's exact subscriber email. Only restore
+    # needs the per-node UUID; legacy records can lack that node delivery item.
+    client_id = _stored_v2ray_uuid(credential, node_id) if restore else None
 
-    script = f'''import json\np="/usr/local/etc/xray/config.json"\nd=json.load(open(p,encoding="utf-8"))\nemail={email!r}\nclient_id={client_id!r}\nfound=False\nfor inbound in d.get("inbounds",[]):\n    if not isinstance(inbound,dict) or inbound.get("protocol")!="vless":\n        continue\n    clients=inbound.setdefault("settings",{{}}).setdefault("clients",[])\n    clients[:]=[c for c in clients if not isinstance(c,dict) or c.get("email")!=email]\n    if {restore!r}:\n        clients.append({{"id":client_id,"email":email}})\n    found=True\n    break\nif not found:\n    raise SystemExit("vless inbound unavailable")\nwith open(p,"w",encoding="utf-8") as f:\n    json.dump(d,f,ensure_ascii=False,indent=2); f.write("\\n")\n'''
+    script = f'''import json\np="/usr/local/etc/xray/config.json"\nd=json.load(open(p,encoding="utf-8"))\nemail={email!r}\nclient_id={client_id!r}\nfound=False\nfor inbound in d.get("inbounds",[]):\n    if not isinstance(inbound,dict) or inbound.get("protocol")!="vless":\n        continue\n    clients=inbound.setdefault("settings",{{}}).setdefault("clients",[])\n    clients[:]=[c for c in clients if not isinstance(c,dict) or c.get("email")!=email]\n    if {restore!r}:\n        clients.append({{"id":client_id,"email":email}})\n    found=True\n    if {restore!r}:\n        break\nif not found:\n    raise SystemExit("vless inbound unavailable")\nwith open(p,"w",encoding="utf-8") as f:\n    json.dump(d,f,ensure_ascii=False,indent=2); f.write("\\n")\n'''
     encoded = base64.b64encode(script.encode()).decode()
     await _remote_run(
         conn,
