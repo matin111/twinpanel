@@ -387,7 +387,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 photo=BufferedInputFile(self._qr_png(link), filename="subscription-qr.png"),
                 caption=(
                     "📱 <b>QR اتصال اکانت</b>\n\n"
-                    "QR را با برنامه کلاینت اسکن کنید یا سابلینک را از دکمه زیر باز/کپی کنید."
+                    "لینک یا QR را در مرورگر باز کنید؛ پروتکل و سرور دلخواه را انتخاب و کانفیگ یا اطلاعات اتصال را در برنامه سازگار وارد کنید."
                 ),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]),
             )
@@ -396,7 +396,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 await bot.send_photo(
                     chat_id=chat_id,
                     photo=BufferedInputFile(self._qr_png(link), filename="subscription-qr.png"),
-                    caption="📱 <b>QR اتصال اکانت</b>",
+                    caption="📱 <b>QR اتصال اکانت</b>\n\nلینک را در مرورگر باز کنید و کانفیگ سرور دلخواه را دریافت کنید.",
                 )
             except Exception:
                 pass
