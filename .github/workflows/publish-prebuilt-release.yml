@@ -169,6 +169,22 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Prevent LocalCore Sudoku migration regression
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/services/central_sudoku_shared_bootstrap_v2.py" \
+            "backend/app/central_sudoku_shared_runtime_v2.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::LocalCore Sudoku support missing from release"
+              exit 1
+            }
+          done
+          grep -Fq 'is_local_core(node)' source/backend/app/services/central_sudoku_shared_bootstrap_v2.py
+          grep -Fq 'isinstance(conn,LocalRuntimeConnection)' source/backend/app/central_sudoku_shared_runtime_v2.py
+          python3 -m py_compile source/backend/app/central_sudoku_shared_runtime_v2.py source/backend/app/services/central_sudoku_shared_bootstrap_v2.py
+
       - name: Verify isolated legacy Sudoku migration and canonical accounting
         shell: bash
         run: |
