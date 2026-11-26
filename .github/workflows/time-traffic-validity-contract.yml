@@ -1,0 +1,50 @@
+name: Time and Traffic Validity Contract
+
+on:
+  pull_request:
+    paths:
+      - backend/app/subscription_override_models.py
+      - backend/app/quota_service.py
+      - backend/app/quota_service_v2.py
+      - backend/app/routers/subscription_admin_v2.py
+      - backend/scripts/twinpanel_time_traffic_policy_audit_v1.py
+      - backend/tests/test_time_volume_policy_v1.py
+      - .github/workflows/time-traffic-validity-contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  time-traffic-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile policy, quota, admin, and audit
+        run: |
+          python -m py_compile backend/app/subscription_override_models.py
+          python -m py_compile backend/app/quota_service.py
+          python -m py_compile backend/app/quota_service_v2.py
+          python -m py_compile backend/app/routers/subscription_admin_v2.py
+          python -m py_compile backend/scripts/twinpanel_time_traffic_policy_audit_v1.py
+      - name: Test 4 time/volume states and legacy provenance
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          APP_SECRET_KEY: ci-only-not-a-real-secret
+          DATABASE_URL: postgresql+psycopg2://unused:unused@127.0.0.1:65432/unused
+          NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
+        run: |
+          # Existing app/__init__.py imports legacy modules that access
+          # PostgreSQL on import. Tests use mocked sessions and must not
+          # depend on a real DB. This namespace overlay preserves all app
+          # source imports without running unrelated startup side effects.
+          mkdir -p /tmp/twinpanel-time-policy-ci/app/routers
+          printf '%s\n' 'from pkgutil import extend_path' '__path__ = extend_path(__path__, __name__)' > /tmp/twinpanel-time-policy-ci/app/__init__.py
+          printf '%s\n' 'from pkgutil import extend_path' '__path__ = extend_path(__path__, __name__)' > /tmp/twinpanel-time-policy-ci/app/routers/__init__.py
+          PYTHONPATH="/tmp/twinpanel-time-policy-ci:." python tests/test_time_volume_policy_v1.py -v

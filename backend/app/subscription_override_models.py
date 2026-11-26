@@ -72,6 +72,51 @@ def unlimited_without_expiry(subscription, plan=None, override=None) -> bool:
     return duration_days(subscription, plan) <= 0
 
 
+
+def classify_time_policy(subscription, plan=None, override=None) -> str:
+    """Non-mutating authoritative duration classification.
+
+    Missing dates and duration on a legacy/planless subscription do not prove
+    that the user purchased unlimited time. This state must be audited rather
+    than silently converted to a finite expiry or explicit unlimited status.
+
+    Deliberately does not change the legacy admission/revocation rules: existing
+    migrated users must not be disconnected before their entitlement provenance
+    has been reviewed.
+    """
+    if getattr(subscription, "expires_at", None) is not None:
+        return "finite_explicit_expiry"
+
+    if override is not None and bool(override.duration_unlimited):
+        return "explicit_unlimited"
+
+    if int(getattr(subscription, "activation_duration_days", 0) or 0) > 0:
+        return (
+            "finite_started_missing_expiry"
+            if getattr(subscription, "starts_at", None) is not None
+            else "finite_waiting_first_use"
+        )
+
+    if plan is not None:
+        plan_days = getattr(plan, "duration_days", None)
+        if plan_days is not None:
+            if int(plan_days) > 0:
+                return (
+                    "finite_started_missing_expiry"
+                    if getattr(subscription, "starts_at", None) is not None
+                    else "finite_waiting_first_use"
+                )
+            if int(plan_days) == 0:
+                return "explicit_unlimited"
+
+    return "legacy_unknown_duration"
+
+
+def has_verified_unlimited_time(subscription, plan=None, override=None) -> bool:
+    """True only for an explicitly unlimited account or a zero-day plan."""
+    return classify_time_policy(subscription, plan, override) == "explicit_unlimited"
+
+
 def duration_is_unlimited(db, subscription, plan=None) -> bool:
     if getattr(subscription, "expires_at", None) is not None:
         return False

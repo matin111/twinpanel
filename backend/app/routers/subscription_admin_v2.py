@@ -29,6 +29,8 @@ from ..subscription_override_models import (
     effective_device_limit,
     get_subscription_override,
     unlimited_without_expiry,
+    classify_time_policy,
+    has_verified_unlimited_time,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
 from ..reserved_renewal_models import PendingSubscriptionRenewal
@@ -97,6 +99,10 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
             "duration_unlimited": unlimited_without_expiry(sub, plan, override),
+            # Existing boolean remains backward-compatible for legacy clients.
+            # New clients and audits must use these provenance-aware fields.
+            "time_policy_state": classify_time_policy(sub, plan, override),
+            "duration_unlimited_verified": has_verified_unlimited_time(sub, plan, override),
             "device_limit": effective_device_limit(db, sub, plan),
             "device_limit_source": (
                 "subscription"
@@ -282,6 +288,10 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
             "duration_unlimited": unlimited_without_expiry(sub, plan, override),
+            # Existing boolean remains backward-compatible for legacy clients.
+            # New clients and audits must use these provenance-aware fields.
+            "time_policy_state": classify_time_policy(sub, plan, override),
+            "duration_unlimited_verified": has_verified_unlimited_time(sub, plan, override),
             "device_limit": device_limit,
             "device_limit_source": (
                 "subscription"
