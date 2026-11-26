@@ -7,6 +7,7 @@ import {useCustomerSession} from "../lib/customer-session";
 import {customerApi,MySubscription,PaymentIntent,StoreOrder,UserNotification,Wallet} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
+function preciseUsage(bytes:number,gb:number){const b=Math.max(0,Number(bytes)||0);if(b>0&&b<1048576)return (b/1024).toLocaleString("fa-IR",{maximumFractionDigits:1})+" KB";if(b>=1048576&&b<1073741824)return (b/1048576).toLocaleString("fa-IR",{maximumFractionDigits:2})+" MB";return Number(gb||0).toLocaleString("fa-IR",{maximumFractionDigits:3})+" GB";}
 function money(value:unknown){return `${Number(value||0).toLocaleString("fa-IR")} تومان`;}
 function clamp(value:number){return Math.min(100,Math.max(0,value));}
 function percent(used:number,limit:number){return limit>0?clamp(Math.round((used/limit)*100)):0;}
@@ -101,7 +102,7 @@ function CustomerDashboardInner(){
 
         {active?<>
           <div className="customer-dash-v27-usage-row">
-            <div className="customer-dash-v27-usage-copy"><small>{pick("مصرف این دوره","Usage this period")}</small><strong>{active.traffic_used_gb.toLocaleString("fa-IR")} <em>/ {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</em></strong></div>
+            <div className="customer-dash-v27-usage-copy"><small>{pick("مصرف این دوره","Usage this period")}</small><strong>{preciseUsage(active.traffic_used_bytes,active.traffic_used_gb)} <em>/ {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</em></strong></div>
             <div className="customer-dash-v27-usage-percent"><strong>{usedPct}%</strong><small>{pick("مصرف شده","used")}</small></div>
           </div>
           <div className="customer-dash-v27-progress" style={usageStyle}><span/></div>
