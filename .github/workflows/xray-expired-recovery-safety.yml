@@ -1,0 +1,22 @@
+name: Xray Expired Command Recovery Safety
+on:
+  pull_request:
+    paths:
+      - backend/scripts/twinpanel_xray_expired_revoke_recovery_v1.py
+      - backend/tests/test_xray_expired_recovery_safety_v1.py
+      - .github/workflows/xray-expired-recovery-safety.yml
+permissions:
+  contents: read
+jobs:
+  recovery-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m py_compile backend/scripts/twinpanel_xray_expired_revoke_recovery_v1.py
+          python -m py_compile backend/tests/test_xray_expired_recovery_safety_v1.py
+          python backend/tests/test_xray_expired_recovery_safety_v1.py -v
