@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-25T18:39:50Z",
+  "released_at": "2026-11-26T05:55:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2f9389258bc0bf3762501c8486dbd31136fd3dbd",
+  "source_sha": "db5e097604686acc9a8dd1ad4629f8b5b773db85",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.17/twinpanel-1.1.17-linux-x86_64.tar.gz",
-    "sha256": "f8ae465e7aa10351b91cb7b7f9d34a4d50651f12c1dfee4ed0b67ccb81a01384",
-    "size_bytes": 31470490
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.18/twinpanel-1.1.18-linux-x86_64.tar.gz",
+    "sha256": "359aa24ee2229a0d6dcfdf0a47195228dcef5355a9c0e40da6fb8764205a47d9",
+    "size_bytes": 31453623
   },
   "notes": {
-    "fa": "اصلاح ذخیره دامنه عمومی تونل هنگام افزودن و ویرایش نود، بدون تغییر دامنه اختصاصی ویتوری، UUID، رمزها یا تنظیمات موتورهای اتصال. حفظ اصلاحات قبلی نسخه 1.1.16.",
-    "en": "Persist the public tunnel domain on node creation and update while keeping the dedicated Xray domain and subscriber credentials independent. Retain all v1.1.16 fixes."
+    "fa": "اصلاح تشخیص آنلاین سودوکو با پورت محلی به‌جای پورت مقصد، ثبت مصرف واقعی سودوکو از شمارنده‌های آپلود/دانلود، و نمایش دقیق مصرف‌های کوچک در پنل و API. جلوگیری از بازگشت اصلاحات حسابداری در انتشارهای بعدی؛ بدون تغییر اعتبار/حجم کاربران یا DNS. نمایش مصرف واقعی در صفحات اشتراک مشتری حتی برای مقادیر زیر یک مگابایت.",
+    "en": "Fix Sudoku presence attribution using local TCP ports, meter authenticated Sudoku uplink/downlink counters, retain sub-MB usage precision across customer/admin endpoints, and protect the fixes in the release workflow. No DNS or subscriber quota/date mutations. Render small nonzero consumption as KB/MB in customer subscription UI."
   }
 }
