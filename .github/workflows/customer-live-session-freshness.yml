@@ -1,0 +1,20 @@
+name: Customer Live Session Freshness
+on:
+  pull_request:
+    paths:
+      - backend/app/routers/customer_subscription_management.py
+      - backend/tests/test_customer_live_session_freshness_v1.py
+      - .github/workflows/customer-live-session-freshness.yml
+permissions:
+  contents: read
+jobs:
+  customer-session-freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m py_compile backend/app/routers/customer_subscription_management.py backend/tests/test_customer_live_session_freshness_v1.py
+      - run: python backend/tests/test_customer_live_session_freshness_v1.py -v

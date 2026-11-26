@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
 
 from fastapi import (
@@ -19,7 +19,7 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
-from ..quota_models import QuotaSession
+from ..quota_models import QuotaDevice, QuotaSession
 from ..subscription_override_models import effective_device_limit
 from ..renewal_models import (
     SubscriptionRenewalOrder,
@@ -190,11 +190,19 @@ def manage_subscription(
             ).strip()
 
     device_limit = effective_device_limit(db, sub, plan)
+    # Only recently authenticated session presence may count as an actual
+    # connection in the customer UI. The canonical live dashboard uses the
+    # same 180s freshness window; stale legacy rows are not proof of online
+    # traffic, especially after device revoke or expiry.
+    activity_cutoff = datetime.utcnow() - timedelta(seconds=180)
     active_connections = int(
         db.query(func.count(QuotaSession.id))
+        .join(QuotaDevice, QuotaDevice.id == QuotaSession.device_id)
         .filter(
             QuotaSession.subscription_id == sub.id,
             QuotaSession.status == "active",
+            QuotaSession.last_seen_at >= activity_cutoff,
+            QuotaDevice.status == "active",
         )
         .scalar()
         or 0
