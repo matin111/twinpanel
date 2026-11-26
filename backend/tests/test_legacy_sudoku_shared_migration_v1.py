@@ -46,7 +46,7 @@ class PublishedLegacySudokuMigrationTests(unittest.TestCase):
         self.assertIn("is_legacy_shared_node(db,node_id)",DELIVERY.read_text())
         self.assertIn("is_legacy_shared_node(db,node_id)",SCHEDULER.read_text())
         self.assertIn("launch_legacy_shared_reconcile",SCHEDULER.read_text())
-        self.assertIn("is_legacy_shared_node(db,node_id)",WORKER.read_text())
+        self.assertIn("or is_legacy_shared_node(db, node_id)",WORKER.read_text())
         self.assertIn("launch_legacy_shared_reconcile",ENFORCE.read_text())
         self.assertIn("source_protocols={\"sudoku\"}",WORKER.read_text())
         self.assertIn('if int(unit["sid"]) in counters',WORKER.read_text())
