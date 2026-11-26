@@ -42,6 +42,14 @@ class SudokuMetering(unittest.TestCase):
         self.assertNotIn('secret=',remote)
         self.assertIn("cfg.get(\"mode\")!=\"server\"",remote)
 
+    def test_presence_inspects_local_not_remote_tcp_ports(self):
+        # ss -H prints Recv-Q Send-Q Local Address:Port Peer Address:Port.
+        # Reading column 4 falsely marks Sudoku online when another process
+        # connects TO a remote random port equal to a Sudoku legacy port.
+        source=LEGACY.read_text()
+        self.assertIn("ss -H -tn state established | awk '{print $3}'", source)
+        self.assertNotIn("ss -H -tn state established | awk '{print $4}'", source)
+
     def test_eligible_ports_are_exact_and_deduplicated(self):
         env=pure_helpers();items=[
             {"subscription_id":12,"telemetry_identity":"sudoku-sub-12:18000"},
