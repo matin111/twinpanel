@@ -7,6 +7,8 @@ on:
       - "backend/app/quota_service.py"
       - "backend/app/quota_service_v2.py"
       - "backend/tests/test_quota_identity_contract_v1.py"
+      - "backend/scripts/twinpanel_node_protocol_metering_matrix_v1.py"
+      - "backend/tests/test_node_protocol_metering_matrix_v1.py"
       - ".github/workflows/quota-device-identity-guard.yml"
   workflow_dispatch:
 
@@ -35,5 +37,7 @@ jobs:
           APP_SECRET_KEY: ci-only-not-a-real-secret
           DATABASE_URL: sqlite:///:memory:
           NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
-        run: python tests/test_quota_identity_contract_v1.py -v
+        run: |
+          python tests/test_quota_identity_contract_v1.py -v
+          python tests/test_node_protocol_metering_matrix_v1.py -v
         working-directory: backend
