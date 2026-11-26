@@ -1,8 +1,8 @@
 {
-  "version": "1.1.18",
-  "source_sha": "db5e097604686acc9a8dd1ad4629f8b5b773db85",
+  "version": "1.1.19",
+  "source_sha": "42f9bb8b7e260b0e815d44bff54800fdbd098417",
   "notes": {
-    "fa": "اصلاح تشخیص آنلاین سودوکو با پورت محلی به‌جای پورت مقصد، ثبت مصرف واقعی سودوکو از شمارنده‌های آپلود/دانلود، و نمایش دقیق مصرف‌های کوچک در پنل و API. جلوگیری از بازگشت اصلاحات حسابداری در انتشارهای بعدی؛ بدون تغییر اعتبار/حجم کاربران یا DNS. نمایش مصرف واقعی در صفحات اشتراک مشتری حتی برای مقادیر زیر یک مگابایت.",
-    "en": "Fix Sudoku presence attribution using local TCP ports, meter authenticated Sudoku uplink/downlink counters, retain sub-MB usage precision across customer/admin endpoints, and protect the fixes in the release workflow. No DNS or subscriber quota/date mutations. Render small nonzero consumption as KB/MB in customer subscription UI."
+    "fa": "رفع توقف گروهی نصب حساب‌های Cisco/OpenConnect و L2TP روی نودهای جدید مانند دوبی و هلند، در صورت وجود نام کاربری وارداتی ناسازگار. ساخت نام ورود یکتای اختصاصی برای همان نود بدون تغییر نام اصلی کاربر، رمز یا سایر نودها. افزودن تست بازگشت و حفاظت انتشار.",
+    "en": "Fix all-or-nothing Cisco/OpenConnect and L2TP bulk provisioning for new Exits when an imported account username is incompatible. Assign a stable per-node login alias without touching original credentials or existing nodes; add regression and release guards."
   }
 }
