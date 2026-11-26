@@ -16,6 +16,7 @@ from .quota_models import (
 )
 from .quota_schemas import CommandAckIn, SessionCloseIn, SessionOpenIn, UsageEventIn
 from .quota_security import advisory_key, sign_command
+from .quota_source_identity_v1 import device_protocol_is_source
 from .subscription_enforcement import queue_subscription_enforcement
 
 
@@ -157,6 +158,8 @@ def apply_usage_event(db: Session, node_id: int, data: UsageEventIn) -> dict:
     device = db.get(QuotaDevice, data.device_id)
     if device is None or device.subscription_id != subscription.id:
         raise HTTPException(status_code=409, detail="device_subscription_mismatch")
+    if not device_protocol_is_source(device.protocol, data.protocol):
+        raise HTTPException(status_code=409, detail="device_protocol_mismatch")
 
     up_delta, down_delta = _counter_delta(data, cursor, epoch_changed)
     billable = up_delta + down_delta
@@ -315,6 +318,8 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
     device = db.get(QuotaDevice, data.device_id)
     if device is None or device.subscription_id != subscription.id or device.status != "active":
         raise HTTPException(status_code=403, detail="device_not_allowed")
+    if not device_protocol_is_source(device.protocol, data.protocol):
+        raise HTTPException(status_code=403, detail="device_protocol_mismatch")
     plan = db.get(Plan, subscription.plan_id)
     max_sessions = max(int(plan.device_limit if plan and plan.device_limit is not None else 1), 0)
     active_count = int(
