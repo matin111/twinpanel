@@ -92,15 +92,17 @@ def make_config(live: dict, secrets_state: dict) -> tuple[dict, int]:
         raise RuntimeError("LOOPBACK_ONLY_CONTRACT_FAILED")
     if not inner.get("users"):
         raise RuntimeError("NO_AUTHENTICATED_CLIENTS")
-    original_outbounds = copy.deepcopy(live.get("outbounds") or [])
-    original_route = copy.deepcopy(live.get("route") or {"final":"direct"})
-    if not original_outbounds:
-        raise RuntimeError("NODE_OUTBOUNDS_MISSING")
+    # Keep this isolated canary functional even if the live node's optional
+    # VLESS/WS upstream is returning 503. Never modify the production
+    # exit policy: the sidecar is loopback-only and delivery remains disabled.
+    # Public rollout must explicitly review IP policy before enabling it.
+    isolated_outbounds = [{"type":"direct","tag":"direct"}]
+    isolated_route = {"final":"direct"}
     config = {
         "log": {"level":"info"},
         "inbounds": [outer, inner],
-        "outbounds": original_outbounds,
-        "route": original_route,
+        "outbounds": isolated_outbounds,
+        "route": isolated_route,
         "services": [{
             "type": "api",
             "tag": "twinpanel-accounting-api",
