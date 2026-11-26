@@ -124,9 +124,13 @@ def test_controller_worker_retries_slow_whitelist_without_unjustified_success():
 
 
 def run():
-    for name, func in sorted(globals().items()):
-        if name.startswith("test_") and callable(func):
-            func()
+    # The fake MembershipDB has no SQL connection. Explicitly model an
+    # unmigrated legacy node rather than accidentally calling get_value().
+    # Migration-marker database integration is tested separately.
+    with patch.object(subject, "is_legacy_shared_node", return_value=False):
+        for name, func in sorted(globals().items()):
+            if name.startswith("test_") and callable(func):
+                func()
     print("SUDOKU_CENTRAL_ENFORCEMENT_V1_SMOKE_OK")
 
 
