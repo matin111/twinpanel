@@ -187,7 +187,7 @@ jobs:
             }
           done
           grep -Fq "if up>0 or down>0:" source/backend/app/services/sudoku_shared_native_presence_v1.py
-          grep -Fq "ss -H -tn state established | awk '{print \\$3}'" source/backend/app/services/modern_quota_runtime_v257.py
+          grep -Fq "ss -H -tn state established" source/backend/app/services/modern_quota_runtime_v257.py
           python3 source/backend/tests/test_sudoku_legacy_real_accounting_v1.py -q
 
       - name: Prevent releases from reverting reserved renewal activation and configurations
