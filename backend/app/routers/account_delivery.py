@@ -3842,7 +3842,7 @@ def public_connection_page(token: str, db: Session = Depends(get_db)):
     pct = float(usage.get("percent") or 0)
     total_label = "نامحدود" if usage["unlimited"] else f'{float(usage.get("total_gb") or 0):.1f} GB'
     remaining_label = "∞" if usage["unlimited"] else f'{float(usage.get("remaining_gb") or 0):.1f} GB'
-    used_label = f"{used:.1f} GB"
+    used_label = (f"{int(sub.traffic_used_bytes)/1024:.1f} KB" if 0 < int(sub.traffic_used_bytes or 0) < 1024**2 else f"{int(sub.traffic_used_bytes)/(1024**2):.2f} MB" if 0 < int(sub.traffic_used_bytes or 0) < 1024**3 else f"{used:.1f} GB")
 
     page = f'''<!doctype html>
 <html lang="fa" dir="rtl">
@@ -5300,9 +5300,9 @@ const panes=[...document.querySelectorAll('.proto-pane')];
 tabs.forEach(btn=>btn.addEventListener('click',()=>{{tabs.forEach(x=>x.classList.remove('active'));panes.forEach(x=>x.classList.remove('active'));btn.classList.add('active');const pane=document.querySelector(`[data-pane="${{btn.dataset.tab}}"]`);if(pane)pane.classList.add('active');}}));
 function toast(){{const el=document.getElementById('toast');el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1200);}}
 document.addEventListener('click',async e=>{{const btn=e.target.closest('[data-copy]');if(!btn)return;try{{await navigator.clipboard.writeText(btn.dataset.copy||'');toast();}}catch(_e){{}}}});
-function gb(v){{return `${{nf.format(Number(v||0))}} GB`;}}
+function gb(v,rawBytes){{const n=Number(rawBytes);if(Number.isFinite(n)&&n>0&&n<1048576)return `${{nf.format(n/1024)}} KB`;if(Number.isFinite(n)&&n>=1048576&&n<1073741824)return `${{nf.format(n/1048576)}} MB`;return `${{nf.format(Number(v||0))}} GB`;}}
 function ago(iso){{if(!iso)return 'بدون مصرف';const sec=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/1000));if(sec<15)return 'همین حالا';if(sec<60)return `${{nf.format(sec)}} ثانیه پیش`;if(sec<3600)return `${{nf.format(Math.floor(sec/60))}} دقیقه پیش`;return new Date(iso).toLocaleTimeString('fa-IR',{{hour:'2-digit',minute:'2-digit'}});}}
-async function refreshUsage(){{try{{const r=await fetch(`/v1/connect/${{SUB_TOKEN}}/usage`,{{cache:'no-store'}});if(!r.ok)return;const u=await r.json();const pct=u.unlimited?0:Number(u.percent||0);document.getElementById('used').textContent=gb(u.used_gb);document.getElementById('remaining').textContent=u.unlimited?'∞':gb(u.remaining_gb);document.getElementById('total').textContent=u.unlimited?'نامحدود':gb(u.total_gb);document.getElementById('lastUpdate').textContent=ago(u.last_usage_event_at||u.refreshed_at);document.getElementById('usageBar').style.width=`${{pct}}%`;document.getElementById('donutPercent').textContent=u.unlimited?'∞':`${{nf.format(pct)}}%`;document.getElementById('trafficDonut').style.background=`conic-gradient(#ff9b38 0 7%,#0fc8e5 7% ${{pct}}%,rgba(255,255,255,.16) ${{pct}}% 100%)`;}}catch(_e){{}}}}
+async function refreshUsage(){{try{{const r=await fetch(`/v1/connect/${{SUB_TOKEN}}/usage`,{{cache:'no-store'}});if(!r.ok)return;const u=await r.json();const pct=u.unlimited?0:Number(u.percent||0);document.getElementById('used').textContent=gb(u.used_gb,u.used_bytes);document.getElementById('remaining').textContent=u.unlimited?'∞':gb(u.remaining_gb);document.getElementById('total').textContent=u.unlimited?'نامحدود':gb(u.total_gb);document.getElementById('lastUpdate').textContent=ago(u.last_usage_event_at||u.refreshed_at);document.getElementById('usageBar').style.width=`${{pct}}%`;document.getElementById('donutPercent').textContent=u.unlimited?'∞':`${{nf.format(pct)}}%`;document.getElementById('trafficDonut').style.background=`conic-gradient(#ff9b38 0 7%,#0fc8e5 7% ${{pct}}%,rgba(255,255,255,.16) ${{pct}}% 100%)`;}}catch(_e){{}}}}
 refreshUsage();setInterval(refreshUsage,8000);
 
 // TWINPANEL_SMART_OS_DETECT_V2
