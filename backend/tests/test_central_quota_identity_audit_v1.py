@@ -46,7 +46,7 @@ guard = _load_functions(
 )
 audit = _load_functions(
     SCRIPTS / "twinpanel_central_quota_evidence_v1.py",
-    {"_canonical","_protocol_totals","build_report"},
+    {"_canonical","_protocol_totals","node_protocol_matrix","build_report"},
     {"ALL_PROTOCOL_KEYS":registry["ALL_PROTOCOL_KEYS"],
      "canonical_protocol":registry["canonical_protocol"], "Any":Any},
 )
@@ -125,6 +125,32 @@ class CentralQuotaContractTests(TestCase):
         code=ast.unparse(usage)
         self.assertIn("accepted=accepted",code)
         self.assertIn("if not blocked",code)
+
+    def test_node_online_does_not_fake_positive_metering(self):
+        matrix=audit["node_protocol_matrix"](
+            configs=[
+                {"node_id":3,"protocol":"shadowtls","status":"online","probe_fresh":True},
+                {"node_id":3,"protocol":"cisco","status":"online","probe_fresh":True},
+                {"node_id":4,"protocol":"wireguard","status":"online","probe_fresh":False},
+            ],
+            cursors=[
+                {"node_id":3,"protocol":"shadowtls","fresh_cursors_30m":10},
+                {"node_id":3,"protocol":"openconnect","fresh_cursors_30m":1},
+            ],
+            positives=[
+                {"node_id":3,"protocol":"openconnect","positive_events_6h":2,"accepted_bytes_6h":99},
+            ],
+        )
+        self.assertEqual(len(matrix),3)
+        shadow=next(v for v in matrix if v["protocol"]=="shadowtls")
+        self.assertEqual(shadow["metering_evidence"],"shadowtls_inner_identity_unverified")
+        self.assertTrue(shadow["service_probe_fresh"])
+        self.assertEqual(shadow["accepted_bytes_6h"],0)
+        cisco=next(v for v in matrix if v["protocol"]=="cisco")
+        self.assertEqual(cisco["accepted_bytes_6h"],99)
+        self.assertEqual(cisco["metering_evidence"],"positive_attributed_ledger_events")
+        wireguard=next(v for v in matrix if v["protocol"]=="wireguard")
+        self.assertEqual(wireguard["metering_evidence"],"no_recent_positive_usage_observed")
 
     def test_mismatched_cursor_is_visible_and_never_healthy(self):
         report=audit["build_report"](
