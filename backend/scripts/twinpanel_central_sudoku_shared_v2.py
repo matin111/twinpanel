@@ -98,9 +98,9 @@ def node_identity(document,node_id):
         raise RuntimeError("SUDOKU_SHARED_SAVED_IDENTITY_CONFLICT")
     return found
 
-def client_item(node,sub_id,private):
+def client_item(node,sub_id,private,*,host_override=None):
     public_port=public_shared_sudoku_port(int(node.id))
-    host=_node_host(node)
+    host=host_override or _node_host(node)
     if not host:
         raise RuntimeError("SUDOKU_SHARED_NODE_HOST_MISSING")
     uri=_sudoku_share_uri(host,public_port,private,
@@ -279,6 +279,17 @@ async def stage(node_id,limit,write,*,migrate_legacy=False):
                     ProtocolCredential.subscription_id.in_(ids))
             .with_for_update().all()
         }
+        # The old US Exit's own Iran ingress (node 9) lost requests.
+        # Node 2's independently verified :18555 relay is the stable
+        # Sudoku-only ingress; no DNS or other protocol endpoint is changed.
+        shared_customer_host=None
+        if migrate_legacy and int(node_id)==11:
+            alternative_ingress=db.get(Node,2)
+            if alternative_ingress is None or alternative_ingress.retired_at is not None:
+                raise RuntimeError("SUDOKU_US_FALLBACK_INGRESS_MISSING")
+            shared_customer_host=_node_host(alternative_ingress)
+            if not shared_customer_host:
+                raise RuntimeError("SUDOKU_US_FALLBACK_HOST_MISSING")
         changed=0
         for sid in ids:
             cred=persisted.get(sid)
@@ -291,7 +302,8 @@ async def stage(node_id,limit,write,*,migrate_legacy=False):
             old=ad._autosync_credential_items(cred)
             if cred.config_text_encrypted and not old:
                 raise RuntimeError("SUDOKU_SHARED_SAVED_CONFIG_UNREADABLE")
-            wanted=client_item(node,sid,entry["client_key"])
+            wanted=client_item(node,sid,entry["client_key"],
+                               host_override=shared_customer_host)
             others=[item for item in old
                     if ad._autosync_item_node_id(item)!=node_id]
             next_items=others+[wanted]
