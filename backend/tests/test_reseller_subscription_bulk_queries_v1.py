@@ -5,7 +5,7 @@ import ast
 import inspect
 import unittest
 
-from app.routers import reseller_portal
+from app.routers import reseller_portal, reseller_admin_v2
 
 
 class ResellerBulkReadContract(unittest.TestCase):
@@ -24,6 +24,17 @@ class ResellerBulkReadContract(unittest.TestCase):
                          and isinstance(n.func.value,ast.Name)
                          and n.func.value.id == "db"]
             self.assertFalse(forbidden,"Per-account SQL reintroduced")
+
+    def test_admin_reseller_list_uses_grouped_counts(self):
+        source=inspect.getsource(reseller_admin_v2.list_resellers_v2)
+        self.assertIn('func.count()',source)
+        self.assertIn('group_by(model.reseller_id)',source)
+        self.assertIn('_serialize(db, row, aggregates)',source)
+        for entity in ('ResellerCustomer','ResellerSubscription',
+                       'ResellerPlanPrice','ResellerWalletTransaction',
+                       'ResellerTrafficTransaction'):
+            self.assertIn(entity,source)
+        self.assertNotIn('_serialize(db, row) for row',source)
 
     def test_batch_lookups_and_overrides_present(self):
         source=inspect.getsource(reseller_portal.reseller_subscriptions)
