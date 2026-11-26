@@ -2804,6 +2804,7 @@ async def _telegram_notification_worker(bot):
                             "",
                             "🔗 <b>لینک اتصال:</b>",
                             f"<code>{safe_link}</code>",
+                            "لینک را داخل مرورگر باز کنید؛ پروتکل و سرور دلخواه را انتخاب و کانفیگ یا اطلاعات اتصال را در برنامه سازگار وارد کنید.",
                         ])
 
                     if app_username and app_password:
