@@ -388,7 +388,7 @@ def runtime_endpoints(
 def dashboard_summary_live_subscriptions(db: Session = Depends(get_db)):
     """Admin dashboard summary with live state and canonical revenue."""
 
-    payload = dict(dashboard_summary_v2(db))
+    payload = dict(dashboard_summary_v2(db, include_monthly_usage=False))
     payload.update(dashboard_revenue(db))
 
     online_subscriptions = len(_online_subscription_ids(db))
