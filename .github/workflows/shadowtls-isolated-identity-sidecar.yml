@@ -1,0 +1,25 @@
+name: ShadowTLS Isolated Identity Sidecar
+on:
+  pull_request:
+    paths:
+      - backend/scripts/twinpanel_shadowtls_identity_local_sidecar_v1.py
+      - backend/scripts/twinpanel_shadowtls_identity_sidecar_probe_v1.py
+      - backend/tests/test_shadowtls_identity_local_sidecar_v1.py
+      - .github/workflows/shadowtls-isolated-identity-sidecar.yml
+permissions:
+  contents: read
+jobs:
+  loopback-identity-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile isolated scripts
+        run: |
+          python -m py_compile backend/scripts/twinpanel_shadowtls_identity_local_sidecar_v1.py
+          python -m py_compile backend/scripts/twinpanel_shadowtls_identity_sidecar_probe_v1.py
+      - name: Test private, disabled-delivery migration canary
+        run: python backend/tests/test_shadowtls_identity_local_sidecar_v1.py -v
