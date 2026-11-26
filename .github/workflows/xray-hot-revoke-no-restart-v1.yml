@@ -1,0 +1,25 @@
+name: Xray Hot Revoke No Global Restart
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/app/services/xray_hot_client_revoke_v1.py
+      - backend/tests/test_xray_hot_revoke_live_v1.py
+      - backend/tests/test_xray_revoke_without_uuid_v1.py
+      - .github/workflows/xray-hot-revoke-no-restart-v1.yml
+permissions:
+  contents: read
+jobs:
+  hot-revoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile and run reversible hot API fixture tests
+        run: |
+          python -m py_compile backend/app/services/account_enforcement_v2.py
+          python -m py_compile backend/app/services/xray_hot_client_revoke_v1.py
+          python backend/tests/test_xray_hot_revoke_live_v1.py -v
