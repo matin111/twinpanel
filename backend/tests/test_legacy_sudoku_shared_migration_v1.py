@@ -51,6 +51,17 @@ class PublishedLegacySudokuMigrationTests(unittest.TestCase):
         self.assertIn("source_protocols={\"sudoku\"}",WORKER.read_text())
         self.assertIn('if int(unit["sid"]) in counters',WORKER.read_text())
 
+    def test_german_shared_ingress_is_unique_to_tunnel_40(self):
+        from app.services.legacy_sudoku_shared_migration_v1 import public_shared_sudoku_port
+        self.assertEqual(public_shared_sudoku_port(6),18553)
+        self.assertEqual(public_shared_sudoku_port(13),18554)
+        self.assertEqual(public_shared_sudoku_port(11),18553)
+        source=STAGE.read_text()
+        self.assertIn("public_port=public_shared_sudoku_port(int(node.id))",source)
+        self.assertIn("_sudoku_endpoint(host,public_port)",source)
+        self.assertIn('"port":public_port',source)
+        self.assertIn("port != public_shared_sudoku_port(node_id)",DELIVERY.read_text())
+
     def test_launcher_uses_fixed_node_unit_and_global_lock(self):
         source=MARKER.read_text()
         self.assertIn("twinpanel-legacy-sudoku-shared-{nid}",source)
