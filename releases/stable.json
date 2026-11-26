@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.21",
+  "version": "1.1.22",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-26T07:00:31Z",
+  "released_at": "2026-11-26T07:37:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "73f389bb94b55549ad450fc0a07ef52c4710fdf2",
+  "source_sha": "c638732b03e1f71b57565ac5dd03958dec27fab3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.21/twinpanel-1.1.21-linux-x86_64.tar.gz",
-    "sha256": "ccf380d8a81d4d39375de46f6571cd44072ac2d38f07cf4393328f5442cf65b7",
-    "size_bytes": 31461846
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.22/twinpanel-1.1.22-linux-x86_64.tar.gz",
+    "sha256": "2326f34dfcfaefe7b7da6d581188ce1628c9b80b557a98b8226df5d6a6eb2551",
+    "size_bytes": 31536438
   },
   "notes": {
-    "fa": "مهاجرت ایمن سودوکو نودهای قدیمی به سرویس چندکاربره دارای شمارنده اختصاصی. ثبت و کسر حجم هر کاربر با موتور سهمیه مرکزی، تشخیص آنلاین مبتنی بر سرویس معتبر، همگام‌سازی خودکار سهمیه/انقضا، حفظ سرویس قدیمی تا تأیید جایگزین، بدون تغییر تنظیمات دیگر پروتکل‌ها.",
-    "en": "Safely migrate legacy Sudoku Exits to per-identity authenticated shared service with canonical quota event accounting, verified online presence and automatic entitlement/expiry reconciliation. Legacy service remains untouched until verified shared replacement."
+    "fa": "اصلاح مهاجرت سرویس سودوکوی فرانسه در پنل مرکزی: نصب امن موتور امضاشده/هش‌تأییدشده به‌صورت محلی بدون SFTP و انتقال محرمانه کلید کاربران از طریق stdin، با حفظ احراز هویت و موتور سهمیه مرکزی.",
+    "en": "Enable authenticated shared Sudoku migration on local TwinPanel core without self-SSH/SFTP; atomically install pinned verified binary and pass key material only over child stdin; preserve canonical quota accounting."
   }
 }
