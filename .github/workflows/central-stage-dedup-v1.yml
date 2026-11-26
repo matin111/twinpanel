@@ -1,0 +1,23 @@
+name: Central Stage Dispatch Deduplication
+on:
+  pull_request:
+    paths:
+      - backend/app/services/central_runtime_visible_convergence_v1.py
+      - backend/tests/test_visible_central_stage_dedup_v1.py
+      - .github/workflows/central-stage-dedup-v1.yml
+permissions:
+  contents: read
+jobs:
+  stage-dedup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile scanner and run systemd-free mock tests
+        run: |
+          python -m py_compile backend/app/services/central_runtime_visible_convergence_v1.py
+          python -m py_compile backend/tests/test_visible_central_stage_dedup_v1.py
+          python backend/tests/test_visible_central_stage_dedup_v1.py -v
