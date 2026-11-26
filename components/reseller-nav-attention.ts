@@ -55,8 +55,12 @@ export function useResellerNavAttention(enabled:boolean){
     }
 
     let alive=true;
+    let refreshInFlight=false;
 
     const refresh=async()=>{
+      if(refreshInFlight)return;
+      refreshInFlight=true;
+      try{
       const results=await Promise.allSettled([
         request<Row[]>("/v1/reseller/bot-commerce/wallet-topups"),
         request<Row[]>("/v1/reseller/bot-commerce/orders"),
@@ -86,6 +90,7 @@ export function useResellerNavAttention(enabled:boolean){
       setCount(routeCounts,"/reseller/notifications",unreadCount);
 
       setState({routeCounts,unreadCount});
+      }finally{refreshInFlight=false;}
     };
 
     const refreshVisible=()=>{
@@ -93,7 +98,7 @@ export function useResellerNavAttention(enabled:boolean){
     };
 
     void refresh();
-    const timer=window.setInterval(refreshVisible,4000);
+    const timer=window.setInterval(refreshVisible,15000);
     window.addEventListener("focus",refreshVisible);
     document.addEventListener("visibilitychange",refreshVisible);
 

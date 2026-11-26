@@ -48,7 +48,7 @@ export function SupportUnreadBadge({active}:{active:boolean}){
       }catch{}finally{busy.current=false;}
     };
     void poll();
-    const timer=window.setInterval(()=>void poll(),1000);
+    const timer=window.setInterval(()=>void poll(),10000);
     const onFocus=()=>void poll();
     const onVisibility=()=>{if(document.visibilityState==="visible")void poll();};
     window.addEventListener("focus",onFocus);
