@@ -8,7 +8,7 @@ import shlex
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, case
 
 from ..database import SessionLocal
 from ..models import Node, NodeProtocolConfig, ProtocolCredential
@@ -158,7 +158,16 @@ def _claim_next_command() -> dict[str, Any] | None:
                     ),
                 ),
             )
-            .order_by(QuotaNodeCommand.issued_at.asc())
+            .order_by(
+                # Expired/suspended users must not stay online behind
+                # thousands of newer restore commands. Preserve FIFO within
+                # each class; controller work is still idempotent.
+                case(
+                    (QuotaNodeCommand.command_type == "revoke_subscription", 0),
+                    else_=1,
+                ),
+                QuotaNodeCommand.issued_at.asc(),
+            )
             .with_for_update(skip_locked=True)
             .first()
         )
@@ -529,7 +538,7 @@ async def _classic_v2ray(
     # needs the per-node UUID; legacy records can lack that node delivery item.
     client_id = _stored_v2ray_uuid(credential, node_id) if restore else None
 
-    script = f'''import json\np="/usr/local/etc/xray/config.json"\nd=json.load(open(p,encoding="utf-8"))\nemail={email!r}\nclient_id={client_id!r}\nfound=False\nfor inbound in d.get("inbounds",[]):\n    if not isinstance(inbound,dict) or inbound.get("protocol")!="vless":\n        continue\n    clients=inbound.setdefault("settings",{{}}).setdefault("clients",[])\n    clients[:]=[c for c in clients if not isinstance(c,dict) or c.get("email")!=email]\n    if {restore!r}:\n        clients.append({{"id":client_id,"email":email}})\n    found=True\n    if {restore!r}:\n        break\nif not found:\n    raise SystemExit("vless inbound unavailable")\nwith open(p,"w",encoding="utf-8") as f:\n    json.dump(d,f,ensure_ascii=False,indent=2); f.write("\\n")\n'''
+    script = f'''import json\np="/usr/local/etc/xray/config.json"\nd=json.load(open(p,encoding="utf-8"))\nemail={email!r}\nclient_id={client_id!r}\nfound=False\nfor inbound in d.get("inbounds",[]):\n    if not isinstance(inbound,dict) or inbound.get("protocol")!="vless":\n        continue\n    clients=inbound.setdefault("settings",{{}}).setdefault("clients",[])\n    clients[:]=[c for c in clients if not isinstance(c,dict) or c.get("email")!=email]\n    if {restore!r}:\n        clients.append({{"id":client_id,"email":email}})\n    found=True\nif not found:\n    raise SystemExit("vless inbound unavailable")\nwith open(p,"w",encoding="utf-8") as f:\n    json.dump(d,f,ensure_ascii=False,indent=2); f.write("\\n")\n'''
     encoded = base64.b64encode(script.encode()).decode()
     await _remote_run(
         conn,
