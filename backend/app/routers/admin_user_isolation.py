@@ -162,7 +162,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     # intentionally visible to the central admin. Only the user identity count
     # is isolated. Revenue is replaced with canonical confirmed-payment totals;
     # the legacy function's subscription-count sales fields are never exposed.
-    payload = legacy_admin.dashboard_summary_v2(db)
+    payload = legacy_admin.dashboard_summary_v2(db, include_monthly_usage=False)
     payload.update(_dashboard_revenue(db))
     payload["total_users"] = (
         _visible_users_query(db)

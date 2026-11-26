@@ -961,6 +961,8 @@ def reset_password(
 )
 def dashboard_summary_v2(
     db: Session = Depends(get_db),
+    *,
+    include_monthly_usage: bool = True,
 ):
     from datetime import datetime, timedelta, timezone
     from zoneinfo import ZoneInfo
@@ -1101,33 +1103,37 @@ def dashboard_summary_v2(
         }
 
 
-    # TWINPANEL_MONTHLY_USAGE_V85
-    month_now = datetime.utcnow()
+    # The live admin dashboard does not display this expensive monthly total.
+    # Historical callers keep the exact aggregate when explicitly requested.
+    monthly_usage_bytes = None
+    if include_monthly_usage:
+        # TWINPANEL_MONTHLY_USAGE_V85
+        month_now = datetime.utcnow()
 
-    month_start = month_now.replace(
-        day=1,
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
+        month_start = month_now.replace(
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
 
-    monthly_usage_bytes = int(
-        db.query(
-            func.coalesce(
-                func.sum(
-                    QuotaUsageEvent.billable_bytes
-                ),
-                0,
+        monthly_usage_bytes = int(
+            db.query(
+                func.coalesce(
+                    func.sum(
+                        QuotaUsageEvent.billable_bytes
+                    ),
+                    0,
+                )
             )
+            .filter(
+                QuotaUsageEvent.reported_at >= month_start,
+                QuotaUsageEvent.reported_at <= month_now,
+            )
+            .scalar()
+            or 0
         )
-        .filter(
-            QuotaUsageEvent.reported_at >= month_start,
-            QuotaUsageEvent.reported_at <= month_now,
-        )
-        .scalar()
-        or 0
-    )
 
 
     return {

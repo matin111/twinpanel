@@ -12,11 +12,17 @@ def main() -> None:
     runtime_router = ROOT / "backend/app/routers/runtime_endpoints.py"
     main_file = ROOT / "backend/app/main.py"
     dashboard = ROOT / "components/admin-dashboard-runtime.tsx"
+    fleet = ROOT / "components/admin-dashboard-lower-panels.tsx"
+    controller = ROOT / "components/admin-dashboard-server-card.tsx"
+    routed_page = ROOT / "components/routed-page-client-v2.tsx"
 
     telemetry_source = telemetry_model.read_text(encoding="utf-8")
     runtime_source = runtime_router.read_text(encoding="utf-8")
     main_source = main_file.read_text(encoding="utf-8")
     dashboard_source = dashboard.read_text(encoding="utf-8")
+    fleet_source = fleet.read_text(encoding="utf-8")
+    controller_source = controller.read_text(encoding="utf-8")
+    routed_source = routed_page.read_text(encoding="utf-8")
 
     # Python wiring must at least parse before CI reaches the full API build.
     ast.parse(telemetry_source)
@@ -43,13 +49,21 @@ def main() -> None:
         "app.include_router(nodes.router)"
     )
 
-    # UI must render the real health values and keep unavailable data explicit.
-    assert 'valueOf(health,"cpu_percent","cpu")' in dashboard_source
-    assert 'valueOf(health,"memory_percent","ram_percent","memory")' in dashboard_source
-    assert 'valueOf(health,"disk_percent","disk")' in dashboard_source
-    assert '<MetricBar label="CPU" value={cpu}/>' in dashboard_source
-    assert '<MetricBar label="RAM" value={ram}/>' in dashboard_source
-    assert '<MetricBar label="Disk" value={disk}/>' in dashboard_source
+    # Current 2027 layout renders node metrics in ServerFleetVisual rather
+    # than the legacy inline MetricBar. The controller's resource pulse is a
+    # separate portal card; never accept synthetic percentages.
+    assert 'measured("cpu_percent","cpu")' in fleet_source
+    assert 'measured("memory_percent","ram_percent","memory")' in fleet_source
+    assert 'measured("disk_percent","disk")' in fleet_source
+    for label in ("CPU", "RAM", "Disk"):
+        assert f'<ResourceMeter name="{label}"' in fleet_source
+
+    assert '/v1/admin/system-health' in controller_source
+    assert "serverSample(payload)" in controller_source
+    assert '<ResourceGauge kind="cpu"' in controller_source
+    assert '<ResourceGauge kind="ram"' in controller_source
+    assert '<ResourceGauge kind="disk"' in controller_source
+    assert "<AdminDashboardServerCard/>" in routed_source
 
     # The dashboard's protocol matrix must remain complete.
     for protocol in (
