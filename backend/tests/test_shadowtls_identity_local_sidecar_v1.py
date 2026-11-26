@@ -52,6 +52,8 @@ class SidecarSafetyTests(TestCase):
                          ["twinpanel-shadowtls-identity-in","twinpanel-shadowtls-identity-inner"])
         self.assertTrue(all(x.get("listen")=="127.0.0.1" for x in cfg["inbounds"]))
         self.assertEqual(cfg["inbounds"][0]["listen_port"],19448)
+        self.assertEqual(cfg["outbounds"],[{"type":"direct","tag":"direct"}])
+        self.assertEqual(cfg["route"],{"final":"direct"})
         self.assertEqual(cfg["services"][0]["listen_port"],19096)
         self.assertEqual(cfg["services"][0]["listen"],"127.0.0.1")
         self.assertNotIn("twinpanel-bootstrap",str(cfg["inbounds"][1]))
