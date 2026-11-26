@@ -9,6 +9,7 @@ import {customerApi,CustomerConnectionInfo,MySubscription} from "../lib/customer
 import {useCustomerSession} from "../lib/customer-session";
 import {useI18n} from "../lib/i18n";
 
+function preciseUsage(bytes:number,gb:number){const b=Math.max(0,Number(bytes)||0);if(b>0&&b<1048576)return (b/1024).toLocaleString("fa-IR",{maximumFractionDigits:1})+" KB";if(b>=1048576&&b<1073741824)return (b/1048576).toLocaleString("fa-IR",{maximumFractionDigits:2})+" MB";return Number(gb||0).toLocaleString("fa-IR",{maximumFractionDigits:3})+" GB";}
 const statusFa=(v:string)=>({active:"فعال",pending:"در انتظار",suspended:"تعلیق",expired:"منقضی",canceled:"لغو شده"} as Record<string,string>)[v]||v;
 const tone=(v:string):"ok"|"warn"|"bad"|"violet"=>v==="active"?"ok":["expired","canceled"].includes(v)?"bad":"warn";
 const pct=(u:number,l:number)=>l>0?Math.min(100,Math.max(0,Math.round(u/l*100))):0;
@@ -133,7 +134,7 @@ function Body(){
             :pick("پس از پایان حجم یا تاریخ فعلی، تمدید خودکار فعال می‌شود.","The next period activates automatically after current quota or expiry ends.")}</p>
         </section>}
 
-        <div className="customerSubTraffic"><div><span>{pick("مصرف","Usage")}</span><b>{usage}%</b></div><div className="progress"><i style={{width:`${usage}%`}}/></div><small>{row.traffic_used_gb.toLocaleString("fa-IR")} / {row.traffic_limit_gb.toLocaleString("fa-IR")} GB</small></div>
+        <div className="customerSubTraffic"><div><span>{pick("مصرف","Usage")}</span><b>{usage}%</b></div><div className="progress"><i style={{width:`${usage}%`}}/></div><small>{preciseUsage(row.traffic_used_bytes,row.traffic_used_gb)} / {row.traffic_limit_gb.toLocaleString("fa-IR")} GB</small></div>
 
         {unavailableReason&&<div className="runtime-error" role="alert">{unavailableReason}</div>}
         <small>{pick("اگر ظرفیت دستگاه‌ها پر باشد، اتصال جدید پذیرفته نمی‌شود. برای اتصال از دستگاه دیگر ابتدا یکی را قطع کنید.","If all device slots are occupied, disconnect an existing device before connecting another.")}</small>
