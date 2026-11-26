@@ -253,7 +253,7 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
         customer_name=user.full_name if user else None,
         plan_name=plan.name if plan else None,
         traffic_limit_gb=round((sub.traffic_limit_bytes or 0) / 1024 / 1024 / 1024, 2),
-        traffic_used_gb=round((sub.traffic_used_bytes or 0) / 1024 / 1024 / 1024, 2),
+        traffic_used_gb=round((sub.traffic_used_bytes or 0) / 1024 / 1024 / 1024, 6),
         node_ids=node_ids,
         protocols=list(context["protocols"].get(int(sub.id), [])),
     ).model_dump(mode="json")
