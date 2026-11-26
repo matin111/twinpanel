@@ -68,6 +68,11 @@ class ParallelEnforcementTests(TestCase):
                 self.assertEqual(max_parallel[0],parallel)
                 self.assertFalse(active)
 
+    def test_production_default_is_serial_after_canary(self):
+        ns = isolated(("_parallel_nodes_limit",), {"os": os})
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(ns["_parallel_nodes_limit"](), 1)
+
     def test_invalid_parallel_setting_fails_safe(self):
         ns=isolated(("_parallel_nodes_limit",),{"os":os})
         with patch.dict(os.environ,{"TP_ACCOUNT_ENFORCEMENT_PARALLEL_NODES":"invalid"}):

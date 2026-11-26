@@ -776,9 +776,9 @@ async def _execute_command(command: dict[str, Any]) -> None:
 
 
 def _parallel_nodes_limit() -> int:
-    """Conservative operator override; range 1..4, with 1 as safe rollback."""
+    """Keep serial enforcement by default; opt into bounded parallelism after canary."""
     try:
-        configured = int(os.environ.get("TP_ACCOUNT_ENFORCEMENT_PARALLEL_NODES", "2"))
+        configured = int(os.environ.get("TP_ACCOUNT_ENFORCEMENT_PARALLEL_NODES", "1"))
     except (TypeError, ValueError):
         return 1
     return max(1, min(configured, 4))
