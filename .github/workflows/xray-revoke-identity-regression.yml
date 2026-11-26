@@ -24,6 +24,6 @@ jobs:
         env:
           PYTHONPATH: .
           APP_SECRET_KEY: ci-only-not-a-real-secret
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: sqlite:////tmp/twinpanel-xray-revoke-ci.sqlite
           NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
         run: python tests/test_xray_revoke_without_uuid_v1.py -v
