@@ -1,0 +1,29 @@
+name: Xray Revocation Identity Regression
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_xray_revoke_without_uuid_v1.py
+      - .github/workflows/xray-revoke-identity-regression.yml
+permissions:
+  contents: read
+jobs:
+  revoke-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Compile
+        run: python -m py_compile backend/app/services/account_enforcement_v2.py backend/tests/test_xray_revoke_without_uuid_v1.py
+      - name: Test targeted revoke and restore contract
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          APP_SECRET_KEY: ci-only-not-a-real-secret
+          DATABASE_URL: sqlite:///:memory:
+          NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
+        run: python tests/test_xray_revoke_without_uuid_v1.py -v
