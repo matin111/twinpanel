@@ -645,7 +645,11 @@ async def _execute_command(command: dict[str, Any]) -> None:
 
             from ..routers.provision import ssh_connect_saved
 
-            # Authentication is already loaded. Do not pin a PostgreSQL\n            # transaction across potentially slow remote SSH login.\n            conn = await ssh_connect_saved(\n                node, db, close_read_transaction_before_ssh=True,\n            )
+            # Authentication is already loaded. Do not pin a PostgreSQL
+            # transaction across potentially slow remote SSH login.
+            conn = await ssh_connect_saved(
+                node, db, close_read_transaction_before_ssh=True,
+            )
 
             if protocol in CONTROLLER_MODERN_PROTOCOLS:
                 if not credential.secret_encrypted:
