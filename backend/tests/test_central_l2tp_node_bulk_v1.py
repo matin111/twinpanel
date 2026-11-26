@@ -85,6 +85,30 @@ class CentralL2TPTests(unittest.TestCase):
                 FakeSubscription(1, "same", "pass1"),
             ])
 
+    def test_incompatible_imported_username_gets_stable_node_only_alias(self):
+        rows = mod.account_rows([
+            FakeSubscription(4091, "user name/غ", "kept-password"),
+            FakeSubscription(42, "standard.user", "standard-password"),
+            FakeSubscription(43, "standard.user", "duplicate-password"),
+        ])
+        self.assertEqual([r["username"] for r in rows],
+                         ["tp-sub-4091", "standard.user", "tp-sub-43"])
+        self.assertEqual(mod.account_rows([
+            FakeSubscription(4091, "user name/غ", "kept-password"),
+            FakeSubscription(42, "standard.user", "standard-password"),
+            FakeSubscription(43, "standard.user", "duplicate-password"),
+        ]), rows)
+        self.assertEqual(rows[0]["password"], "kept-password")
+        conflict = mod.account_rows([
+            FakeSubscription(4091, "bad name", "first"),
+            FakeSubscription(42, "tp-sub-4091", "second"),
+        ])
+        self.assertEqual(conflict[1]["username"], "tp-sub-4091")
+        self.assertTrue(conflict[0]["username"].startswith("tp-sub-4091-"))
+        self.assertNotEqual(conflict[0]["username"], conflict[1]["username"])
+        with self.assertRaises(RuntimeError):
+            mod.account_rows([FakeSubscription(4091, "", "pass")])
+
     def test_remote_merge_preserves_unrelated_users_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / "chap-secrets"
