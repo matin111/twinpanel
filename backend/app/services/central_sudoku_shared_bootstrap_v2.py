@@ -91,6 +91,27 @@ def build_pinned_binary() -> Path:
 
 async def ensure_shared_binary(node, db) -> dict:
     """Node SSH invoked once; fail closed on unpinned target installations."""
+    from ..node_runtime_connection import is_local_core
+    if is_local_core(node):
+        # LocalCore has no SSH/SFTP adapter. Install the exact pinned binary
+        # directly and atomically, never replacing an unknown existing binary.
+        target=Path(TARGET)
+        if target.exists():
+            _check_binary(target)
+            return {"ok":True,"binary_ready":True,"installed_now":False}
+        source=await asyncio.to_thread(build_pinned_binary)
+        target.parent.mkdir(parents=True,exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=target.parent,prefix=".sudoku-pinned-",delete=False) as tmp:
+            temporary=Path(tmp.name)
+        try:
+            shutil.copyfile(source,temporary)
+            _check_binary(temporary)
+            os.chmod(temporary,0o755)
+            os.replace(temporary,target)
+            _check_binary(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return {"ok":True,"binary_ready":True,"installed_now":True}
     conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=25)
     try:
         probe = await asyncio.wait_for(conn.run(
