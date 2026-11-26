@@ -195,7 +195,21 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
                 credential=ProtocolCredential(subscription_id=sid, protocol="cisco")
                 db.add(credential)
             items=ad._autosync_credential_items(credential)
-            if any(ad._autosync_item_node_id(x)==node_id for x in items):
+            existing_item=next(
+                (x for x in items if ad._autosync_item_node_id(x)==node_id), None
+            )
+            if existing_item is not None:
+                # The earlier all-or-nothing run may have left a stale login
+                # for a newly aliased account. Reconcile this node only:
+                # never rewrite credentials for other exit nodes.
+                if (existing_item.get("username")==row["username"]
+                        and existing_item.get("password")==row["password"]):
+                    continue
+                existing_item["username"]=row["username"]
+                existing_item["password"]=row["password"]
+                credential.config_text_encrypted=ad._enc(items)
+                credential.is_active=True
+                written+=1
                 continue
             items.append({
                 "node_id":node_id, "node":node.name, "server":host,
