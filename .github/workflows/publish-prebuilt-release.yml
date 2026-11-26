@@ -184,6 +184,8 @@ jobs:
             }
           done
           grep -Fq 'if not USERNAME.fullmatch(name) or name in usernames:' source/backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py
+          grep -Fq 'existing_item["username"]=row["username"]' source/backend/scripts/twinpanel_central_cisco_node_bulk_v1.py
+          grep -Fq 'existing_item["username"] = row["username"]' source/backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py
           # This pre-dependency release guard executes just the pure identity
           # helper without requiring SQLAlchemy/other backend packages.
           python3 - <<'PY'
