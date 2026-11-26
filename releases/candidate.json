@@ -1,8 +1,8 @@
 {
-  "version": "1.1.20",
-  "source_sha": "a04f243a0d1701252b5a1fdbc0ff4a774385852a",
+  "version": "1.1.21",
+  "source_sha": "73f389bb94b55549ad450fc0a07ef52c4710fdf2",
   "notes": {
-    "fa": "تکمیل اصلاح Cisco و L2TP نودهای جدید دوبی و هلند: رفع توقف ساخت همه حساب‌ها به‌خاطر یک نام کاربری وارداتی ناسازگار، و ترمیم خودکار کانفیگ‌های ازقبل‌موجود که نام ورود آن‌ها با احراز هویت واقعی سرور متفاوت است؛ بدون تغییر نام اصلی اشتراک یا کانفیگ نودهای دیگر.",
-    "en": "Complete Cisco/L2TP new-Exit account repair: preserve stable aliases for incompatible imported usernames and reconcile stale existing per-node login credentials with actual remote service authentication without modifying other nodes."
+    "fa": "مهاجرت ایمن سودوکو نودهای قدیمی به سرویس چندکاربره دارای شمارنده اختصاصی. ثبت و کسر حجم هر کاربر با موتور سهمیه مرکزی، تشخیص آنلاین مبتنی بر سرویس معتبر، همگام‌سازی خودکار سهمیه/انقضا، حفظ سرویس قدیمی تا تأیید جایگزین، بدون تغییر تنظیمات دیگر پروتکل‌ها.",
+    "en": "Safely migrate legacy Sudoku Exits to per-identity authenticated shared service with canonical quota event accounting, verified online presence and automatic entitlement/expiry reconciliation. Legacy service remains untouched until verified shared replacement."
   }
 }
