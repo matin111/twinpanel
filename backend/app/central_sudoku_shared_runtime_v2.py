@@ -310,17 +310,34 @@ else:
 
 
 async def _remote(conn: Any, request: dict, *, timeout: int = 300) -> dict:
-    encoded=base64.b64encode(remote_source().encode()).decode("ascii")
-    process=await asyncio.wait_for(conn.create_process(
-        "python3 -c \"$(printf '%s' '"+encoded+"' | base64 -d)\"",
-    ),timeout=25)
-    process.stdin.write(json.dumps(request,separators=(",",":")))
-    process.stdin.write_eof()
-    result=await asyncio.wait_for(process.wait(),timeout=timeout)
-    if result.exit_status:
+    from .node_runtime_connection import LocalRuntimeConnection
+    if isinstance(conn,LocalRuntimeConnection):
+        # LocalCore does not implement SSH create_process. Pass private keys
+        # exclusively on child stdin, never argv or logs. Never echo stderr.
+        import subprocess,sys
+        def local_exec():
+            return subprocess.run(
+                [sys.executable,"-c",remote_source()],
+                input=json.dumps(request,separators=(",",":")),
+                capture_output=True,text=True,timeout=timeout,check=False,
+            )
+        result=await asyncio.wait_for(asyncio.to_thread(local_exec),timeout=timeout+8)
+        result_exit=result.returncode
+        result_out=result.stdout
+    else:
+        encoded=base64.b64encode(remote_source().encode()).decode("ascii")
+        process=await asyncio.wait_for(conn.create_process(
+            "python3 -c \"$(printf '%s' '"+encoded+"' | base64 -d)\"",
+        ),timeout=25)
+        process.stdin.write(json.dumps(request,separators=(",",":")))
+        process.stdin.write_eof()
+        result=await asyncio.wait_for(process.wait(),timeout=timeout)
+        result_exit=result.exit_status
+        result_out=result.stdout
+    if result_exit:
         raise RuntimeError("SUDOKU_SHARED_REMOTE_"+str(request.get("action")).upper()+"_FAILED")
     try:
-        output=json.loads((result.stdout or "").strip().splitlines()[-1])
+        output=json.loads((result_out or "").strip().splitlines()[-1])
     except (IndexError,ValueError,TypeError) as exc:
         raise RuntimeError("SUDOKU_SHARED_REMOTE_ACK_INVALID") from exc
     if output.get("ok") is not True:
