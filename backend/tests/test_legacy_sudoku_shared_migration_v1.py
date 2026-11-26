@@ -53,12 +53,14 @@ class PublishedLegacySudokuMigrationTests(unittest.TestCase):
 
     def test_german_shared_ingress_is_unique_to_tunnel_40(self):
         mapping=MARKER.read_text()
-        self.assertIn("return 18554 if int(node_id)==13 else 18553",mapping)
+        self.assertIn("return {13:18554, 11:18555}.get(int(node_id),18553)",mapping)
         source=STAGE.read_text()
         self.assertIn("public_port=public_shared_sudoku_port(int(node.id))",source)
         self.assertIn("_sudoku_endpoint(host,public_port)",source)
         self.assertIn('"port":public_port',source)
         self.assertIn("port != public_shared_sudoku_port(node_id)",DELIVERY.read_text())
+        self.assertIn("shared_customer_host=_node_host(alternative_ingress)",source)
+        self.assertIn("host_override=shared_customer_host",source)
 
     def test_launcher_uses_fixed_node_unit_and_global_lock(self):
         source=MARKER.read_text()
