@@ -108,41 +108,30 @@ def _get_reseller(db: Session, reseller_id: int) -> Reseller:
     return reseller
 
 
-def _serialize(db: Session, reseller: Reseller) -> dict:
-    owner = db.get(User, reseller.owner_user_id)
-
-    customer_count = (
-        db.query(ResellerCustomer)
-        .filter(ResellerCustomer.reseller_id == reseller.id)
-        .count()
-    )
-
-    subscription_count = (
-        db.query(ResellerSubscription)
-        .filter(ResellerSubscription.reseller_id == reseller.id)
-        .count()
-    )
-
-    active_plan_count = (
-        db.query(ResellerPlanPrice)
-        .filter(
+def _serialize(db: Session, reseller: Reseller, aggregates: dict | None = None) -> dict:
+    if aggregates is None:
+        # Keep single-reseller edit/create response semantics unchanged.
+        owner = db.get(User, reseller.owner_user_id)
+        customer_count = db.query(ResellerCustomer).filter(
+            ResellerCustomer.reseller_id == reseller.id).count()
+        subscription_count = db.query(ResellerSubscription).filter(
+            ResellerSubscription.reseller_id == reseller.id).count()
+        active_plan_count = db.query(ResellerPlanPrice).filter(
             ResellerPlanPrice.reseller_id == reseller.id,
-            ResellerPlanPrice.is_active.is_(True),
-        )
-        .count()
-    )
-
-    wallet_transaction_count = (
-        db.query(ResellerWalletTransaction)
-        .filter(ResellerWalletTransaction.reseller_id == reseller.id)
-        .count()
-    )
-
-    traffic_transaction_count = (
-        db.query(ResellerTrafficTransaction)
-        .filter(ResellerTrafficTransaction.reseller_id == reseller.id)
-        .count()
-    )
+            ResellerPlanPrice.is_active.is_(True)).count()
+        wallet_transaction_count = db.query(ResellerWalletTransaction).filter(
+            ResellerWalletTransaction.reseller_id == reseller.id).count()
+        traffic_transaction_count = db.query(ResellerTrafficTransaction).filter(
+            ResellerTrafficTransaction.reseller_id == reseller.id).count()
+    else:
+        # Batch route preloads all counts; never query within the reseller loop.
+        rid = int(reseller.id)
+        owner = aggregates["owners"].get(int(reseller.owner_user_id))
+        customer_count = aggregates["customers"].get(rid, 0)
+        subscription_count = aggregates["subscriptions"].get(rid, 0)
+        active_plan_count = aggregates["plans"].get(rid, 0)
+        wallet_transaction_count = aggregates["wallet_transactions"].get(rid, 0)
+        traffic_transaction_count = aggregates["traffic_transactions"].get(rid, 0)
 
     balance = int(reseller.traffic_balance_bytes or 0)
     traffic_credit = int(reseller.traffic_credit_bytes or 0)
@@ -273,7 +262,31 @@ def list_resellers_v2(
             )
         )
 
-    return [_serialize(db, row) for row in query.order_by(Reseller.id.desc()).all()]
+    rows = query.order_by(Reseller.id.desc()).all()
+    if not rows:
+        return []
+
+    from sqlalchemy import func
+    reseller_ids = [int(row.id) for row in rows]
+    owner_ids = sorted({int(row.owner_user_id) for row in rows})
+    aggregates = {
+        "owners": {int(u.id): u for u in db.query(User).filter(
+            User.id.in_(owner_ids)).all()},
+    }
+    for key, model, extra_filter in (
+        ("customers", ResellerCustomer, None),
+        ("subscriptions", ResellerSubscription, None),
+        ("plans", ResellerPlanPrice, ResellerPlanPrice.is_active.is_(True)),
+        ("wallet_transactions", ResellerWalletTransaction, None),
+        ("traffic_transactions", ResellerTrafficTransaction, None),
+    ):
+        group = db.query(model.reseller_id, func.count()).filter(
+            model.reseller_id.in_(reseller_ids))
+        if extra_filter is not None:
+            group = group.filter(extra_filter)
+        aggregates[key] = {int(reseller_id): int(count)
+                           for reseller_id, count in group.group_by(model.reseller_id).all()}
+    return [_serialize(db, row, aggregates) for row in rows]
 
 
 @router.post("")
