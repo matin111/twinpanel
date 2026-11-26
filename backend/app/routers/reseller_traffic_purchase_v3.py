@@ -51,9 +51,11 @@ def buy_traffic_and_restore(
     db: Session = Depends(get_db),
 ):
     """Keep the same idempotency key when a usage-ledger row lock is busy."""
+    # Capture the stable primary key before any rollback expires ORM objects.
+    reseller_id = int(reseller.id)
     for attempt in range(5):
         try:
-            return _buy_traffic_once(payload, reseller, db)
+            return _buy_traffic_once(payload, reseller_id, db)
         except OperationalError as exc:
             db.rollback()
             code = getattr(getattr(exc, "orig", None), "pgcode", None)
@@ -69,12 +71,12 @@ def buy_traffic_and_restore(
     raise AssertionError("unreachable")
 
 
-def _buy_traffic_once(payload: BuyTrafficIn, reseller: Reseller, db: Session):
+def _buy_traffic_once(payload: BuyTrafficIn, reseller_id: int, db: Session):
 
     old = (
         db.query(ResellerTrafficTransaction)
         .filter(
-            ResellerTrafficTransaction.reseller_id == reseller.id,
+            ResellerTrafficTransaction.reseller_id == reseller_id,
             ResellerTrafficTransaction.idempotency_key
             == payload.idempotency_key
         )
@@ -91,7 +93,7 @@ def _buy_traffic_once(payload: BuyTrafficIn, reseller: Reseller, db: Session):
     # before reading wallet or pool balances, not after making pending writes.
     reseller = db.execute(
         select(Reseller)
-        .where(Reseller.id == reseller.id, Reseller.is_active.is_(True))
+        .where(Reseller.id == reseller_id, Reseller.is_active.is_(True))
         .with_for_update()
         .execution_options(populate_existing=True)
     ).scalar_one_or_none()
