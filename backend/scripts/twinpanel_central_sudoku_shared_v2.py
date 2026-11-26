@@ -65,6 +65,8 @@ def check_node(db,node_id,*,migrate_legacy=False):
         and node.status==NodeStatus.ONLINE and bool(node.show_to_users)
         and not is_central_node(db,int(node_id))
     )
+    if migrate_legacy and not migrated_candidate:
+        raise RuntimeError("SUDOKU_SHARED_LEGACY_MIGRATION_SCOPE_INVALID")
     if not (ordinary or migrated_candidate):
         raise RuntimeError("SUDOKU_SHARED_REQUIRES_HIDDEN_OR_EXPLICIT_LEGACY_EXIT")
     cfg=(db.query(NodeProtocolConfig)
