@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import and_, or_, case
 
 from ..database import SessionLocal
-from ..models import Node, NodeProtocolConfig, ProtocolCredential
+from ..models import Node, NodeProtocolConfig, ProtocolCredential, Subscription, SubscriptionStatus
 from ..quota_models import QuotaNodeCommand
 from ..protocol_identity import is_openvpn_central_pki_enabled
 from .. import subscription_enforcement as enforcement
@@ -205,6 +205,7 @@ def _claim_next_command(*, exclude_node_ids: set[int] | None = None) -> dict[str
             "protocol": protocol,
             "executor": expected_executor,
             "attempt": int(row.attempt_count),
+            "reason": str(payload.get("reason") or ""),
         }
         db.commit()
         return snapshot
@@ -606,6 +607,40 @@ async def _execute_classic_command(
     raise RuntimeError(f"unsupported classic protocol: {protocol}")
 
 
+_STALE_REVOKE_REASONS = frozenset({
+    "scheduled_expiration", "scheduled_quota_exhausted",
+    "quota_exhausted", "reseller_manual_suspend",
+    "subscription_deleted", "subscription_hard_deleted",
+})
+
+
+def _stale_enforcement_result(subscription, command_type: str, reason: str, now: datetime) -> str | None:
+    """Skip stale global entitlement commands before any node mutation.
+
+    A later renewal may make an old expiry/quota revoke obsolete. Conversely,
+    no queued restore may reactivate an expired/suspended account. Do NOT skip
+    node-scoped/migration or reseller-pool revokes based on subscription ACTIVE
+    alone: they have separate per-node/pool entitlements.
+    """
+    if subscription is None:
+        # Hard-deleted subscriptions still need node cleanup; the existing
+        # credential-specific worker must decide whether it can do so.
+        return None
+    valid = (
+        subscription.status == SubscriptionStatus.ACTIVE
+        and (subscription.expires_at is None or subscription.expires_at > now)
+        and (
+            int(subscription.traffic_limit_bytes or 0) <= 0
+            or int(subscription.traffic_used_bytes or 0) < int(subscription.traffic_limit_bytes or 0)
+        )
+    )
+    if command_type == "restore_subscription" and not valid:
+        return "controller_stale_restore_skipped"
+    if command_type == "revoke_subscription" and valid and reason in _STALE_REVOKE_REASONS:
+        return "controller_stale_revoke_skipped"
+    return None
+
+
 async def _execute_command(command: dict[str, Any]) -> None:
     command_id = str(command["command_id"])
     protocol = str(command["protocol"])
@@ -625,8 +660,17 @@ async def _execute_command(command: dict[str, Any]) -> None:
         if node is None or getattr(node, "retired_at", None) is not None:
             raise RuntimeError("exit node is unavailable")
 
-        handled_by_central_sudoku = False
-        if protocol == "sudoku":
+        # Recheck current entitlement at the moment the worker claims a
+        # possibly hours-old command. This never writes user balances or
+        # changes duration and prevents stale renew/revoke races.
+        current_sub = db.get(Subscription, subscription_id)
+        stale_result = _stale_enforcement_result(
+            current_sub, command_type, str(command.get("reason") or ""), datetime.utcnow(),
+        )
+        handled_by_central_sudoku = stale_result is not None
+        if stale_result is not None:
+            result_code = stale_result
+        if protocol == "sudoku" and stale_result is None:
             from .sudoku_central_enforcement_v1 import (
                 central_sudoku_enforcement_result,
             )

@@ -1,0 +1,23 @@
+name: Enforcement Current Entitlement Guard
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_enforcement_stale_entitlement_guard_v1.py
+      - .github/workflows/enforcement-current-entitlement-guard.yml
+permissions:
+  contents: read
+jobs:
+  entitlement-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile and test stale-command safety with no DB
+        run: |
+          python -m py_compile backend/app/services/account_enforcement_v2.py
+          python -m py_compile backend/tests/test_enforcement_stale_entitlement_guard_v1.py
+          python backend/tests/test_enforcement_stale_entitlement_guard_v1.py -v
