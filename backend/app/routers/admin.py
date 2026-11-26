@@ -1103,33 +1103,37 @@ def dashboard_summary_v2(
         }
 
 
-    # The authenticated live dashboard never displays monthly_usage_bytes.\n    # Scanning millions of quota events per page visit stalls the request pool.\n    # Keep the exact historical aggregate for the legacy endpoint only.\n    monthly_usage_bytes = None\n    if include_monthly_usage:\n        # TWINPANEL_MONTHLY_USAGE_V85
-    month_now = datetime.utcnow()
+    # The live admin dashboard does not display this expensive monthly total.
+    # Historical callers keep the exact aggregate when explicitly requested.
+    monthly_usage_bytes = None
+    if include_monthly_usage:
+        # TWINPANEL_MONTHLY_USAGE_V85
+        month_now = datetime.utcnow()
 
-    month_start = month_now.replace(
-        day=1,
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
+        month_start = month_now.replace(
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
 
-    monthly_usage_bytes = int(
-        db.query(
-            func.coalesce(
-                func.sum(
-                    QuotaUsageEvent.billable_bytes
-                ),
-                0,
+        monthly_usage_bytes = int(
+            db.query(
+                func.coalesce(
+                    func.sum(
+                        QuotaUsageEvent.billable_bytes
+                    ),
+                    0,
+                )
             )
+            .filter(
+                QuotaUsageEvent.reported_at >= month_start,
+                QuotaUsageEvent.reported_at <= month_now,
+            )
+            .scalar()
+            or 0
         )
-        .filter(
-            QuotaUsageEvent.reported_at >= month_start,
-            QuotaUsageEvent.reported_at <= month_now,
-        )
-        .scalar()
-        or 0
-    )
 
 
     return {
