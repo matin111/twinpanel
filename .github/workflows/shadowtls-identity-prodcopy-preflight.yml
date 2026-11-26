@@ -1,0 +1,25 @@
+name: ShadowTLS Identity Production Copy Preflight
+on:
+  pull_request:
+    paths:
+      - backend/scripts/twinpanel_shadowtls_identity_prodcopy_preflight.py
+      - backend/tests/test_shadowtls_identity_prodcopy_preflight.py
+      - backend/app/services/shadowtls_2022_identity_v1.py
+      - .github/workflows/shadowtls-identity-prodcopy-preflight.yml
+permissions:
+  contents: read
+jobs:
+  safe-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile no-side-effect code
+        run: |
+          python -m py_compile backend/scripts/twinpanel_shadowtls_identity_prodcopy_preflight.py
+          python -m py_compile backend/tests/test_shadowtls_identity_prodcopy_preflight.py
+      - name: Run synthetic production-copy safety checks without daemon
+        run: python backend/tests/test_shadowtls_identity_prodcopy_preflight.py -v
