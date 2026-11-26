@@ -180,7 +180,9 @@ jobs:
             "backend/app/routers/subscriptions.py" \
             "backend/app/routers/subscription_admin_v2.py" \
             "backend/app/routers/customer_subscription_management.py" \
-            "backend/tests/test_sudoku_legacy_real_accounting_v1.py"; do
+            "backend/tests/test_sudoku_legacy_real_accounting_v1.py" \
+            "components/customer-dashboard-pro.tsx" \
+            "components/customer-subscriptions-runtime.tsx"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Release would revert accounting or usage reporting"
               exit 1
