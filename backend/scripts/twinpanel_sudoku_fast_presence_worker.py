@@ -27,12 +27,14 @@ from app.services.accounting_device_map_batch_v1 import (
     install_accounting_device_batch_cache, build_presence_devices_for_protocols,
 )
 from app.services.central_runtime_ownership_v1 import is_central_node
+from app.services.legacy_sudoku_shared_migration_v1 import is_legacy_shared_node
 from app.services.sudoku_shared_native_presence_v1 import (
     collect_shared_native_users, apply_shared_native_presence,
     apply_shared_native_counters,
 )
 from app.services.sudoku_legacy_systemd_accounting_v1 import (
     collect_legacy_unit_counters, apply_legacy_unit_counters,
+    eligible_legacy_units,
 )
 
 LOCK_FILE = Path("/run/twinpanel-sudoku-fast-presence-v1.lock")
@@ -69,7 +71,8 @@ async def reconcile_once() -> dict:
                     continue
                 # Registered published central Exits have ONE shared port for
                 # every account. No per-user presence may be inferred from it.
-                central_shared = is_central_node(db, node_id)
+                central_shared = (is_central_node(db, node_id)
+                                  or is_legacy_shared_node(db, node_id))
                 node = db.get(Node, node_id)
                 # This is a read-only lookup. Release the PostgreSQL
                 # transaction BEFORE awaiting SSH (up to 12 seconds).
@@ -115,8 +118,18 @@ async def reconcile_once() -> dict:
                         db,node=node,devices=devices,snapshot=native,
                     )
                 else:
+                    # The old socket-only check could mark the wrong account
+                    # online if another service happened to use its port.
+                    # A legitimate legacy subscriber must own a verified,
+                    # active per-subscription systemd unit on this Exit.
+                    verified_ports={
+                        int(unit["port"]):ports.get(int(unit["port"]),0)
+                        for unit in eligible_legacy_units(devices)
+                        if int(unit["sid"]) in counters
+                    } if usage_ok else {}
                     stats = canonical._apply_sudoku_presence(
-                        db, node=node, devices=devices, established_ports=ports,
+                        db, node=node, devices=devices,
+                        established_ports=verified_ports,
                     )
                     usage = (
                         apply_legacy_unit_counters(
