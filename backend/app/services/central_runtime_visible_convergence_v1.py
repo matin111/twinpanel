@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
 from datetime import datetime
 
 from ..database import SessionLocal
@@ -32,10 +33,32 @@ _log=logging.getLogger(__name__)
 _INTERVAL_SECONDS=30
 
 
+def _stage_unit_running(unit: str) -> bool:
+    """Defer if an already-scheduled transient stage owns this exact unit.
+
+    Re-running systemd-run with an active fixed name is always rejected.
+    Treat inability to read systemd state as a hard scan error, not as
+    permission to enqueue duplicate heavy stages.
+    """
+    if not unit.startswith(("twinpanel-legacy-sudoku-shared-", "twinpanel-central-node-stage-")):
+        raise ValueError("CENTRAL_STAGE_UNIT_INVALID")
+    try:
+        result = subprocess.run(
+            ["systemctl", "show", "--no-pager", "--property=ActiveState", "--value", unit],
+            capture_output=True, text=True, check=False, timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("CENTRAL_STAGE_UNIT_STATE_UNAVAILABLE") from exc
+    if result.returncode:
+        raise RuntimeError("CENTRAL_STAGE_UNIT_STATE_UNAVAILABLE")
+    return result.stdout.strip() in {"active", "activating", "reloading"}
+
+
 def run_once() -> dict:
     """One fleet-wide scan, no account-level network access or credentials."""
     dispatched=[]
     clean=[]
+    in_progress=[]
     failed=[]
     with SessionLocal() as db:
         nodes=(db.query(Node)
@@ -57,6 +80,9 @@ def run_once() -> dict:
                     if sudoku_last_applied(db,node_id)==sudoku_desired(db,node_id):
                         clean.append(node_id)
                         continue
+                    if _stage_unit_running(f"twinpanel-legacy-sudoku-shared-{node_id}.service"):
+                        in_progress.append(node_id)
+                        continue
                     launch_legacy_shared_reconcile(db,node_id)
                     dispatched.append(node_id)
                     continue
@@ -64,6 +90,9 @@ def run_once() -> dict:
                     load_desired_state(db,node_id),max_users=3000)
                 if last_applied(db,node_id)==desired.fingerprint:
                     clean.append(node_id)
+                    continue
+                if _stage_unit_running(f"twinpanel-central-node-stage-{node_id}.service"):
+                    in_progress.append(node_id)
                     continue
                 # systemd-run --unit fixed per Exit ensures at most one active
                 # job. The stage itself takes an independent file lock.
@@ -78,7 +107,8 @@ def run_once() -> dict:
                 failed.append(node_id)
             finally:
                 db.rollback()
-    return {"ok":not failed,"dispatched":dispatched,
+    return {"ok":not failed and not in_progress,
+            "dispatched":dispatched, "in_progress":in_progress,
             "up_to_date":clean,"deferred":failed}
 
 
