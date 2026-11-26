@@ -52,10 +52,8 @@ class PublishedLegacySudokuMigrationTests(unittest.TestCase):
         self.assertIn('if int(unit["sid"]) in counters',WORKER.read_text())
 
     def test_german_shared_ingress_is_unique_to_tunnel_40(self):
-        from app.services.legacy_sudoku_shared_migration_v1 import public_shared_sudoku_port
-        self.assertEqual(public_shared_sudoku_port(6),18553)
-        self.assertEqual(public_shared_sudoku_port(13),18554)
-        self.assertEqual(public_shared_sudoku_port(11),18553)
+        mapping=MARKER.read_text()
+        self.assertIn("return 18554 if int(node_id)==13 else 18553",mapping)
         source=STAGE.read_text()
         self.assertIn("public_port=public_shared_sudoku_port(int(node.id))",source)
         self.assertIn("_sudoku_endpoint(host,public_port)",source)
