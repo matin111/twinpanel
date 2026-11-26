@@ -1,8 +1,8 @@
 {
-  "version": "1.1.21",
-  "source_sha": "73f389bb94b55549ad450fc0a07ef52c4710fdf2",
+  "version": "1.1.22",
+  "source_sha": "c638732b03e1f71b57565ac5dd03958dec27fab3",
   "notes": {
-    "fa": "مهاجرت ایمن سودوکو نودهای قدیمی به سرویس چندکاربره دارای شمارنده اختصاصی. ثبت و کسر حجم هر کاربر با موتور سهمیه مرکزی، تشخیص آنلاین مبتنی بر سرویس معتبر، همگام‌سازی خودکار سهمیه/انقضا، حفظ سرویس قدیمی تا تأیید جایگزین، بدون تغییر تنظیمات دیگر پروتکل‌ها.",
-    "en": "Safely migrate legacy Sudoku Exits to per-identity authenticated shared service with canonical quota event accounting, verified online presence and automatic entitlement/expiry reconciliation. Legacy service remains untouched until verified shared replacement."
+    "fa": "اصلاح مهاجرت سرویس سودوکوی فرانسه در پنل مرکزی: نصب امن موتور امضاشده/هش‌تأییدشده به‌صورت محلی بدون SFTP و انتقال محرمانه کلید کاربران از طریق stdin، با حفظ احراز هویت و موتور سهمیه مرکزی.",
+    "en": "Enable authenticated shared Sudoku migration on local TwinPanel core without self-SSH/SFTP; atomically install pinned verified binary and pass key material only over child stdin; preserve canonical quota accounting."
   }
 }
