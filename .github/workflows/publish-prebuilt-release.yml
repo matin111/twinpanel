@@ -169,6 +169,24 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Protect complete Cisco and L2TP staging on new Exit nodes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py" \
+            "backend/scripts/twinpanel_central_cisco_node_bulk_v1.py" \
+            "backend/tests/test_central_l2tp_node_bulk_v1.py" \
+            "backend/tests/test_central_cisco_node_bulk_v1.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would revert Cisco/L2TP new node accounts"
+              exit 1
+            }
+          done
+          grep -Fq 'if not USERNAME.fullmatch(name) or name in usernames:' source/backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py
+          python3 source/backend/tests/test_central_l2tp_node_bulk_v1.py -q
+          python3 source/backend/tests/test_central_cisco_node_bulk_v1.py -q
+
       - name: Preserve quota accounting and usage-display fixes in release
         shell: bash
         run: |
