@@ -10,7 +10,7 @@ from typing import Any
 
 from ..models import Node, NodeType
 from .central_runtime_ownership_v1 import is_central_node
-from .legacy_sudoku_shared_migration_v1 import is_legacy_shared_node
+from .legacy_sudoku_shared_migration_v1 import is_legacy_shared_node, public_shared_sudoku_port
 
 SHARED_SUDOKU_PORT = 18553
 
@@ -23,7 +23,7 @@ def _is_active_central_shared_item(db: Any, item: dict[str, Any]) -> bool:
         port = int(item.get("port"))
     except (TypeError, ValueError, OverflowError):
         return False
-    if node_id <= 0 or port != SHARED_SUDOKU_PORT:
+    if node_id <= 0 or port != public_shared_sudoku_port(node_id):
         return False
     node = db.get(Node, node_id)
     if (
