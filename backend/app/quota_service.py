@@ -54,9 +54,10 @@ def _activate_from_accepted_traffic(db: Session, subscription: Subscription, *, 
         return False
 
     from .subscription_override_models import (
+        classify_time_policy,
         duration_days,
-        duration_is_unlimited,
         effective_expiry_at,
+        get_subscription_override,
     )
 
     if subscription.starts_at is not None:
@@ -70,11 +71,19 @@ def _activate_from_accepted_traffic(db: Session, subscription: Subscription, *, 
         subscription.expires_at = expiry
         return True
 
-    if duration_is_unlimited(db, subscription):
+    plan = db.get(Plan, subscription.plan_id) if subscription.plan_id is not None else None
+    override = get_subscription_override(db, subscription.id)
+    time_policy = classify_time_policy(subscription, plan, override)
+    if time_policy == "legacy_unknown_duration":
+        # Historical planless accounts may predate explicit unlimited flags.
+        # Accept verified traffic under the existing quota policy but do not
+        # silently turn missing-duration imports into first-use unlimited time.
+        return False
+    if time_policy == "explicit_unlimited":
         subscription.starts_at = now
+        subscription.expires_at = None
         return True
 
-    plan = db.get(Plan, subscription.plan_id) if subscription.plan_id is not None else None
     days = int(subscription.activation_duration_days or (plan.duration_days if plan else 0) or 0)
     if days <= 0:
         return False
