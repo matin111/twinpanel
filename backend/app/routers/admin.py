@@ -961,6 +961,8 @@ def reset_password(
 )
 def dashboard_summary_v2(
     db: Session = Depends(get_db),
+    *,
+    include_monthly_usage: bool = True,
 ):
     from datetime import datetime, timedelta, timezone
     from zoneinfo import ZoneInfo
@@ -1101,7 +1103,7 @@ def dashboard_summary_v2(
         }
 
 
-    # TWINPANEL_MONTHLY_USAGE_V85
+    # The authenticated live dashboard never displays monthly_usage_bytes.\n    # Scanning millions of quota events per page visit stalls the request pool.\n    # Keep the exact historical aggregate for the legacy endpoint only.\n    monthly_usage_bytes = None\n    if include_monthly_usage:\n        # TWINPANEL_MONTHLY_USAGE_V85
     month_now = datetime.utcnow()
 
     month_start = month_now.replace(
