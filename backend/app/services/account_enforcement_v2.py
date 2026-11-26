@@ -539,22 +539,29 @@ async def _classic_v2ray(
     command_type: str,
 ) -> str:
     email = f"mv-{int(subscription_id)}@twinpanel"
-    if command_type not in {"revoke_subscription", "restore_subscription"}:
+    if command_type == "revoke_subscription":
+        # The VLESS email is the canonical subscriber identity, even when
+        # node-specific UUID delivery was lost. Remove it through the live
+        # HandlerService and persist an atomic JSON update; NEVER restart
+        # the Xray daemon and disconnect unrelated active users.
+        from .xray_hot_client_revoke_v1 import hot_revoke_script
+        script = hot_revoke_script(subscription_id)
+    elif command_type == "restore_subscription":
+        # Reuse the existing proven per-user live add path. It requires
+        # the real node UUID and declines unverified rotations, rather than
+        # blindly rewriting every VLESS inbound then restarting the server.
+        from ..xray_hot_client_sync_v1 import hot_client_sync_script
+        client_id = _stored_v2ray_uuid(credential, node_id)
+        script = hot_client_sync_script(client_id, email)
+    else:
         raise RuntimeError(f"unsupported command type: {command_type}")
-    restore = command_type == "restore_subscription"
-    # Revocation targets the account's exact subscriber email. Only restore
-    # needs the per-node UUID; legacy records can lack that node delivery item.
-    client_id = _stored_v2ray_uuid(credential, node_id) if restore else None
 
-    script = f'''import json\np="/usr/local/etc/xray/config.json"\nd=json.load(open(p,encoding="utf-8"))\nemail={email!r}\nclient_id={client_id!r}\nfound=False\nfor inbound in d.get("inbounds",[]):\n    if not isinstance(inbound,dict) or inbound.get("protocol")!="vless":\n        continue\n    clients=inbound.setdefault("settings",{{}}).setdefault("clients",[])\n    clients[:]=[c for c in clients if not isinstance(c,dict) or c.get("email")!=email]\n    if {restore!r}:\n        clients.append({{"id":client_id,"email":email}})\n    found=True\nif not found:\n    raise SystemExit("vless inbound unavailable")\nwith open(p,"w",encoding="utf-8") as f:\n    json.dump(d,f,ensure_ascii=False,indent=2); f.write("\\n")\n'''
     encoded = base64.b64encode(script.encode()).decode()
     await _remote_run(
         conn,
-        "printf '%s' "
-        + shlex.quote(encoded)
-        + " | base64 -d | python3 && systemctl restart xray",
+        "printf '%s' " + shlex.quote(encoded) + " | base64 -d | python3",
     )
-    return "controller_classic_restored" if restore else "controller_classic_revoked"
+    return "controller_classic_restored" if command_type == "restore_subscription" else "controller_classic_revoked"
 
 
 async def _execute_classic_command(
