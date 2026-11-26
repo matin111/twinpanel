@@ -45,16 +45,29 @@ function persistUpdateAttention(value:boolean){
   try{window.localStorage.setItem(RELEASE_NOTICE_KEY,value?"1":"0");}catch{}
 }
 
-async function request<T>(path:string):Promise<T>{
+// Share only concurrent navigation reads, scoped to the authenticated session.
+const pendingAttention = new Map<string, Promise<unknown>>();
+
+export async function requestAttention<T>(path:string):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
-  const response=await fetch(`${API_BASE}${path}`,{
-    headers:{Authorization:`Bearer ${token}`},
-    cache:"no-store",
-    signal:AbortSignal.timeout(5000),
-  });
-  if(!response.ok)throw new Error(`API ${response.status}`);
-  return response.json() as Promise<T>;
+  const key=JSON.stringify([token,path]);
+  const existing=pendingAttention.get(key);
+  if(existing)return existing as Promise<T>;
+  const pending=(async()=>{
+    const response=await fetch(`${API_BASE}${path}`,{
+      headers:{Authorization:`Bearer ${token}`},
+      cache:"no-store",
+      signal:AbortSignal.timeout(5000),
+    });
+    if(!response.ok)throw new Error(`API ${response.status}`);
+    const data=await response.json() as T;
+    if(getCustomerToken()!==token)throw new Error("AUTH_CHANGED");
+    return data;
+  })();
+  pendingAttention.set(key,pending);
+  try{return await pending;}
+  finally{if(pendingAttention.get(key)===pending)pendingAttention.delete(key);}
 }
 
 function normalizeRoute(raw:unknown):string|null{
@@ -78,7 +91,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshSupport=async()=>{
       try{
-        const rows=await request<SupportTicket[]>("/v1/admin/support/tickets?status=open");
+        const rows=await requestAttention<SupportTicket[]>("/v1/admin/support/tickets?status=open");
         if(!alive)return;
         const count=Array.isArray(rows)?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length:0;
         setState(current=>({...current,supportNeedsReplyCount:count}));
@@ -87,7 +100,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshPayments=async()=>{
       try{
-        const summary=await request<PaymentReviewSummary>("/v1/payments/admin/review-summary");
+        const summary=await requestAttention<PaymentReviewSummary>("/v1/payments/admin/review-summary");
         if(!alive)return;
         setState(current=>({...current,paymentReviewCount:Math.max(0,Number(summary.needs_review)||0)}));
       }catch{}
@@ -95,7 +108,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshNotifications=async()=>{
       try{
-        const payload=await request<NotificationPayload>("/v1/admin/panel-notifications");
+        const payload=await requestAttention<NotificationPayload>("/v1/admin/panel-notifications");
         if(!alive)return;
         const rows=Array.isArray(payload.items)?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object")):[];
         const unreadRows=rows.filter(row=>!row.is_read&&!row.read_at);
@@ -107,7 +120,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshRelease=async()=>{
       try{
-        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
+        const release=await requestAttention<ReleaseStatus>("/v1/admin/system/release/status");
         if(!alive)return;
         const available=Boolean(release.update_available);
         persistUpdateAttention(available);
