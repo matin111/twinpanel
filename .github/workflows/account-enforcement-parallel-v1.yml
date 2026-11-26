@@ -1,0 +1,24 @@
+name: Account Enforcement Bounded Node Concurrency
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_enforcement_bounded_parallel_nodes_v1.py
+      - .github/workflows/account-enforcement-parallel-v1.yml
+permissions:
+  contents: read
+jobs:
+  bounded-node-concurrency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: |
+          python -m py_compile backend/app/services/account_enforcement_v2.py
+          python -m py_compile backend/tests/test_enforcement_bounded_parallel_nodes_v1.py
+      - name: Isolated worker concurrency and DB boundary tests
+        run: python backend/tests/test_enforcement_bounded_parallel_nodes_v1.py -v
