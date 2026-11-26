@@ -97,12 +97,16 @@ def account_rows(subs) -> list[dict]:
         password = str(sub.account_password_encrypted or "")
         if sid <= 0 or sid in seen_ids:
             raise RuntimeError("DUPLICATE_CENTRAL_SUBSCRIPTION_ID")
-        if not USERNAME.fullmatch(name) or not password or any(
+        if not name or not password or any(
             char in password for char in ("\n", "\r", "\x00")
         ):
             raise RuntimeError("ELIGIBLE_ACCOUNT_WITH_INVALID_IDENTITY")
         seen_ids.add(sid)
-        if name in usernames:
+        # A single imported username may contain Unicode, spaces or exceed
+        # ocserv/PPP's safe login contract. Keep the original subscription
+        # identity untouched, and issue a stable node-only alias instead of
+        # failing provisioning for every other eligible subscriber.
+        if not USERNAME.fullmatch(name) or name in usernames:
             import hashlib
             candidate = f"tp-sub-{sid}"
             if candidate in reserved or candidate in usernames:
