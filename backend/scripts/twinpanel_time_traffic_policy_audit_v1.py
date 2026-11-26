@@ -69,6 +69,15 @@ def build_summary(rows: list[dict]) -> dict:
             count for (status,time_policy,_),count in groups.items()
             if status == "ACTIVE" and time_policy == "legacy_unknown_duration"
         ),
+        "unknown_legacy_started": sum(
+            1 for row in rows if str(row["status"]) == "ACTIVE"
+            and classify_row(row)[1] == "legacy_unknown_duration"
+            and row["starts_at"] is not None
+        ),
+        "conflicting_explicit_unlimited_with_expiry": sum(
+            1 for row in rows if bool(row["duration_unlimited"])
+            and row["expires_at"] is not None
+        ),
         "explicit_unlimited_active": sum(
             count for (status,time_policy,_),count in groups.items()
             if status == "ACTIVE" and time_policy == "explicit_unlimited"
