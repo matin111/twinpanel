@@ -1,8 +1,8 @@
 {
   "version": "1.1.18",
-  "source_sha": "84a2e96ee94d79ebe5f82043d871f561ac96af6c",
+  "source_sha": "db5e097604686acc9a8dd1ad4629f8b5b773db85",
   "notes": {
-    "fa": "اصلاح تشخیص آنلاین سودوکو با پورت محلی به‌جای پورت مقصد، ثبت مصرف واقعی سودوکو از شمارنده‌های آپلود/دانلود، و نمایش دقیق مصرف‌های کوچک در پنل و API. جلوگیری از بازگشت اصلاحات حسابداری در انتشارهای بعدی؛ بدون تغییر اعتبار/حجم کاربران یا DNS.",
-    "en": "Fix Sudoku presence attribution using local TCP ports, meter authenticated Sudoku uplink/downlink counters, retain sub-MB usage precision across customer/admin endpoints, and protect the fixes in the release workflow. No DNS or subscriber quota/date mutations."
+    "fa": "اصلاح تشخیص آنلاین سودوکو با پورت محلی به‌جای پورت مقصد، ثبت مصرف واقعی سودوکو از شمارنده‌های آپلود/دانلود، و نمایش دقیق مصرف‌های کوچک در پنل و API. جلوگیری از بازگشت اصلاحات حسابداری در انتشارهای بعدی؛ بدون تغییر اعتبار/حجم کاربران یا DNS. نمایش مصرف واقعی در صفحات اشتراک مشتری حتی برای مقادیر زیر یک مگابایت.",
+    "en": "Fix Sudoku presence attribution using local TCP ports, meter authenticated Sudoku uplink/downlink counters, retain sub-MB usage precision across customer/admin endpoints, and protect the fixes in the release workflow. No DNS or subscriber quota/date mutations. Render small nonzero consumption as KB/MB in customer subscription UI."
   }
 }
