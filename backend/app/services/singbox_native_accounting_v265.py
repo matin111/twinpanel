@@ -1469,7 +1469,7 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
         # operations. expire_on_commit=False keeps the loaded Node attributes
         # available without a new query. Do not hold a PostgreSQL snapshot
         # across network waits (idle-in-transaction resilience failure).
-        db.rollback()
+        db.commit()
 
         for node in nodes:
             node_started = time.monotonic()
