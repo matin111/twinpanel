@@ -1,8 +1,8 @@
 {
-  "version": "1.1.24",
-  "source_sha": "05ffda13f5b2937d049e3c90ed89db04d63aaa54",
+  "version": "1.1.25",
+  "source_sha": "23b4a64f7e2ab47a595f9b461c62b948da1221f1",
   "notes": {
-    "fa": "مسیر پایدار سودوکو آمریکا از ورودی ایران شماره ۲ روی پورت اختصاصی ۱۸۵۵۵، با حفظ سرویس سودوکوی دارای شمارنده هر کاربر و حسابداری مستقل از پروتکل‌های دیگر. آلمان روی پورت ۱۸۵۵۴ و ترکیه روی ۱۸۵۵۳ بدون تغییر باقی می‌مانند.",
-    "en": "Use separately validated Iran2 ingress 18555 for legacy USA Sudoku while keeping authenticated per-account US exit metering, Germany 18554 and Turkey 18553 unchanged. No DNS mutation."
+    "fa": "بهبود سرعت ربات و پنل مدیریت، کاهش درخواست‌های تکراری اعلان‌ها، جلوگیری از اجرای تکراری همگام‌سازی نودها و اصلاح لغو دسترسی Xray بدون راه‌اندازی مجدد سراسری.",
+    "en": "Improve bot and admin responsiveness, coalesce navigation polling, deduplicate node convergence stages and revoke individual Xray access without global daemon restart."
   }
 }
