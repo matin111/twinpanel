@@ -20,6 +20,7 @@ import secrets
 import stat
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path("/etc/twinpanel/sing-box/shadowtls-identity-canary")
@@ -181,11 +182,19 @@ def create(*, apply: bool) -> dict:
         installed.append(UNIT)
         run(["systemctl", "daemon-reload"])
         run(["systemctl", "enable", "--now", UNIT.stem], timeout=25)
-        # Wait for an actual API socket and successful service state.
-        service = run(["systemctl", "is-active", UNIT.stem], check=False)
-        if service.stdout.strip() != "active":
-            raise RuntimeError("SIDECAR_SYSTEMD_NOT_ACTIVE")
-        if not port_occupied(PORT) or not port_occupied(API_PORT):
+        # Native sing-box takes time to build hundreds of authenticated
+        # users; `systemctl start` succeeding is not a readiness signal.
+        # The deadline is bounded, never published without both live sockets.
+        ready = False
+        for _ in range(50):
+            service = run(["systemctl", "is-active", UNIT.stem], check=False)
+            if service.stdout.strip() != "active":
+                raise RuntimeError("SIDECAR_SYSTEMD_NOT_ACTIVE")
+            if port_occupied(PORT) and port_occupied(API_PORT):
+                ready = True
+                break
+            time.sleep(0.5)
+        if not ready:
             raise RuntimeError("SIDECAR_SOCKETS_UNAVAILABLE")
     except Exception:
         subprocess.run(["systemctl","stop",UNIT.stem],capture_output=True,timeout=8,check=False)
