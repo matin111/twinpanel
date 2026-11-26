@@ -20,6 +20,13 @@ from .central_node_desired_state_v1 import (
 )
 from .central_runtime_ownership_v1 import is_central_node, last_applied
 from .central_node_stage_launcher_v1 import launch, CentralStageLaunchError
+from .legacy_sudoku_shared_migration_v1 import (
+    is_legacy_shared_node, launch_legacy_shared_reconcile,
+)
+from .central_sudoku_fingerprint_v1 import (
+    desired_fingerprint as sudoku_desired,
+    last_applied as sudoku_last_applied,
+)
 
 _log=logging.getLogger(__name__)
 _INTERVAL_SECONDS=30
@@ -41,6 +48,17 @@ def run_once() -> dict:
             node_id=int(node.id)
             try:
                 if not is_central_node(db,node_id):
+                    # A published legacy Exit may own only the shared Sudoku
+                    # family. Its expiry/quota whitelist must still converge
+                    # automatically; never grant central ownership of Xray,
+                    # Cisco or any other family to this node.
+                    if not is_legacy_shared_node(db,node_id):
+                        continue
+                    if sudoku_last_applied(db,node_id)==sudoku_desired(db,node_id):
+                        clean.append(node_id)
+                        continue
+                    launch_legacy_shared_reconcile(db,node_id)
+                    dispatched.append(node_id)
                     continue
                 desired=require_valid_desired_state(
                     load_desired_state(db,node_id),max_users=3000)
