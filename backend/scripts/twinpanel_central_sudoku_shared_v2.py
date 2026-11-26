@@ -38,7 +38,7 @@ from app.services.central_family_readiness_v1 import verify_central_family_readi
 from app.services.central_sudoku_fingerprint_v1 import mark_applied as mark_sudoku_applied
 from app.services.central_runtime_ownership_v1 import is_central_node
 from app.services.legacy_sudoku_shared_migration_v1 import (
-    is_legacy_shared_node, mark_legacy_shared_node,
+    is_legacy_shared_node, mark_legacy_shared_node, public_shared_sudoku_port,
 )
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
@@ -99,14 +99,15 @@ def node_identity(document,node_id):
     return found
 
 def client_item(node,sub_id,private):
+    public_port=public_shared_sudoku_port(int(node.id))
     host=_node_host(node)
     if not host:
         raise RuntimeError("SUDOKU_SHARED_NODE_HOST_MISSING")
-    uri=_sudoku_share_uri(host,SHARED_PORT,private,
+    uri=_sudoku_share_uri(host,public_port,private,
                           f"tp-sub-{sub_id}-{node.name}-sudoku")
     config={
         "mode":"client","transport":"tcp",
-        "server_address":_sudoku_endpoint(host,SHARED_PORT),
+        "server_address":_sudoku_endpoint(host,public_port),
         "local_address":"127.0.0.1","local_port":1080,
         "key":private,"aead":"chacha20-poly1305",
         "padding_min":5,"padding_max":15,
@@ -116,7 +117,7 @@ def client_item(node,sub_id,private):
     }
     return {
         "node_id":int(node.id),"node":str(node.name),
-        "server":host,"server_ip":host,"port":SHARED_PORT,
+        "server":host,"server_ip":host,"port":public_port,
         "username":f"tp-sub-{sub_id}",
         "telemetry_identity":f"sudoku-sub-{sub_id}:{SHARED_PORT}",
         "config_format":"sudoku-json",
