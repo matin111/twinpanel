@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.23",
+  "version": "1.1.24",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-26T08:10:00Z",
+  "released_at": "2026-11-26T08:24:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9581837f41f00f2c68abb12b2715444ea94dcd21",
+  "source_sha": "05ffda13f5b2937d049e3c90ed89db04d63aaa54",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.23/twinpanel-1.1.23-linux-x86_64.tar.gz",
-    "sha256": "ab240c51ec99ea4fb211697621bb597e94a0d06905f909f91d52f26392cf8196",
-    "size_bytes": 31536264
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.24/twinpanel-1.1.24-linux-x86_64.tar.gz",
+    "sha256": "a1b58030abfebe94e6de67c0af006466cd7bc71cd62ea8d6b13a449edf05207d",
+    "size_bytes": 31492746
   },
   "notes": {
-    "fa": "سودوکو نود آلمان: پورت عمومی مجزای 18554 روی تونل مشترک ایران، هدایت به سرویس تایید هویت چندکاربره داخلی 18553، ثبت مصرف و انقضا در موتور سهمیه مرکزی، بدون تداخل با پورت 18553 ترکیه.",
-    "en": "Distinct public Sudoku port 18554 for German Exit on shared Iran ingress, forwarding to authenticated shared per-user core listener 18553; preserve Turkey 18553 and canonical subscription quota accounting."
+    "fa": "مسیر پایدار سودوکو آمریکا از ورودی ایران شماره ۲ روی پورت اختصاصی ۱۸۵۵۵، با حفظ سرویس سودوکوی دارای شمارنده هر کاربر و حسابداری مستقل از پروتکل‌های دیگر. آلمان روی پورت ۱۸۵۵۴ و ترکیه روی ۱۸۵۵۳ بدون تغییر باقی می‌مانند.",
+    "en": "Use separately validated Iran2 ingress 18555 for legacy USA Sudoku while keeping authenticated per-account US exit metering, Germany 18554 and Turkey 18553 unchanged. No DNS mutation."
   }
 }
