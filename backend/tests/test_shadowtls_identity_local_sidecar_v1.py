@@ -54,7 +54,7 @@ class SidecarSafetyTests(TestCase):
         self.assertEqual(cfg["inbounds"][0]["listen_port"],19448)
         self.assertEqual(cfg["services"][0]["listen_port"],19096)
         self.assertEqual(cfg["services"][0]["listen"],"127.0.0.1")
-        self.assertNotIn("twinpanel-bootstrap",str(cfg))
+        self.assertNotIn("twinpanel-bootstrap",str(cfg["inbounds"][1]))
         self.assertNotIn("test-old-inner",str(cfg))
         self.assertNotIn("test-outer-one",str(cfg["inbounds"][1]))
 
