@@ -16,6 +16,8 @@ class SudokuSharedAccountingReleaseTests(unittest.TestCase):
         self.assertIn('downTotal',source)
         self.assertIn('"InvocationID"',source)
         self.assertIn('type(used) is not int',source)
+        self.assertIn('if up>0 or down>0:',source)
+        self.assertNotIn('if used>0:',source)
         self.assertNotIn('used!=up+down',source)
         self.assertIn('validated_counters',source)
 
