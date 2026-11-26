@@ -101,6 +101,31 @@ class CentralQuotaContractTests(TestCase):
         self.assertEqual(report["revoke_commands_pending_24h"],5)
         self.assertEqual(report["first_use_date_flags"]["active_expiry_without_start"],2)
 
+    def test_all_central_entry_points_check_source_identity(self):
+        service = (ROOT / "quota_service.py").read_text(encoding="utf-8")
+        v2 = (ROOT / "quota_service_v2.py").read_text(encoding="utf-8")
+        for fn,source in (
+            ("apply_usage_event",service),
+            ("open_session",service),
+            ("open_session",v2),
+        ):
+            tree=ast.parse(source)
+            functions=[x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name==fn]
+            self.assertEqual(len(functions),1)
+            rendered=ast.unparse(functions[0])
+            self.assertIn("device_protocol_is_source(device.protocol, data.protocol)",rendered)
+
+    def test_activation_from_usage_requires_positive_accepted_bytes(self):
+        tree=ast.parse((ROOT/"quota_service.py").read_text(encoding="utf-8"))
+        f=next(n for n in tree.body if isinstance(n,ast.FunctionDef)
+               and n.name=="_activate_from_accepted_traffic")
+        self.assertIn("int(accepted) <= 0",ast.unparse(f))
+        usage=next(n for n in tree.body if isinstance(n,ast.FunctionDef)
+                   and n.name=="apply_usage_event")
+        code=ast.unparse(usage)
+        self.assertIn("accepted=accepted",code)
+        self.assertIn("if not blocked",code)
+
     def test_mismatched_cursor_is_visible_and_never_healthy(self):
         report=audit["build_report"](
             devices=[],cursors=[],
