@@ -1,8 +1,7 @@
 "use client";
 
 import {useEffect,useState} from "react";
-import {API_BASE} from "../lib/api";
-import {getCustomerToken} from "../lib/customer-api";
+import {requestAttention} from "./admin-nav-attention";
 
 type ReviewSummary={
   needs_review:number;
@@ -30,17 +29,7 @@ const badgeStyle:React.CSSProperties={
 };
 
 async function fetchSummary():Promise<ReviewSummary>{
-  const token=getCustomerToken();
-  if(!token)throw new Error("AUTH_REQUIRED");
-  const response=await fetch(
-    `${API_BASE}/v1/payments/admin/review-summary`,
-    {
-      headers:{Authorization:`Bearer ${token}`},
-      cache:"no-store",
-    },
-  );
-  if(!response.ok)throw new Error(`API ${response.status}`);
-  return response.json() as Promise<ReviewSummary>;
+  return requestAttention<ReviewSummary>("/v1/payments/admin/review-summary");
 }
 
 export function PaymentReviewBadge(){
@@ -50,6 +39,7 @@ export function PaymentReviewBadge(){
     let alive=true;
 
     const refresh=async()=>{
+      if(!alive||document.visibilityState!=="visible")return;
       try{
         const summary=await fetchSummary();
         if(alive)setCount(Math.max(0,Number(summary.needs_review||0)));
