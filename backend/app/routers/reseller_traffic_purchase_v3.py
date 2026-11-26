@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -48,11 +50,61 @@ def buy_traffic_and_restore(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
+    """Keep the same idempotency key when a usage-ledger row lock is busy."""
+    for attempt in range(5):
+        try:
+            return _buy_traffic_once(payload, reseller, db)
+        except OperationalError as exc:
+            db.rollback()
+            code = getattr(getattr(exc, "orig", None), "pgcode", None)
+            if code not in {"55P03", "40P01", "40001"}:
+                raise
+            if attempt == 4:
+                raise HTTPException(
+                    status_code=503,
+                    detail="حسابداری نمایندگی مشغول است؛ خریدی ثبت نشده است. دوباره تلاش کنید.",
+                    headers={"Retry-After": "2"},
+                ) from exc
+            time.sleep(0.15 * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
+def _buy_traffic_once(payload: BuyTrafficIn, reseller: Reseller, db: Session):
+
     old = (
         db.query(ResellerTrafficTransaction)
         .filter(
+            ResellerTrafficTransaction.reseller_id == reseller.id,
             ResellerTrafficTransaction.idempotency_key
             == payload.idempotency_key
+        )
+        .first()
+    )
+    if old:
+        return {
+            "ok": True,
+            "duplicate": True,
+            "traffic_balance_bytes": int(old.balance_after or 0),
+        }
+
+    # Metering and buying charge the same reseller row. Acquire its lock
+    # before reading wallet or pool balances, not after making pending writes.
+    reseller = db.execute(
+        select(Reseller)
+        .where(Reseller.id == reseller.id, Reseller.is_active.is_(True))
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if reseller is None:
+        raise HTTPException(status_code=403, detail="نمایندگی غیرفعال است")
+
+    # Check again after waiting: a concurrent same-key purchase may already
+    # have committed. A retry must never deduct wallet/traffic twice.
+    old = (
+        db.query(ResellerTrafficTransaction)
+        .filter(
+            ResellerTrafficTransaction.reseller_id == reseller.id,
+            ResellerTrafficTransaction.idempotency_key == payload.idempotency_key,
         )
         .first()
     )
@@ -129,6 +181,7 @@ def buy_traffic_and_restore(
         duplicate = (
             db.query(ResellerTrafficTransaction)
             .filter(
+                ResellerTrafficTransaction.reseller_id == reseller.id,
                 ResellerTrafficTransaction.idempotency_key
                 == payload.idempotency_key
             )
