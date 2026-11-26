@@ -39,4 +39,12 @@ jobs:
           APP_SECRET_KEY: ci-only-not-a-real-secret
           DATABASE_URL: postgresql+psycopg2://unused:unused@127.0.0.1:65432/unused
           NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
-        run: python tests/test_time_volume_policy_v1.py -v
+        run: |
+          # Existing app/__init__.py imports legacy modules that access
+          # PostgreSQL on import. Tests use mocked sessions and must not
+          # depend on a real DB. This namespace overlay preserves all app
+          # source imports without running unrelated startup side effects.
+          mkdir -p /tmp/twinpanel-time-policy-ci/app/routers
+          printf '%s\n' 'from pkgutil import extend_path' '__path__ = extend_path(__path__, __name__)' > /tmp/twinpanel-time-policy-ci/app/__init__.py
+          printf '%s\n' 'from pkgutil import extend_path' '__path__ = extend_path(__path__, __name__)' > /tmp/twinpanel-time-policy-ci/app/routers/__init__.py
+          PYTHONPATH="/tmp/twinpanel-time-policy-ci:." python tests/test_time_volume_policy_v1.py -v
