@@ -44,7 +44,7 @@ class PublishedLegacySudokuMigrationTests(unittest.TestCase):
 
     def test_delivery_metering_revoke_and_expiry_have_scoped_ownership(self):
         self.assertIn("is_legacy_shared_node(db,node_id)",DELIVERY.read_text())
-        self.assertIn("is_legacy_shared_node(db, node_id)",SCHEDULER.read_text())
+        self.assertIn("is_legacy_shared_node(db,node_id)",SCHEDULER.read_text())
         self.assertIn("launch_legacy_shared_reconcile",SCHEDULER.read_text())
         self.assertIn("is_legacy_shared_node(db,node_id)",WORKER.read_text())
         self.assertIn("launch_legacy_shared_reconcile",ENFORCE.read_text())
