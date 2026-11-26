@@ -264,13 +264,13 @@ def manage_subscription(
         "traffic_used_gb":
             round(
                 used / 1024**3,
-                2,
+                6,
             ),
 
         "traffic_remaining_gb":
             round(
                 remaining / 1024**3,
-                2,
+                6,
             ),
 
         "device_limit": device_limit,
