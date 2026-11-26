@@ -483,7 +483,8 @@ def install_account_link_feature(
         if callback.message is not None:
             await show_navigation_page(callback.message, 
                 "🔗 <b>دریافت لینک اکانت</b>\n\n"
-                "نام کاربری VPN اکانت خود را وارد کنید.",
+                "نام کاربری VPN اکانت خود را وارد کنید.\n\n"
+                "پس از دریافت لینک، آن را داخل مرورگر باز کنید؛ پروتکل و سرور دلخواه را انتخاب و کانفیگ یا اطلاعات اتصال را در برنامه سازگار وارد کنید.",
                 reply_markup=_cancel_keyboard(),
             )
 
@@ -496,7 +497,8 @@ def install_account_link_feature(
         await state.set_state(AccountLinkState.username)
         await message.answer(
             "🔗 <b>دریافت لینک اکانت</b>\n\n"
-            "نام کاربری VPN اکانت خود را وارد کنید.",
+            "نام کاربری VPN اکانت خود را وارد کنید.\n\n"
+                "پس از دریافت لینک، آن را داخل مرورگر باز کنید؛ پروتکل و سرور دلخواه را انتخاب و کانفیگ یا اطلاعات اتصال را در برنامه سازگار وارد کنید.",
             reply_markup=_cancel_keyboard(),
         )
 
