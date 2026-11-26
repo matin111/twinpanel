@@ -1063,7 +1063,7 @@ async def _collect_established_tcp_ports(
     ok, output = await _run_node_command(
         conn,
         r"""set -eu
-ss -H -tn state established | awk '{print $4}'
+ss -H -tn state established | awk '{print $3}'
 """,
         timeout=6,
     )
