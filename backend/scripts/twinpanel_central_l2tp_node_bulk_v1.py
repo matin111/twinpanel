@@ -275,7 +275,21 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
                 cred = ProtocolCredential(subscription_id=sid, protocol="l2tp")
                 db.add(cred)
             items = ad._autosync_credential_items(cred)
-            if any(ad._autosync_item_node_id(item) == node_id for item in items):
+            existing_item = next(
+                (item for item in items if ad._autosync_item_node_id(item) == node_id),
+                None,
+            )
+            if existing_item is not None:
+                # Correct only this node's stale login after collision/Unicode
+                # aliasing; preserve every other published node's credentials.
+                if (existing_item.get("username") == row["username"]
+                        and existing_item.get("password") == row["password"]):
+                    continue
+                existing_item["username"] = row["username"]
+                existing_item["password"] = row["password"]
+                cred.config_text_encrypted = ad._enc(items)
+                cred.is_active = True
+                stored += 1
                 continue
             item = {
                 "node_id": node_id, "node": node.name,
