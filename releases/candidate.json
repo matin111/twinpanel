@@ -1,8 +1,8 @@
 {
-  "version": "1.1.19",
-  "source_sha": "9c4499ef3ef2869525cdaf1c02d7eaa3c4522809",
+  "version": "1.1.20",
+  "source_sha": "a04f243a0d1701252b5a1fdbc0ff4a774385852a",
   "notes": {
-    "fa": "رفع توقف گروهی نصب حساب‌های Cisco/OpenConnect و L2TP روی نودهای جدید مانند دوبی و هلند، در صورت وجود نام کاربری وارداتی ناسازگار. ساخت نام ورود یکتای اختصاصی برای همان نود بدون تغییر نام اصلی کاربر، رمز یا سایر نودها. افزودن تست بازگشت و حفاظت انتشار.",
-    "en": "Fix all-or-nothing Cisco/OpenConnect and L2TP bulk provisioning for new Exits when an imported account username is incompatible. Assign a stable per-node login alias without touching original credentials or existing nodes; add regression and release guards."
+    "fa": "تکمیل اصلاح Cisco و L2TP نودهای جدید دوبی و هلند: رفع توقف ساخت همه حساب‌ها به‌خاطر یک نام کاربری وارداتی ناسازگار، و ترمیم خودکار کانفیگ‌های ازقبل‌موجود که نام ورود آن‌ها با احراز هویت واقعی سرور متفاوت است؛ بدون تغییر نام اصلی اشتراک یا کانفیگ نودهای دیگر.",
+    "en": "Complete Cisco/L2TP new-Exit account repair: preserve stable aliases for incompatible imported usernames and reconcile stale existing per-node login credentials with actual remote service authentication without modifying other nodes."
   }
 }
