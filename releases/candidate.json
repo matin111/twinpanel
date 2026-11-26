@@ -1,6 +1,6 @@
 {
   "version": "1.1.23",
-  "source_sha": "fb0bc11d9541c25df9f341eb41e86ace7c37504c",
+  "source_sha": "9581837f41f00f2c68abb12b2715444ea94dcd21",
   "notes": {
     "fa": "سودوکو نود آلمان: پورت عمومی مجزای 18554 روی تونل مشترک ایران، هدایت به سرویس تایید هویت چندکاربره داخلی 18553، ثبت مصرف و انقضا در موتور سهمیه مرکزی، بدون تداخل با پورت 18553 ترکیه.",
     "en": "Distinct public Sudoku port 18554 for German Exit on shared Iran ingress, forwarding to authenticated shared per-user core listener 18553; preserve Turkey 18553 and canonical subscription quota accounting."
