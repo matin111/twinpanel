@@ -30,6 +30,15 @@ def key(node_id: int) -> str:
     return f"vpn.legacy_sudoku_shared.exit.{nid}.migrated_v1"
 
 
+def public_shared_sudoku_port(node_id: int) -> int:
+    """Public ingress port, not the core listener. Germany shares Iran TP6
+    ingress with Turkey, so it must never claim Turkey's :18553 socket.
+    Dedicated TP40 ingress uses :18554 -> German shared core :18553.
+    This mapping is intentionally confined to Sudoku for the legacy Exit.
+    """
+    return 18554 if int(node_id)==13 else 18553
+
+
 def is_legacy_shared_node(db, node_id: int) -> bool:
     try:
         return get_value(db, key(node_id), "") == "v1"
