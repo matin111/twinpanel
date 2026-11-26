@@ -76,7 +76,7 @@ class EntitlementCommandSafety(TestCase):
         self.assertIn("if not handled_by_central_sudoku:",source)
         claim=next(n for n in TREE.body if isinstance(n,ast.FunctionDef)
                    and n.name=="_claim_next_command")
-        self.assertIn('"reason"',ast.unparse(claim))
+        self.assertIn("'reason':",ast.unparse(claim))
 
 if __name__=="__main__":
     main()
