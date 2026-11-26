@@ -12,8 +12,11 @@ from .quota_schemas import SessionOpenIn
 from .quota_service import _lock
 from .quota_source_identity_v1 import device_protocol_is_source
 from .subscription_override_models import (
+    classify_time_policy,
     duration_is_unlimited,
     effective_device_limit,
+    get_subscription_override,
+    has_verified_unlimited_time,
 )
 
 
@@ -100,12 +103,17 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
     if max_sessions > 0 and active_count >= max_sessions:
         raise HTTPException(status_code=409, detail="concurrent_session_limit")
 
-    # First successful VPN session starts the clock. V2 unlimited-time
-    # subscriptions record starts_at but intentionally leave expires_at NULL.
+    # Explicit unlimited time has no expiry even when volume is finite.
+    # Missing duration on migrated planless accounts is NOT proof of a
+    # purchased unlimited term; preserve their access without assigning
+    # a synthetic first-use clock or expiry until provenance is reviewed.
+    override = get_subscription_override(db, subscription.id)
+    policy_at_admission = classify_time_policy(subscription, plan, override)
     if subscription.starts_at is None and subscription.expires_at is None:
         if duration_is_unlimited(db, subscription):
-            subscription.starts_at = now
-            subscription.expires_at = None
+            if policy_at_admission == "explicit_unlimited":
+                subscription.starts_at = now
+                subscription.expires_at = None
         else:
             duration_days = int(
                 subscription.activation_duration_days
@@ -161,6 +169,12 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
         "status": vpn_session.status,
         "active_sessions": active_count + 1,
         "max_concurrent_sessions": max_sessions,
+        # Keep the legacy flag for existing clients, but expose the explicit
+        # policy independently for new consumers and administrative audits.
         "duration_unlimited": duration_is_unlimited(db, subscription),
+        "duration_unlimited_verified": has_verified_unlimited_time(
+            subscription, plan, override
+        ),
+        "time_policy_state": classify_time_policy(subscription, plan, override),
         "traffic_unlimited": limit == 0,
     }
