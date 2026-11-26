@@ -10,6 +10,7 @@ from .models import Plan, Subscription, SubscriptionStatus
 from .quota_models import QuotaDevice, QuotaSession
 from .quota_schemas import SessionOpenIn
 from .quota_service import _lock
+from .quota_source_identity_v1 import device_protocol_is_source
 from .subscription_override_models import (
     duration_is_unlimited,
     effective_device_limit,
@@ -77,6 +78,7 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
         device is None
         or device.subscription_id != subscription.id
         or device.status != "active"
+        or not device_protocol_is_source(device.protocol, data.protocol)
     ):
         raise HTTPException(status_code=403, detail="device_not_allowed")
 

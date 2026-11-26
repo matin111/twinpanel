@@ -1,0 +1,33 @@
+name: Central Quota Identity and Evidence
+
+on:
+  pull_request:
+    paths:
+      - backend/app/quota_source_identity_v1.py
+      - backend/app/quota_service.py
+      - backend/app/quota_service_v2.py
+      - backend/scripts/twinpanel_central_quota_evidence_v1.py
+      - backend/tests/test_central_quota_identity_audit_v1.py
+      - .github/workflows/central-quota-identity-evidence.yml
+
+permissions:
+  contents: read
+
+jobs:
+  quota-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile central quota modules
+        run: |
+          python -m py_compile backend/app/quota_source_identity_v1.py
+          python -m py_compile backend/app/quota_service.py
+          python -m py_compile backend/app/quota_service_v2.py
+          python -m py_compile backend/scripts/twinpanel_central_quota_evidence_v1.py
+          python -m py_compile backend/tests/test_central_quota_identity_audit_v1.py
+      - name: Isolated source identity and accounting evidence tests
+        run: python backend/tests/test_central_quota_identity_audit_v1.py -v
