@@ -1,0 +1,36 @@
+name: Quota Device Identity Guard
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/quota_identity_contract_v1.py"
+      - "backend/app/quota_service.py"
+      - "backend/app/quota_service_v2.py"
+      - "backend/tests/test_quota_identity_contract_v1.py"
+      - ".github/workflows/quota-device-identity-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend requirements
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile modified modules
+        run: |
+          python -m py_compile backend/app/quota_identity_contract_v1.py
+          python -m py_compile backend/app/quota_service.py
+          python -m py_compile backend/app/quota_service_v2.py
+      - name: Verify all protocol mappings and reject cross-protocol billing
+        env:
+          PYTHONPATH: backend
+        run: python -m unittest -v tests.test_quota_identity_contract_v1
+        working-directory: backend
