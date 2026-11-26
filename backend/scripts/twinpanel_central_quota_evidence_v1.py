@@ -44,6 +44,52 @@ def _protocol_totals(rows: list[dict], name: str) -> dict[str, dict[str, int]]:
     return totals
 
 
+def node_protocol_matrix(configs: list[dict], cursors: list[dict],
+                         positives: list[dict]) -> list[dict]:
+    """Per-node evidence; ONLINE or a fresh cursor is never traffic proof."""
+    def key(row: dict):
+        name = _canonical(row.get("protocol"))
+        node_id = row.get("node_id")
+        return (int(node_id), name) if node_id is not None and name else None
+
+    lookup: dict[tuple[int, str], dict] = {}
+    for row in configs:
+        k = key(row)
+        if k is None:
+            continue
+        lookup[k] = {
+            "node_id": k[0], "protocol": k[1],
+            "configured_status": str(row.get("status") or ""),
+            "service_probe_fresh": bool(row.get("probe_fresh")),
+            "fresh_cursors_30m": 0,
+            "positive_events_6h": 0,
+            "accepted_bytes_6h": 0,
+        }
+    for rows, fields in (
+        (cursors, ("fresh_cursors_30m",)),
+        (positives, ("positive_events_6h", "accepted_bytes_6h")),
+    ):
+        for row in rows:
+            k = key(row)
+            if k is None or k not in lookup:
+                continue
+            target = lookup[k]
+            for field in fields:
+                target[field] += int(row.get(field) or 0)
+    matrix = []
+    for _, item in sorted(lookup.items()):
+        if item["positive_events_6h"] > 0 and item["accepted_bytes_6h"] > 0:
+            item["metering_evidence"] = "positive_attributed_ledger_events"
+        elif item["protocol"] == "shadowtls":
+            item["metering_evidence"] = "shadowtls_inner_identity_unverified"
+        elif item["fresh_cursors_30m"] > 0:
+            item["metering_evidence"] = "fresh_counter_no_positive_bytes"
+        else:
+            item["metering_evidence"] = "no_recent_positive_usage_observed"
+        matrix.append(item)
+    return matrix
+
+
 def build_report(
     *,
     devices: list[dict],
@@ -53,6 +99,9 @@ def build_report(
     expiry_flags: dict,
     enforcement: list[dict],
     observed_at_utc: str,
+    node_configs: list[dict] | None = None,
+    node_cursors: list[dict] | None = None,
+    node_positives: list[dict] | None = None,
 ) -> dict:
     device_counts = _protocol_totals(devices, "devices")
     cursor_counts = _protocol_totals(cursors, "cursors")
@@ -109,6 +158,9 @@ def build_report(
         "observed_at_utc": observed_at_utc,
         "registered_protocols": len(ALL_PROTOCOL_KEYS),
         "protocols": protocols,
+        "node_protocol_evidence": node_protocol_matrix(
+            node_configs or [], node_cursors or [], node_positives or []
+        ),
         "cursor_identity_mismatch_count": sum(int(x["cursor_count"]) for x in invalid_pairs),
         "cursor_identity_mismatch_pairs": invalid_pairs,
         "first_use_date_flags": {str(k): int(v or 0) for k, v in expiry_flags.items()},
@@ -174,11 +226,36 @@ def gather(db) -> dict:
            AND command_type IN ('revoke_subscription','restore_subscription')
          GROUP BY command_type,status
     """)).mappings()]
+    node_configs = [dict(r) for r in db.execute(text("""
+        SELECT c.node_id,c.protocol,c.status,
+               (c.checked_at IS NOT NULL
+                AND c.checked_at >= (NOW() AT TIME ZONE 'UTC') - interval '5 minutes')
+                    AS probe_fresh
+          FROM node_protocol_configs c JOIN nodes n ON n.id=c.node_id
+         WHERE n.retired_at IS NULL
+    """)).mappings()]
+    node_cursors = [dict(r) for r in db.execute(text("""
+        SELECT node_id,protocol,
+               count(*) FILTER (WHERE updated_at >= NOW() - interval '30 minutes')
+                   AS fresh_cursors_30m
+          FROM quota_cursors
+         GROUP BY node_id,protocol
+    """)).mappings()]
+    node_positives = [dict(r) for r in db.execute(text("""
+        SELECT node_id,protocol,count(*) AS positive_events_6h,
+               COALESCE(sum(accepted_bytes),0) AS accepted_bytes_6h
+          FROM quota_usage_events
+         WHERE accepted_bytes > 0
+           AND reported_at >= NOW()-interval '6 hours'
+         GROUP BY node_id,protocol
+    """)).mappings()]
     return build_report(
         devices=devices, cursors=cursors, positive_events=positive_events,
         cursor_device_pairs=pairs, expiry_flags=dates,
         enforcement=enforcement,
         observed_at_utc=datetime.now(timezone.utc).isoformat(),
+        node_configs=node_configs, node_cursors=node_cursors,
+        node_positives=node_positives,
     )
 
 
