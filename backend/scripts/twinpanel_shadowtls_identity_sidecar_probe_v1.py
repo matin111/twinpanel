@@ -109,6 +109,10 @@ def probe() -> dict:
         for name,pwd in zip(names,passwords)
     ]
     changed = json.loads(original)
+    # Test attribution independently of the node's upstream VLESS egress.
+    # The entire original sidecar config is restored in the finally block.
+    changed["outbounds"] = [{"type":"direct","tag":"direct"}]
+    changed["route"] = {"final":"direct"}
     for row in changed["inbounds"]:
         if row.get("tag") == module.NEW_OUTER_TAG:
             row["users"].extend(
@@ -197,6 +201,7 @@ def probe() -> dict:
                       and all(any(int(r.get("uplink_total") or 0)+int(r.get("downlink_total") or 0)>0
                                   for r in group) for group in evidence),
                 "synthetic_clients":2,
+                "test_route":"direct_only",
                 "http_success":checks,
                 "authenticated_inner_user_observed":[bool(group) for group in evidence],
                 "positive_per_user_bytes":[any(
