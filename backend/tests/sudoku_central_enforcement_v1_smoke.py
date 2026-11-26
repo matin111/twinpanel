@@ -112,7 +112,7 @@ def test_legacy_restore_never_resurrects_if_central_exit_registered():
 def test_controller_worker_retries_slow_whitelist_without_unjustified_success():
     from pathlib import Path
     worker=(Path(__file__).resolve().parents[1]/"app/services/account_enforcement_v2.py").read_text()
-    assert "if protocol == \"sudoku\":" in worker
+    assert 'if protocol == "sudoku" and stale_result is None:' in worker
     assert "handled_by_central_sudoku = True" in worker
     assert "if not handled_by_central_sudoku:" in worker
     assert "isinstance(error, CentralSudokuReconciliationPending)" in worker
