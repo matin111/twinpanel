@@ -169,6 +169,26 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Verify isolated legacy Sudoku migration and canonical accounting
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/services/legacy_sudoku_shared_migration_v1.py" \
+            "backend/app/services/central_runtime_visible_convergence_v1.py" \
+            "backend/app/services/sudoku_central_delivery_v1.py" \
+            "backend/app/services/sudoku_central_enforcement_v1.py" \
+            "backend/scripts/twinpanel_central_sudoku_shared_v2.py" \
+            "backend/scripts/twinpanel_sudoku_fast_presence_worker.py" \
+            "backend/tests/test_legacy_sudoku_shared_migration_v1.py" \
+            "backend/tests/sudoku_shared_native_presence_v1_smoke.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Release would revert authenticated Sudoku migration"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_legacy_sudoku_shared_migration_v1.py -q
+
       - name: Protect complete Cisco and L2TP staging on new Exit nodes
         shell: bash
         run: |
