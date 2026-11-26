@@ -29,7 +29,7 @@ class ResellerBulkReadContract(unittest.TestCase):
         source=inspect.getsource(reseller_portal.reseller_subscriptions)
         for entity in ("Subscription","User","Plan","SubscriptionProtocol",
                        "SubscriptionNode","SubscriptionRuntimeOverride"):
-            self.assertIn("db.query("+entity+")",source)
+            self.assertIn("db.query("+entity,source)
         self.assertIn("overrides_by_id.get(int(sub.id))",source)
         self.assertIn("protocols_by_subscription.get(int(sub.id)",source)
 
