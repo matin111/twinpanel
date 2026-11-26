@@ -32,5 +32,8 @@ jobs:
       - name: Verify all protocol mappings and reject cross-protocol billing
         env:
           PYTHONPATH: .
+          APP_SECRET_KEY: ci-only-not-a-real-secret
+          DATABASE_URL: sqlite:///:memory:
+          NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
         run: python tests/test_quota_identity_contract_v1.py -v
         working-directory: backend
