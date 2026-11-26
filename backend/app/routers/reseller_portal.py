@@ -463,13 +463,63 @@ def reseller_subscriptions(
         .all()
     )
 
+    # Avoid N+1 DB round-trips when a reseller owns thousands of accounts.
+    # Retain each returned row and its ordering; only change read batching.
+    from collections import defaultdict
+
+    subscription_ids = sorted({int(row.subscription_id) for row in rows})
+    customer_ids = sorted({int(row.customer_user_id) for row in rows if row.customer_user_id})
+    subs_by_id = {
+        int(sub.id): sub
+        for sub in (
+            db.query(Subscription).filter(Subscription.id.in_(subscription_ids)).all()
+            if subscription_ids else []
+        )
+    }
+    users_by_id = {
+        int(user.id): user
+        for user in (
+            db.query(User).filter(User.id.in_(customer_ids)).all()
+            if customer_ids else []
+        )
+    }
+    plan_ids = sorted({
+        int(sub.plan_id) for sub in subs_by_id.values() if sub.plan_id
+    })
+    plans_by_id = {
+        int(plan.id): plan
+        for plan in (
+            db.query(Plan).filter(Plan.id.in_(plan_ids)).all()
+            if plan_ids else []
+        )
+    }
+    protocols_by_subscription = defaultdict(list)
+    nodes_by_subscription = defaultdict(list)
+    for subscription_id, protocol in (
+        db.query(SubscriptionProtocol.subscription_id, SubscriptionProtocol.protocol)
+        .filter(SubscriptionProtocol.subscription_id.in_(subscription_ids)).all()
+        if subscription_ids else []
+    ):
+        protocols_by_subscription[int(subscription_id)].append(protocol)
+    for subscription_id, node_id in (
+        db.query(SubscriptionNode.subscription_id, SubscriptionNode.node_id)
+        .filter(SubscriptionNode.subscription_id.in_(subscription_ids)).all()
+        if subscription_ids else []
+    ):
+        nodes_by_subscription[int(subscription_id)].append(node_id)
+    overrides_by_id = {
+        int(override.subscription_id): override
+        for override in (
+            db.query(SubscriptionRuntimeOverride)
+            .filter(SubscriptionRuntimeOverride.subscription_id.in_(subscription_ids))
+            .all()
+            if subscription_ids else []
+        )
+    }
     result = []
 
     for row in rows:
-        sub = db.get(
-            Subscription,
-            row.subscription_id,
-        )
+        sub = subs_by_id.get(int(row.subscription_id))
 
         if not sub:
             continue
@@ -486,15 +536,16 @@ def reseller_subscriptions(
         if sub_status == "canceled":
             continue
 
-        user = db.get(
-            User,
-            row.customer_user_id,
-        )
+        user = users_by_id.get(int(row.customer_user_id or 0))
 
-        plan = db.get(
-            Plan,
-            sub.plan_id,
-        )
+        plan = plans_by_id.get(int(sub.plan_id or 0))
+        override = overrides_by_id.get(int(sub.id))
+        if override is not None and override.device_limit is not None:
+            device_limit = max(int(override.device_limit), 0)
+        elif plan is not None:
+            device_limit = max(int(plan.device_limit if plan.device_limit is not None else 1), 0)
+        else:
+            device_limit = 1
 
         result.append(
             {
@@ -522,10 +573,10 @@ def reseller_subscriptions(
                 ),
 
                 "plan_id": sub.plan_id,
-                "device_limit": effective_device_limit(db, sub, plan),
+                "device_limit": device_limit,
                 "activation_duration_days": int(sub.activation_duration_days or 0),
-                "protocols": [p[0] for p in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id == sub.id).all()],
-                "node_ids": [n[0] for n in db.query(SubscriptionNode.node_id).filter(SubscriptionNode.subscription_id == sub.id).all()],
+                "protocols": protocols_by_subscription.get(int(sub.id), []),
+                "node_ids": nodes_by_subscription.get(int(sub.id), []),
                 "plan_name": (
                     plan.name
                     if plan
