@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .models import Plan, Subscription, SubscriptionStatus
 from .quota_models import QuotaDevice, QuotaSession
 from .quota_schemas import SessionOpenIn
+from .quota_identity_contract_v1 import quota_device_matches_protocol
 from .quota_service import _lock
 from .subscription_override_models import (
     duration_is_unlimited,
@@ -77,6 +78,7 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
         device is None
         or device.subscription_id != subscription.id
         or device.status != "active"
+        or not quota_device_matches_protocol(device.protocol, data.protocol)
     ):
         raise HTTPException(status_code=403, detail="device_not_allowed")
 

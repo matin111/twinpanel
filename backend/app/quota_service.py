@@ -15,6 +15,7 @@ from .quota_models import (
     QuotaUsageEvent,
 )
 from .quota_schemas import CommandAckIn, SessionCloseIn, SessionOpenIn, UsageEventIn
+from .quota_identity_contract_v1 import quota_device_matches_protocol
 from .quota_security import advisory_key, sign_command
 from .subscription_enforcement import queue_subscription_enforcement
 
@@ -157,6 +158,10 @@ def apply_usage_event(db: Session, node_id: int, data: UsageEventIn) -> dict:
     device = db.get(QuotaDevice, data.device_id)
     if device is None or device.subscription_id != subscription.id:
         raise HTTPException(status_code=409, detail="device_subscription_mismatch")
+    # A device key for another protocol must never absorb this source's bytes.
+    # Canonical aliases (cisco/openconnect, v2ray/xray) are handled centrally.
+    if not quota_device_matches_protocol(device.protocol, data.protocol):
+        raise HTTPException(status_code=409, detail="device_protocol_mismatch")
 
     up_delta, down_delta = _counter_delta(data, cursor, epoch_changed)
     billable = up_delta + down_delta
