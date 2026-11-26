@@ -97,7 +97,9 @@ for row in rows:
     names.add(name)
     # The controller's "used" policy field can lag independent up/down\n    # counters mid-update; validate its type, but bill from upTotal/downTotal.\n    # Zero-traffic subscribers need no quota cursor: shared Exit whitelists
     # may contain thousands of users with no activity.
-    if used>0:
+    # Bill from authoritative wire counters, never from the potentially stale
+    # controller policy field "used". Preserve zero-traffic cursor suppression.
+    if up>0 or down>0:
         counters[name]={"up":up,"down":down}
     if conns>0:
         online[name]=conns
