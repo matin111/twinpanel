@@ -20,6 +20,11 @@ def get_current_user(
     user = db.query(User).filter(User.id == int(subject)).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User unavailable")
+    # FastAPI shares this Session with the endpoint. Release the auth-only
+    # SELECT transaction now, before an async handler may await SSH/HTTP for
+    # tens of seconds. expire_on_commit=False retains the loaded User fields.
+    # Authentication has not executed any account/billing writes.
+    db.commit()
     return user
 
 
@@ -55,4 +60,7 @@ def require_reseller(
             detail="نمایندگی غیرفعال است",
         )
 
+    # The reseller lookup is also read-only. Do not let the authentication
+    # dependency pin a request-pool connection while the handler awaits I/O.
+    db.commit()
     return reseller
