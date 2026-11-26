@@ -134,7 +134,8 @@ def test_async_ssh_success_and_error_never_expose_native_credentials():
 def test_dedicated_worker_retains_legacy_only_for_unregistered_exits():
     text=(Path(__file__).resolve().parents[1]/
           "scripts/twinpanel_sudoku_fast_presence_worker.py").read_text()
-    assert "central_shared = is_central_node(db, node_id)" in text
+    assert "central_shared = (is_central_node(db, node_id)" in text
+    assert "or is_legacy_shared_node(db, node_id)" in text
     assert "if central_shared:" in text
     assert "collect_shared_native_users(conn)" in text
     assert "apply_shared_native_presence(" in text
