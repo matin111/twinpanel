@@ -1,0 +1,30 @@
+name: HTTP Auth Transaction Pool Guard
+on:
+  pull_request:
+    paths:
+      - backend/app/deps.py
+      - backend/tests/test_auth_read_transaction_release_v1.py
+      - .github/workflows/http-auth-transaction-pool-guard.yml
+permissions:
+  contents: read
+jobs:
+  auth-read-transaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile modules
+        run: python -m py_compile backend/app/deps.py backend/tests/test_auth_read_transaction_release_v1.py
+      - name: Verify request connection release contract
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          APP_SECRET_KEY: ci-only-not-a-real-secret
+          DATABASE_URL: sqlite:///:memory:
+          NODE_AGENT_SHARED_SECRET: ci-only-not-a-real-secret
+        run: python tests/test_auth_read_transaction_release_v1.py -v
