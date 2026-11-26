@@ -143,7 +143,7 @@ def subscription_out(db: Session, sub: Subscription) -> SubscriptionOut:
         ),
 
         traffic_used_gb=(
-            round(sub.traffic_used_bytes / 1024 / 1024 / 1024, 2)
+            round(sub.traffic_used_bytes / 1024 / 1024 / 1024, 6)
         ),
 
         node_ids=node_ids,
@@ -257,8 +257,8 @@ def my_subscriptions(user: User = Depends(get_current_user), db: Session = Depen
                 sub.account_username
                 or None
             ),
-            traffic_limit_gb=round(limit_gb, 2), traffic_used_gb=round(used_gb, 2),
-            traffic_remaining_gb=round(remaining_gb, 2), days_remaining=days_remaining,
+            traffic_limit_gb=round(limit_gb, 2), traffic_used_gb=round(used_gb, 6),
+            traffic_remaining_gb=round(remaining_gb, 6), days_remaining=days_remaining,
             device_limit=effective_device_limit(db, sub, plan),
             duration_unlimited=duration_is_unlimited(db, sub, plan),
             reserved_renewal=next_reserved_renewal(db, sub.id),
