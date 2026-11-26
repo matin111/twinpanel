@@ -11,6 +11,9 @@ from typing import Any
 
 from ..models import Node, NodeType, SubscriptionNode
 from .central_runtime_ownership_v1 import is_central_node
+from .legacy_sudoku_shared_migration_v1 import (
+    is_legacy_shared_node, launch_legacy_shared_reconcile,
+)
 from .central_sudoku_fingerprint_v1 import (
     desired_fingerprint as desired_sudoku_fingerprint,
     entitled_ids as sudoku_entitled_ids,
@@ -38,7 +41,7 @@ def central_sudoku_enforcement_result(
         return None
     node_id = int(node.id)
 
-    if is_central_node(db, node_id):
+    if is_central_node(db, node_id) or is_legacy_shared_node(db,node_id):
         # Never acknowledge a command that contradicts the canonical
         # subscription status/expiry/quota/membership. Fingerprint parity
         # alone does not prove a particular command's intended result.
@@ -59,8 +62,11 @@ def central_sudoku_enforcement_result(
         )
 
         try:
-            launch(db, node_id)
-        except CentralStageLaunchError:
+            if is_legacy_shared_node(db,node_id):
+                launch_legacy_shared_reconcile(db,node_id)
+            else:
+                launch(db, node_id)
+        except (CentralStageLaunchError, RuntimeError):
             # A previously dispatched fixed-name unit may be running. Do
             # not mark the request succeeded. The controller's 30s periodic
             # scan will continue even if this opportunistic trigger fails.
@@ -91,6 +97,7 @@ def central_sudoku_enforcement_result(
     for other in published_exit_nodes:
         if other.id == node_id:
             continue
-        if is_central_node(db, int(other.id)):
+        if (is_central_node(db, int(other.id))
+                or is_legacy_shared_node(db,int(other.id))):
             return "controller_legacy_sudoku_restore_suppressed"
     return None
