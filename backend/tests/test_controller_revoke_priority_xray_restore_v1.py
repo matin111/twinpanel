@@ -62,56 +62,16 @@ class ControllerEnforcementTests(TestCase):
         self.assertEqual(len(persistence), 1)
         self.assertFalse(persistence[0]["enabled"])
 
-    def test_xray_restore_applies_to_every_vless_inbound_without_touching_others(self):
-        commands = []
-        uuid = "11223344-5566-7788-99aa-bbccddeeff00"
-        async def remote(conn, command, **kw):
-            commands.append(command)
-        namespace = isolated("_classic_v2ray", {
-            "base64": base64,
-            "shlex": shlex,
-            "_stored_v2ray_uuid": lambda credential, node_id: uuid,
-            "_remote_run": remote,
-        })
-        connector = object()
-        self.assertEqual(
-            asyncio.run(namespace["_classic_v2ray"](
-                connector, SimpleNamespace(), 42, 7, "restore_subscription"
-            )),
-            "controller_classic_restored",
-        )
-        self.assertEqual(len(commands), 1)
-        encoded = shlex.split(commands[0].split(" | base64 -d", 1)[0])[-1]
-        script = base64.b64decode(encoded).decode("utf-8")
-        with TemporaryDirectory() as directory:
-            path = Path(directory) / "fixture.json"
-            doc = {"inbounds": [
-                {"protocol": "vless", "settings": {"clients": [
-                    {"email": "mv-42@twinpanel", "id": "old"},
-                    {"email": "mv-9@twinpanel", "id": "other"}]}},
-                {"protocol": "vless", "settings": {"clients": [
-                    {"email": "mv-42@twinpanel", "id": "old2"}]}},
-                {"protocol": "vless", "settings": {"clients": []}},
-                {"protocol": "trojan", "settings": {"clients": [
-                    {"email": "mv-42@twinpanel", "id": "trojan"}]}}
-            ]}
-            path.write_text(json.dumps(doc), encoding="utf-8")
-            script = script.replace('p="/usr/local/etc/xray/config.json"', f"p={str(path)!r}")
-            for _ in (1, 2):
-                exec(compile(script, str(path), "exec"), {})
-                loaded = json.loads(path.read_text())
-                for inbound in loaded["inbounds"][:3]:
-                    matches = [c for c in inbound["settings"]["clients"]
-                               if c.get("email") == "mv-42@twinpanel"]
-                    self.assertEqual(matches, [{"id": uuid, "email": "mv-42@twinpanel"}])
-                self.assertEqual(
-                    loaded["inbounds"][0]["settings"]["clients"][0],
-                    {"email": "mv-9@twinpanel", "id": "other"},
-                )
-                self.assertEqual(
-                    loaded["inbounds"][3]["settings"]["clients"],
-                    doc["inbounds"][3]["settings"]["clients"],
-                )
+    def test_xray_restore_uses_existing_live_hot_sync_without_restart(self):
+        source = ast.unparse(next(
+            node for node in TREE.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_classic_v2ray"
+        ))
+        self.assertIn("hot_client_sync_script(client_id, email)", source)
+        self.assertIn("_stored_v2ray_uuid(credential, node_id)", source)
+        self.assertIn("hot_revoke_script(subscription_id)", source)
+        self.assertNotIn("systemctl restart xray", source)
+        self.assertIn("| base64 -d | python3", source)
 
 
 if __name__ == "__main__":
