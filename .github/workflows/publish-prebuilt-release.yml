@@ -169,6 +169,27 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Preserve quota accounting and usage-display fixes in release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/services/sudoku_shared_native_presence_v1.py" \
+            "backend/app/services/modern_quota_runtime_v257.py" \
+            "backend/app/routers/account_delivery.py" \
+            "backend/app/routers/subscriptions.py" \
+            "backend/app/routers/subscription_admin_v2.py" \
+            "backend/app/routers/customer_subscription_management.py" \
+            "backend/tests/test_sudoku_legacy_real_accounting_v1.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Release would revert accounting or usage reporting"
+              exit 1
+            }
+          done
+          grep -Fq "if up>0 or down>0:" source/backend/app/services/sudoku_shared_native_presence_v1.py
+          grep -Fq "ss -H -tn state established | awk '{print \\$3}'" source/backend/app/services/modern_quota_runtime_v257.py
+          python3 source/backend/tests/test_sudoku_legacy_real_accounting_v1.py -q
+
       - name: Prevent releases from reverting reserved renewal activation and configurations
         shell: bash
         run: |
