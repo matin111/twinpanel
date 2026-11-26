@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.19",
+  "version": "1.1.20",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-26T06:14:10Z",
+  "released_at": "2026-11-26T06:27:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9c4499ef3ef2869525cdaf1c02d7eaa3c4522809",
+  "source_sha": "a04f243a0d1701252b5a1fdbc0ff4a774385852a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.19/twinpanel-1.1.19-linux-x86_64.tar.gz",
-    "sha256": "57a382ac769f849f057bda0f4808d596cce711d3d57cd90f85c52d7938c261d4",
-    "size_bytes": 31502588
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.20/twinpanel-1.1.20-linux-x86_64.tar.gz",
+    "sha256": "188781c29576ffec47b94e12346b918c41129b1d88a1c8b6dd722506feefab65",
+    "size_bytes": 31501206
   },
   "notes": {
-    "fa": "رفع توقف گروهی نصب حساب‌های Cisco/OpenConnect و L2TP روی نودهای جدید مانند دوبی و هلند، در صورت وجود نام کاربری وارداتی ناسازگار. ساخت نام ورود یکتای اختصاصی برای همان نود بدون تغییر نام اصلی کاربر، رمز یا سایر نودها. افزودن تست بازگشت و حفاظت انتشار.",
-    "en": "Fix all-or-nothing Cisco/OpenConnect and L2TP bulk provisioning for new Exits when an imported account username is incompatible. Assign a stable per-node login alias without touching original credentials or existing nodes; add regression and release guards."
+    "fa": "تکمیل اصلاح Cisco و L2TP نودهای جدید دوبی و هلند: رفع توقف ساخت همه حساب‌ها به‌خاطر یک نام کاربری وارداتی ناسازگار، و ترمیم خودکار کانفیگ‌های ازقبل‌موجود که نام ورود آن‌ها با احراز هویت واقعی سرور متفاوت است؛ بدون تغییر نام اصلی اشتراک یا کانفیگ نودهای دیگر.",
+    "en": "Complete Cisco/L2TP new-Exit account repair: preserve stable aliases for incompatible imported usernames and reconcile stale existing per-node login credentials with actual remote service authentication without modifying other nodes."
   }
 }
