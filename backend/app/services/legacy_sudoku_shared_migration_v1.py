@@ -36,7 +36,7 @@ def public_shared_sudoku_port(node_id: int) -> int:
     Dedicated TP40 ingress uses :18554 -> German shared core :18553.
     This mapping is intentionally confined to Sudoku for the legacy Exit.
     """
-    return 18554 if int(node_id)==13 else 18553
+    return {13:18554, 11:18555}.get(int(node_id),18553)
 
 
 def is_legacy_shared_node(db, node_id: int) -> bool:
