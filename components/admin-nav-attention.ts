@@ -135,13 +135,13 @@ export function useAdminNavAttention(_active:string){
     const fastTimer=window.setInterval(()=>{
       if(document.visibilityState!=="visible")return;
       void refreshSupport();
-    },2500);
+    },15000);
 
     const workTimer=window.setInterval(()=>{
       if(document.visibilityState!=="visible")return;
       void refreshPayments();
       void refreshNotifications();
-    },10000);
+    },20000);
 
     const releaseStatusTimer=window.setInterval(()=>{
       if(document.visibilityState==="visible")void refreshRelease();
