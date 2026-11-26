@@ -36,6 +36,10 @@ from app.routers import account_delivery as ad
 from app.standalone_subscription_accounts import _node_host,_sudoku_endpoint,_sudoku_share_uri
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.services.central_sudoku_fingerprint_v1 import mark_applied as mark_sudoku_applied
+from app.services.central_runtime_ownership_v1 import is_central_node
+from app.services.legacy_sudoku_shared_migration_v1 import (
+    is_legacy_shared_node, mark_legacy_shared_node,
+)
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
 
@@ -52,12 +56,17 @@ def eligible(db,node_id):
                     Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes))
         .distinct().order_by(Subscription.id).all())
 
-def check_node(db,node_id):
+def check_node(db,node_id,*,migrate_legacy=False):
     node=db.get(Node,int(node_id))
-    if (node is None or node.retired_at is not None
-        or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
-        or not allow_central_node(db,node)):
-        raise RuntimeError("SUDOKU_SHARED_REQUIRES_HIDDEN_ONLINE_EXIT")
+    ordinary = allow_central_node(db,node)
+    migrated_candidate = (
+        migrate_legacy and node is not None
+        and node.retired_at is None and node.node_type==NodeType.EXIT
+        and node.status==NodeStatus.ONLINE and bool(node.show_to_users)
+        and not is_central_node(db,int(node_id))
+    )
+    if not (ordinary or migrated_candidate):
+        raise RuntimeError("SUDOKU_SHARED_REQUIRES_HIDDEN_OR_EXPLICIT_LEGACY_EXIT")
     cfg=(db.query(NodeProtocolConfig)
          .filter_by(node_id=int(node_id),protocol="sudoku").one_or_none())
     if (cfg is None or str(getattr(cfg.status,"value",cfg.status)).lower()!="online"):
@@ -113,9 +122,9 @@ def client_item(node,sub_id,private):
         "uri":uri,
     }
 
-async def stage(node_id,limit,write):
+async def stage(node_id,limit,write,*,migrate_legacy=False):
     with SessionLocal() as db:
-        node=check_node(db,node_id)
+        node=check_node(db,node_id,migrate_legacy=migrate_legacy)
         subscriptions=eligible(db,node_id)
         ids=[int(s.id) for s in subscriptions]
         if len(ids)>limit:
@@ -171,7 +180,27 @@ async def stage(node_id,limit,write):
             "daemon_count":1,"port":SHARED_PORT,"apply":bool(write),
         }),flush=True)
         if not write:return 0
-        readiness=await verify_central_family_readiness(db, node_id, {"sudoku"})
+        if migrate_legacy:
+            # Published legacy Exits are not registered for central ownership.
+            # Validate the original listener on first migration; later
+            # reconciliation has its own shared-daemon apply ACK.
+            if not is_legacy_shared_node(db,node_id):
+                from app.modern_protocol_dispatch import profile_health
+                conn=await asyncio.wait_for(
+                    connect_protocol_runtime(node,db),timeout=25)
+                try:
+                    cfg=(db.query(NodeProtocolConfig).filter_by(
+                        node_id=node_id,protocol="sudoku").one())
+                    status=await asyncio.wait_for(
+                        profile_health(conn,"sudoku",cfg.port),timeout=25)
+                finally:
+                    conn.close()
+                    await conn.wait_closed()
+                if not status.get("ok"):
+                    raise RuntimeError("SUDOKU_LEGACY_LIVE_LISTENER_NOT_READY")
+            readiness={"ok":True}
+        else:
+            readiness=await verify_central_family_readiness(db, node_id, {"sudoku"})
         if not readiness.get("ok"):
             # A published Exit with zero subscribers intentionally stops its
             # shared daemon; the next positive entitlement must be able to
@@ -220,7 +249,7 @@ async def stage(node_id,limit,write):
             if missing:db.commit()
             # Refresh all identities. Fail closed if entitlements changed.
             db.expire_all()
-            check_node(db,node_id)
+            check_node(db,node_id,migrate_legacy=migrate_legacy)
             if [int(s.id) for s in eligible(db,node_id)]!=ids:
                 raise RuntimeError("SUDOKU_SHARED_ENTITLEMENTS_CHANGED")
             all_accounts=[]
@@ -238,7 +267,7 @@ async def stage(node_id,limit,write):
         if ack["users"]!=len(ids):
             raise RuntimeError("SUDOKU_SHARED_NODE_ACK_COUNT_MISMATCH")
         db.expire_all()
-        node=check_node(db,node_id)
+        node=check_node(db,node_id,migrate_legacy=migrate_legacy)
         if [int(s.id) for s in eligible(db,node_id)]!=ids:
             raise RuntimeError("SUDOKU_SHARED_ENTITLEMENTS_CHANGED_AFTER_APPLY")
         persisted={
@@ -271,6 +300,9 @@ async def stage(node_id,limit,write):
         # persist this family's own exact entitlement fingerprint. A failed
         # Sing-box family must not delay the confirmed Sudoku ACK.
         mark_sudoku_applied(db, node_id, ids)
+        if migrate_legacy:
+            # Mark only after authenticated whitelist and credential ACK.
+            mark_legacy_shared_node(db,node_id)
         db.commit()
         print("SUDOKU_SHARED_COMPLETE",json.dumps({
             "node_id":node_id,"users":len(ids),
@@ -287,18 +319,22 @@ def args(argv=None):
     parser.add_argument("--limit",type=int,default=3000)
     parser.add_argument("--apply",action="store_true")
     parser.add_argument("--confirm-node-id",type=int)
+    parser.add_argument("--migrate-legacy",action="store_true")
     opt=parser.parse_args(argv)
     if opt.node_id<=0 or opt.limit<1:
         parser.error("invalid target")
     if opt.apply and opt.confirm_node_id!=opt.node_id:
         parser.error("confirmation required")
+    if opt.migrate_legacy and (not opt.apply or opt.confirm_node_id!=opt.node_id):
+        parser.error("legacy migration requires explicit scoped apply confirmation")
     return opt
 
 if __name__=="__main__":
     options=args()
     try:
         raise SystemExit(asyncio.run(stage(
-            options.node_id,options.limit,options.apply)))
+            options.node_id,options.limit,options.apply,
+            migrate_legacy=options.migrate_legacy)))
     except Exception as exc:
         print("SUDOKU_SHARED_SAFE_STOP",json.dumps({
             "node_id":options.node_id,"error_type":type(exc).__name__,
