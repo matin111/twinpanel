@@ -31,6 +31,6 @@ jobs:
           python -m py_compile backend/app/quota_service_v2.py
       - name: Verify all protocol mappings and reject cross-protocol billing
         env:
-          PYTHONPATH: backend
-        run: python -m unittest -v tests.test_quota_identity_contract_v1
+          PYTHONPATH: .
+        run: python tests/test_quota_identity_contract_v1.py -v
         working-directory: backend
