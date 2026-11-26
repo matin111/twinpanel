@@ -84,7 +84,7 @@ def require_ready() -> None:
     raise RuntimeError("SIDECAR_NOT_READY")
 
 
-def probe() -> dict:
+def probe(*, use_upstream: bool = False) -> dict:
     cfg_path = BASE / "config.json"
     state_path = BASE / "identity_state.json"
     if not cfg_path.is_file() or not state_path.is_file():
@@ -111,8 +111,9 @@ def probe() -> dict:
     changed = json.loads(original)
     # Test attribution independently of the node's upstream VLESS egress.
     # The entire original sidecar config is restored in the finally block.
-    changed["outbounds"] = [{"type":"direct","tag":"direct"}]
-    changed["route"] = {"final":"direct"}
+    if not use_upstream:
+        changed["outbounds"] = [{"type":"direct","tag":"direct"}]
+        changed["route"] = {"final":"direct"}
     for row in changed["inbounds"]:
         if row.get("tag") == module.NEW_OUTER_TAG:
             row["users"].extend(
@@ -201,7 +202,7 @@ def probe() -> dict:
                       and all(any(int(r.get("uplink_total") or 0)+int(r.get("downlink_total") or 0)>0
                                   for r in group) for group in evidence),
                 "synthetic_clients":2,
-                "test_route":"direct_only",
+                "test_route":"original_upstream" if use_upstream else "direct_only",
                 "http_success":checks,
                 "authenticated_inner_user_observed":[bool(group) for group in evidence],
                 "positive_per_user_bytes":[any(
@@ -230,8 +231,12 @@ def probe() -> dict:
 
 
 if __name__ == "__main__":
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--route",choices=("direct","original"),default="direct")
+    args=parser.parse_args()
     try:
-        print(json.dumps(probe(),sort_keys=True))
+        print(json.dumps(probe(use_upstream=args.route=="original"),sort_keys=True))
     except Exception as exc:
         print(json.dumps({"ok":False,"reason":str(exc)},sort_keys=True))
         raise SystemExit(1)
