@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
+from time import monotonic
 
 from aiogram.types import InlineKeyboardButton, KeyboardButton
 from sqlalchemy.orm import Session
@@ -59,12 +60,11 @@ def _normalize(value: Any, fallback: str = "default") -> str:
 def button_style_config(db: Session) -> TelegramButtonStyles:
     defaults = TelegramButtonStyles().as_dict()
     values: dict[str, str] = {}
+    keys = [_setting_key(name) for name in _KEYS]
+    rows = db.query(RuntimeSetting).filter(RuntimeSetting.setting_key.in_(keys)).all()
+    by_key = {row.setting_key: row.setting_value for row in rows}
     for name in _KEYS:
-        row = db.get(RuntimeSetting, _setting_key(name))
-        values[name] = _normalize(
-            row.setting_value if row else defaults[name],
-            defaults[name],
-        )
+        values[name] = _normalize(by_key.get(_setting_key(name), defaults[name]), defaults[name])
     return TelegramButtonStyles(**values)
 
 
@@ -82,10 +82,19 @@ def save_button_style_config(db: Session, values: dict[str, Any]) -> TelegramBut
     return button_style_config(db)
 
 
+_style_cache: tuple[float, TelegramButtonStyles] | None = None
+
+
 def live_button_styles() -> TelegramButtonStyles:
+    global _style_cache
+    now = monotonic()
+    if _style_cache is not None and now < _style_cache[0]:
+        return _style_cache[1]
     db = SessionLocal()
     try:
-        return button_style_config(db)
+        result = button_style_config(db)
+        _style_cache = (monotonic() + 15, result)
+        return result
     finally:
         db.close()
 
