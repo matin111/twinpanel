@@ -1,0 +1,24 @@
+name: Controller Revoke Priority and Xray All-Inbound Restore
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_controller_revoke_priority_xray_restore_v1.py
+      - .github/workflows/controller-revoke-priority-v1.yml
+permissions:
+  contents: read
+jobs:
+  priority-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile service and isolated behavioral tests
+        run: |
+          python -m py_compile backend/app/services/account_enforcement_v2.py
+          python -m py_compile backend/tests/test_controller_revoke_priority_xray_restore_v1.py
+      - name: Run priority and local Xray fixture tests without DB or SSH
+        run: python backend/tests/test_controller_revoke_priority_xray_restore_v1.py -v
