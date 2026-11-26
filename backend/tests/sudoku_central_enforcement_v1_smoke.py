@@ -119,7 +119,7 @@ def test_controller_worker_retries_slow_whitelist_without_unjustified_success():
     assert '"controller_central_sudoku_awaiting_ack"' in worker
     assert 'row.status = "controller_processing"' in worker
     assert worker.index("handled_by_central_sudoku = True") < worker.index(
-        "conn = await ssh_connect_saved(node, db)"
+        "conn = await ssh_connect_saved("
     )
 
 

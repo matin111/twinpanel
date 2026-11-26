@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import os
 import re
 import shlex
 from datetime import datetime, timedelta
@@ -140,12 +141,12 @@ def install_account_enforcement_hooks() -> None:
     _installed = True
 
 
-def _claim_next_command() -> dict[str, Any] | None:
+def _claim_next_command(*, exclude_node_ids: set[int] | None = None) -> dict[str, Any] | None:
     db = SessionLocal()
     try:
         now = datetime.utcnow()
         stale_before = now - timedelta(seconds=_PROCESSING_TIMEOUT_SECONDS)
-        row = (
+        query = (
             db.query(QuotaNodeCommand)
             .filter(
                 QuotaNodeCommand.expires_at > now,
@@ -158,6 +159,13 @@ def _claim_next_command() -> dict[str, Any] | None:
                     ),
                 ),
             )
+        )
+        if exclude_node_ids:
+            # A batch must never make two concurrent mutations to one node's
+            # mutable config; separate nodes can be processed concurrently.
+            query = query.filter(QuotaNodeCommand.node_id.notin_(sorted(exclude_node_ids)))
+        row = (
+            query
             .order_by(
                 # Expired/suspended users must not stay online behind
                 # thousands of newer restore commands. Preserve FIFO within
@@ -637,7 +645,11 @@ async def _execute_command(command: dict[str, Any]) -> None:
 
             from ..routers.provision import ssh_connect_saved
 
-            conn = await ssh_connect_saved(node, db)
+            # Authentication is already loaded. Do not pin a PostgreSQL
+            # transaction across potentially slow remote SSH login.
+            conn = await ssh_connect_saved(
+                node, db, close_read_transaction_before_ssh=True,
+            )
 
             if protocol in CONTROLLER_MODERN_PROTOCOLS:
                 if not credential.secret_encrypted:
@@ -763,14 +775,43 @@ async def _execute_command(command: dict[str, Any]) -> None:
         status_db.close()
 
 
+def _parallel_nodes_limit() -> int:
+    """Conservative operator override; range 1..4, with 1 as safe rollback."""
+    try:
+        configured = int(os.environ.get("TP_ACCOUNT_ENFORCEMENT_PARALLEL_NODES", "2"))
+    except (TypeError, ValueError):
+        return 1
+    return max(1, min(configured, 4))
+
+
 async def process_account_enforcement_once(*, limit: int = 20) -> int:
+    remaining = max(1, min(int(limit), 100))
     processed = 0
-    for _ in range(max(1, min(int(limit), 100))):
-        command = _claim_next_command()
-        if command is None:
+    parallel = _parallel_nodes_limit()
+    while remaining > 0:
+        commands = []
+        occupied_nodes: set[int] = set()
+        for _ in range(min(remaining, parallel)):
+            command = _claim_next_command(exclude_node_ids=occupied_nodes)
+            if command is None:
+                break
+            occupied_nodes.add(int(command["node_id"]))
+            commands.append(command)
+        if not commands:
             break
-        await _execute_command(command)
-        processed += 1
+
+        # The original single-node executor still owns retries, rollback
+        # and final ACK. Gather only different node IDs; never overlap two
+        # restarts/config edits against the same node in one batch.
+        outcomes = await asyncio.gather(
+            *(_execute_command(command) for command in commands),
+            return_exceptions=True,
+        )
+        processed += len(commands)
+        remaining -= len(commands)
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                raise outcome
     return processed
 
 
