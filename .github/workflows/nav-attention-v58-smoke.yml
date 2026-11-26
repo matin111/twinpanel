@@ -44,7 +44,8 @@ jobs:
           assert "normalizeRoute" not in reseller
           assert "row.route" not in reseller
           assert "unreadNotificationCount" in reseller
-          assert "4000" in reseller
+          assert "15000" in reseller
+          assert "refreshInFlight" in reseller
 
           assert "useResellerNavAttention" in shell
           assert "portal-nav-attention-count" in shell
