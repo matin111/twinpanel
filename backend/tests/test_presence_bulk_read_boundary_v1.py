@@ -69,10 +69,13 @@ class CleanPresenceReadBoundary(unittest.TestCase):
             actual=batch.build_presence_devices_for_protocols(
                 db,source_protocols={"sudoku"})
         self.assertEqual(actual,{19:[]})
-        filter_expressions=[
-            str(call.args[0]) for call in
-            db.query.return_value.filter.call_args_list
-        ]
+        # SQLAlchemy chaining calls the second filter on the prior query
+        # object's return value, not on the original db.query mock.
+        filter_calls = (
+            list(db.query.return_value.filter.call_args_list)
+            + list(db.query.return_value.filter.return_value.filter.call_args_list)
+        )
+        filter_expressions = [str(call.args[0]) for call in filter_calls]
         self.assertTrue(any("protocol_credentials.protocol IN" in x
                             for x in filter_expressions))
         self.assertTrue(any("protocol_credentials.is_active" in x

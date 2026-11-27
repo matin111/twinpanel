@@ -1,0 +1,23 @@
+name: Quota Ambiguous Peer Attribution
+on:
+  pull_request:
+    paths:
+      - backend/app/services/modern_quota_runtime_v314.py
+      - backend/scripts/twinpanel_sudoku_fast_presence_worker.py
+      - backend/scripts/twinpanel_mieru_fast_presence_worker.py
+      - backend/scripts/twinpanel_naive_fast_presence_worker.py
+      - backend/tests/test_quota_ambiguous_peer_ownership_v1.py
+      - .github/workflows/quota-ambiguous-peer-ownership-v1.yml
+permissions:
+  contents: read
+jobs:
+  fail-closed-peer-ownership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m py_compile backend/app/services/modern_quota_runtime_v314.py backend/scripts/twinpanel_sudoku_fast_presence_worker.py backend/scripts/twinpanel_mieru_fast_presence_worker.py backend/scripts/twinpanel_naive_fast_presence_worker.py backend/tests/test_quota_ambiguous_peer_ownership_v1.py
+      - run: python backend/tests/test_quota_ambiguous_peer_ownership_v1.py -v

@@ -95,6 +95,47 @@ async def _collect_node_runtime(
 ACCOUNTING_APPLY_BATCH_SIZE = 64
 
 
+
+def _exclude_ambiguous_peer_owners(
+    devices: list[dict[str, Any]],
+    peers: list[dict[str, Any]],
+    *,
+    protocol: str,
+) -> tuple[list[dict[str, Any]], int, int]:
+    """Never attribute one physical peer's cumulative bytes to two accounts.
+
+    Resolve ownership across the FULL node, not a 64-device accounting batch.
+    All ambiguous owners fail closed; unrelated devices remain billable.
+    No WireGuard keys, runtime configs or quota database rows are mutated.
+    """
+    if protocol not in ("wireguard", "amneziawg"):
+        raise ValueError("UNSUPPORTED_PEER_PROTOCOL")
+    matcher = (
+        canonical._peer_for_public_key
+        if protocol == "amneziawg"
+        else canonical._peer_for_wireguard_identity
+    )
+    rows = []
+    owners: dict[str, set[tuple[int, int]]] = {}
+    for device in devices:
+        identity = str(
+            device.get("telemetry_identity") or device.get("identity") or ""
+        ).strip()
+        peer = matcher(peers, identity) if identity else None
+        source = None
+        if peer is not None:
+            # Exactly the key used by _baseline_or_apply_cumulative().
+            source = f"{protocol}:{str(peer.get('public_key') or identity).strip()}"[:220]
+            owner = (int(device["subscription_id"]), int(device["device_id"]))
+            owners.setdefault(source, set()).add(owner)
+        rows.append((device, source))
+    ambiguous = {source for source, group in owners.items() if len(group) > 1}
+    if not ambiguous:
+        return devices, 0, 0
+    safe = [device for device, source in rows if source not in ambiguous]
+    return safe, len(devices) - len(safe), len(ambiguous)
+
+
 def _apply_collected_node_runtime_batched(
     db,
     *,
@@ -133,6 +174,23 @@ def _apply_collected_node_runtime_batched(
         summary: dict[str, Any] = {
             "ok": True, "collector": protocol, "node_id": node_id,
         }
+        if protocol in ("wireguard", "amneziawg"):
+            # A single WireGuard peer reports one combined counter. Duplicate
+            # delivery addresses/keys cannot be split across subscriptions.
+            _, _, peers, _ = reading
+            devices, skipped, ambiguous_sources = _exclude_ambiguous_peer_owners(
+                devices, peers, protocol=protocol,
+            )
+            if ambiguous_sources:
+                summary.update({
+                    "ok": False,
+                    "error": "ambiguous_peer_ownership",
+                    "ambiguous_peer_sources": ambiguous_sources,
+                    "ambiguous_devices_skipped": skipped,
+                })
+            if not devices:
+                outcomes.append(summary)
+                continue
         failures: list[str] = []
         recovered = failed = 0
 
