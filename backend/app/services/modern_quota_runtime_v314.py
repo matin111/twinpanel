@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy import or_
 
 from ..database import SessionLocal
-from ..models import Node, NodeType
+from ..models import Node, NodeType, NodeStatus
 from ..node_runtime_connection import connect_protocol_runtime
 from . import modern_quota_runtime_v257 as canonical
 
@@ -571,6 +571,7 @@ async def reconcile_modern_quota_once() -> dict[str, Any]:
                 db.query(Node.id)
                 .filter(
                     Node.retired_at.is_(None),
+                    Node.status == NodeStatus.ONLINE,
                     or_(
                         Node.node_type == NodeType.EXIT,
                         Node.agent_url == "local://core",
