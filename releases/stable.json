@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.26-rc.1",
+  "version": "1.1.26-rc.2",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-27T18:53:07Z",
+  "released_at": "2026-11-27T18:57:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5e7ece686eaf8760569525cdac5964b80de6517d",
+  "source_sha": "a53517505daff87cbcc91056acc4f4067d2802db",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.26-rc.1/twinpanel-1.1.26-rc.1-linux-x86_64.tar.gz",
-    "sha256": "d9f363321dbe80657c72fcf2ff42c688255a45c027d158160b70df2e9c8e26c4",
-    "size_bytes": 31629595
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.26-rc.2/twinpanel-1.1.26-rc.2-linux-x86_64.tar.gz",
+    "sha256": "f7d3c03c785db8dbbf9f6cb2193fc1237ca842b7e65a68df4acb62eed2f24022",
+    "size_bytes": 31631965
   },
   "notes": {
-    "fa": "نسخه کاندید 1.1.26-rc.1 شامل تثبیت اصلاح محاسبه مرکزی Sudoku برای Snapshot احراز هویت‌شده با شمارنده خالی، ثبت ماژول در Runtime Manifest و حفظ اصلاحات فعلی پرداخت، تمدید، مدیریت نودها و پنل است. این نسخه پس از تست‌های انتشار و تأیید بسته نصب منتشر می‌شود.",
-    "en": "TwinPanel 1.1.26-rc.1 candidate includes the Sudoku shared-native accounting support fix for authenticated snapshots with empty counters, runtime manifest integrity coverage, and preserves current payment, renewal, node-management and panel fixes. Publication follows release tests and artifact verification."
+    "fa": "نسخه 1.1.26-rc.2 شامل اصلاح محاسبه مرکزی Sudoku، بازسازی و اعتبارسنجی کامل Runtime Manifest (۱۱۰ فایل)، و حفظ اصلاحات پرداخت، تمدید، مدیریت نودها و پنل است.",
+    "en": "TwinPanel 1.1.26-rc.2 includes the central Sudoku accounting fix, regenerated and fully verified 110-file runtime integrity manifest, and preserves payment, renewal, node-management and panel fixes."
   }
 }
