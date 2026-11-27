@@ -34,7 +34,7 @@ class ParallelEnforcementTests(TestCase):
         fn=next(n for n in TREE.body if isinstance(n,ast.FunctionDef)
                 and n.name=="_claim_next_command")
         self.assertIn("node_id.notin_(sorted(exclude_node_ids))",ast.unparse(fn))
-        self.assertIn("with_for_update(skip_locked=True)",ast.unparse(fn))
+        self.assertIn("with_for_update(of=QuotaNodeCommand, skip_locked=True)",ast.unparse(fn))
 
     def test_bounded_parallel_never_overlaps_same_node(self):
         for parallel in (1,2,4):

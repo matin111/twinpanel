@@ -29,7 +29,7 @@ class ControllerEnforcementTests(TestCase):
         src = ast.unparse(next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == "_claim_next_command"))
         self.assertIn("case((QuotaNodeCommand.command_type == 'revoke_subscription', 0)", src)
         self.assertIn("QuotaNodeCommand.issued_at.asc()", src)
-        self.assertIn(".with_for_update(skip_locked=True)", src)
+        self.assertIn(".with_for_update(of=QuotaNodeCommand, skip_locked=True)", src)
         self.assertIn("QuotaNodeCommand.expires_at > now", src)
 
     def test_wireguard_revoke_exact_remote_command_signature(self):
