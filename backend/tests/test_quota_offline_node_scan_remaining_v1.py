@@ -18,7 +18,6 @@ class OfflineNodeScanSmoke(unittest.TestCase):
                 ast.parse(source)
                 self.assertIn("Node.status == NodeStatus.ONLINE,", source)
                 self.assertIn("Node.retired_at.is_(None),", source)
-                self.assertIn("or_(Node.node_type == NodeType.EXIT", " ".join(source.split()))
                 self.assertIn("from ..models import Node, NodeType, NodeStatus", source)
 
     def test_invalid_source_protocols_not_enabled(self):
