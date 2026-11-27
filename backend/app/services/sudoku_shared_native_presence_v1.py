@@ -263,7 +263,7 @@ def apply_shared_native_counters(
     """
     epoch=snapshot.get("epoch")
     counters=snapshot.get("counters")
-    if not epoch or not isinstance(counters,dict) or not counters:
+    if not epoch or not isinstance(counters,dict):
         return {"usage_supported":False,"usage_events":0,
                 "accepted_bytes":0,"baselined":0,"rejected_counters":0}
     from ..models import Subscription, SubscriptionStatus
