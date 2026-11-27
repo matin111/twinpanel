@@ -84,5 +84,19 @@ class AttributionGuardTests(unittest.TestCase):
         self.assertLess(guard, batches)
         self.assertIn('"ambiguous_peer_ownership"', source)
 
+
+class OfflineUsageWorkerTests(unittest.TestCase):
+    def test_registered_offline_nodes_are_not_ssh_polled(self):
+        for name in (
+            "twinpanel_sudoku_fast_presence_worker.py",
+            "twinpanel_mieru_fast_presence_worker.py",
+            "twinpanel_naive_fast_presence_worker.py",
+        ):
+            with self.subTest(name=name):
+                text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+                self.assertIn("from app.models import Node, NodeType, NodeStatus", text)
+                self.assertIn("Node.status == NodeStatus.ONLINE", text)
+                self.assertIn("Node.retired_at.is_(None)", text)
+
 if __name__ == "__main__":
     unittest.main()
