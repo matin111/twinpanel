@@ -1,0 +1,20 @@
+name: Offline Restore Deferral Safety
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_enforcement_offline_restore_deferral_v1.py
+      - .github/workflows/enforcement-offline-restore-deferral-v1.yml
+permissions:
+  contents: read
+jobs:
+  offline-restore-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m py_compile backend/app/services/account_enforcement_v2.py backend/tests/test_enforcement_offline_restore_deferral_v1.py
+      - run: python backend/tests/test_enforcement_offline_restore_deferral_v1.py -v
