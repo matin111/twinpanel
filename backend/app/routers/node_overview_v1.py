@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
+from threading import Lock
+from time import monotonic
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -25,6 +27,35 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 HEARTBEAT_FRESH_SECONDS = 90
+
+# Read-only dashboard metric cache. Actual quota accounting is never cached.
+# Key includes visible node ids so admin mother-node visibility stays correct.
+_TRAFFIC_CACHE_TTL_SECONDS = 15.0
+_traffic_cache_lock = Lock()
+_traffic_cache: dict[tuple[int, ...], tuple[float, dict[int, int]]] = {}
+
+
+def _dashboard_usage_totals(db: Session, ids: list[int]) -> dict[int, int]:
+    key = tuple(sorted(ids))
+    now = monotonic()
+    with _traffic_cache_lock:
+        cached = _traffic_cache.get(key)
+        if cached and cached[0] > now:
+            return dict(cached[1])
+        rows = (
+            db.query(
+                QuotaUsageEvent.node_id,
+                func.coalesce(func.sum(QuotaUsageEvent.accepted_bytes), 0),
+            )
+            .filter(QuotaUsageEvent.node_id.in_(ids))
+            .group_by(QuotaUsageEvent.node_id)
+            .all()
+        )
+        totals = {int(node_id): int(total or 0) for node_id, total in rows}
+        _traffic_cache.clear()
+        _traffic_cache[key] = (monotonic() + _TRAFFIC_CACHE_TTL_SECONDS, totals)
+        return dict(totals)
+
 
 
 def configured_ports(rows: list[NodeProtocolConfig]) -> list[int]:
@@ -70,15 +101,7 @@ def node_overview(db: Session = Depends(get_db)) -> dict:
         .group_by(SubscriptionNode.node_id)
         .all()
     )
-    usage = dict(
-        db.query(
-            QuotaUsageEvent.node_id,
-            func.coalesce(func.sum(QuotaUsageEvent.accepted_bytes), 0),
-        )
-        .filter(QuotaUsageEvent.node_id.in_(ids))
-        .group_by(QuotaUsageEvent.node_id)
-        .all()
-    )
+    usage = _dashboard_usage_totals(db, ids)
     configs: dict[int, list[NodeProtocolConfig]] = {key: [] for key in ids}
     for row in db.query(NodeProtocolConfig).filter(NodeProtocolConfig.node_id.in_(ids)).all():
         configs[int(row.node_id)].append(row)
