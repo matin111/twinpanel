@@ -68,7 +68,7 @@ def select_proven_peer_devices(
                 continue
             try:
                 stored = load_stored_public_key(int(device["subscription_id"]))
-            except (Exception):
+            except Exception:
                 # Corrupt/missing encrypted identity must never charge a peer.
                 stored = None
             verified = (
