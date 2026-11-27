@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.25",
+  "version": "1.1.26-rc.1",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-26T14:24:59Z",
+  "released_at": "2026-11-27T18:47:58Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "23b4a64f7e2ab47a595f9b461c62b948da1221f1",
+  "source_sha": "e571459543e05bbad7f92aa8337bdeea0644bf6c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.25/twinpanel-1.1.25-linux-x86_64.tar.gz",
-    "sha256": "d11293d5effb672779e1774f90e552c7cc9d3f68862df66c5d32308e29b9d449",
-    "size_bytes": 31547182
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.26-rc.1/twinpanel-1.1.26-rc.1-linux-x86_64.tar.gz",
+    "sha256": "8444f4dd683746590e6e47aa1f36fa77a31d8e9a5b49e77a239e4fb4be7408c4",
+    "size_bytes": 31635854
   },
   "notes": {
-    "fa": "بهبود سرعت ربات و پنل مدیریت، کاهش درخواست‌های تکراری اعلان‌ها، جلوگیری از اجرای تکراری همگام‌سازی نودها و اصلاح لغو دسترسی Xray بدون راه‌اندازی مجدد سراسری.",
-    "en": "Improve bot and admin responsiveness, coalesce navigation polling, deduplicate node convergence stages and revoke individual Xray access without global daemon restart."
+    "fa": "نسخه کاندید 1.1.26-rc.1 شامل تثبیت اصلاح محاسبه مرکزی Sudoku برای Snapshot احراز هویت‌شده با شمارنده خالی، ثبت ماژول در Runtime Manifest و حفظ اصلاحات فعلی پرداخت، تمدید، مدیریت نودها و پنل است. این نسخه پس از تست‌های انتشار و تأیید بسته نصب منتشر می‌شود.",
+    "en": "TwinPanel 1.1.26-rc.1 candidate includes the Sudoku shared-native accounting support fix for authenticated snapshots with empty counters, runtime manifest integrity coverage, and preserves current payment, renewal, node-management and panel fixes. Publication follows release tests and artifact verification."
   }
 }
