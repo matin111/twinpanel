@@ -55,7 +55,7 @@ class ExactLinkRepairSafetyTests(TestCase):
 
     def test_apply_requires_exact_node_and_stage_exclusion(self):
         self.assertIn('fcntl.LOCK_EX | fcntl.LOCK_NB',ast.unparse(TREE))
-        self.assertIn('args.apply and args.confirm_node_id != args.node_id',SCRIPT)
+        self.assertIn('args.apply and args.confirm_node_id != args.node_id',ast.unparse(TREE))
         self.assertIn('"node_service_restart":False',SCRIPT)
         self.assertIn('"quota_or_expiry_modified":False',SCRIPT)
 
