@@ -215,3 +215,14 @@ def test_sparse_verified_counters_do_not_baseline_idle_whitelist_users():
     value=subject.validate_snapshot(payload)
     assert len(value["known"])==2
     assert value["counters"]=={"tp-sub-11":{"up":30,"down":70}}
+
+
+def test_empty_but_authenticated_counter_snapshot_is_supported():
+    payload={"marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
+        "names":["tp-sub-11"],"online":{},"total":1,"connections":0,
+        "epoch":"d"*32,"counters":{}}
+    snapshot=subject.validate_snapshot(payload)
+    row=subject.apply_shared_native_counters(
+        object(),node=SimpleNamespace(id=29),devices=[],snapshot=snapshot)
+    assert row["usage_supported"] is True
+    assert row["usage_events"]==0 and row["accepted_bytes"]==0
