@@ -79,10 +79,10 @@ class AttributionGuardTests(unittest.TestCase):
     def test_guard_runs_before_per_batch_loop(self):
         source = SOURCE.read_text(encoding="utf-8")
         start = source.index("def _apply_collected_node_runtime_batched(")
-        guard = source.index("_exclude_ambiguous_peer_owners(", start)
+        guard = source.index("select_proven_peer_devices(", start)
         batches = source.index("for offset in range(0, len(devices),", start)
         self.assertLess(guard, batches)
-        self.assertIn('"ambiguous_peer_ownership"', source)
+        self.assertIn('"peer_counter_evidence_incomplete"', source)
 
 
 class OfflineUsageWorkerTests(unittest.TestCase):

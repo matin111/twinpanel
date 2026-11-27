@@ -14,6 +14,9 @@ from ..database import SessionLocal
 from ..models import Node, NodeType, NodeStatus
 from ..node_runtime_connection import connect_protocol_runtime
 from . import modern_quota_runtime_v257 as canonical
+from ..quota_models import QuotaCursor
+from .central_node_identity_store_v1 import load as load_node_identity
+from .wireguard_counter_ownership_v1 import select_proven_peer_devices
 
 
 MODERN_ACCOUNTING_INTERVAL_SECONDS = canonical.MODERN_ACCOUNTING_INTERVAL_SECONDS
@@ -175,19 +178,69 @@ def _apply_collected_node_runtime_batched(
             "ok": True, "collector": protocol, "node_id": node_id,
         }
         if protocol in ("wireguard", "amneziawg"):
-            # A single WireGuard peer reports one combined counter. Duplicate
-            # delivery addresses/keys cannot be split across subscriptions.
-            _, _, peers, _ = reading
-            devices, skipped, ambiguous_sources = _exclude_ambiguous_peer_owners(
+            _, epoch, peers, _ = reading
+            # Read identity/cursor evidence ONCE across the full node before
+            # per-device batches. No network I/O or credential mutation here.
+            source_keys = {
+                f"{protocol}:{str(p.get('public_key') or '').strip()}"[:220]
+                for p in peers if p.get("public_key")
+            }
+            rows = (
+                db.query(QuotaCursor)
+                .filter(
+                    QuotaCursor.node_id == node_id,
+                    QuotaCursor.source_key.in_(source_keys),
+                )
+                .all()
+            ) if source_keys else []
+            cursor_owners = {
+                row.source_key: {
+                    "subscription_id": row.subscription_id,
+                    "device_id": row.device_id,
+                    "protocol": row.protocol,
+                    "counter_epoch": row.counter_epoch,
+                    "last_uplink_value": row.last_uplink_value,
+                    "last_downlink_value": row.last_downlink_value,
+                }
+                for row in rows
+            }
+            verified_lookup = (
+                lambda sid: (
+                    (load_node_identity(db, "wireguard", sid, node_id) or {})
+                    .get("public")
+                )
+            ) if protocol == "wireguard" else None
+            devices, evidence = select_proven_peer_devices(
                 devices, peers, protocol=protocol,
+                match_address=canonical._peer_for_wireguard_identity,
+                match_public_key=canonical._peer_for_public_key,
+                load_stored_public_key=verified_lookup,
+                cursor_owners=cursor_owners,
+                counter_epoch=canonical._short_epoch(
+                    epoch, fallback=f"{protocol}:{node_id}"
+                ),
             )
-            if ambiguous_sources:
+            missing = sum(evidence[k] for k in (
+                "unproven_identity_skipped",
+                "shared_peer_skipped",
+                "cursor_owner_conflict_skipped",
+                "counter_regression_skipped",
+            ))
+            if missing:
                 summary.update({
                     "ok": False,
-                    "error": "ambiguous_peer_ownership",
-                    "ambiguous_peer_sources": ambiguous_sources,
-                    "ambiguous_devices_skipped": skipped,
+                    "error": "peer_counter_evidence_incomplete",
+                    "ambiguous_peer_sources": evidence["original_ambiguous_sources"],
+                    "ambiguous_devices_skipped": (
+                        evidence["unproven_identity_skipped"]
+                        + evidence["shared_peer_skipped"]
+                    ),
+                    "verified_peer_owners_recovered": evidence["verified_key_recovered"],
+                    "cursor_owner_conflict_skipped": evidence["cursor_owner_conflict_skipped"],
+                    "counter_regression_skipped": evidence["counter_regression_skipped"],
                 })
+            elif evidence["verified_key_recovered"]:
+                summary["verified_peer_owners_recovered"] = evidence["verified_key_recovered"]
             if not devices:
                 outcomes.append(summary)
                 continue

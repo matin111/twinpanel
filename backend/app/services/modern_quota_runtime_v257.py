@@ -567,10 +567,20 @@ def _apply_wireguard_like(
         identity = str(
             device.get("telemetry_identity") or device.get("identity") or ""
         ).strip()
+        # Only the central collector can attach this key after comparing it
+        # to the node-specific encrypted identity AND the live WireGuard peer.
+        # It supersedes an ambiguous legacy AllowedIPs address in memory only.
+        verified_public_key = (
+            str(device.get("verified_runtime_public_key") or "").strip()
+            if protocol == "wireguard" else ""
+        )
         peer = (
-            _peer_for_public_key(peers, identity)
-            if match_by_key
-            else _peer_for_wireguard_identity(peers, identity)
+            _peer_for_public_key(peers, verified_public_key)
+            if verified_public_key else (
+                _peer_for_public_key(peers, identity)
+                if match_by_key
+                else _peer_for_wireguard_identity(peers, identity)
+            )
         )
         if peer is None:
             presence = _mark_presence(
