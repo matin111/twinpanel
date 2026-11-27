@@ -118,6 +118,27 @@ def _is_reseller_bot_internal_user(
     )
 
 
+def _admin_visible_payment_rows(db: Session, rows: list[PaymentIntent]) -> list[PaymentIntent]:
+    """Preserve visibility rules without one SELECT per payment intent."""
+    user_ids = {int(row.user_id) for row in rows if row.user_id is not None}
+    internal_ids: set[int] = set()
+    if user_ids:
+        user_rows = (
+            db.query(User.id, User.email)
+            .filter(User.id.in_(user_ids))
+            .all()
+        )
+        internal_ids = {
+            int(uid) for uid, email in user_rows
+            if str(email or "").strip().lower().startswith(RESELLER_INTERNAL_EMAIL_PREFIX)
+            and str(email or "").strip().lower().endswith(RESELLER_INTERNAL_EMAIL_SUFFIX)
+        }
+    return [
+        row for row in rows
+        if row.user_id is None or int(row.user_id) not in internal_ids
+    ]
+
+
 def _admin_visible_intent(
     db: Session,
     intent_id: int,
@@ -256,14 +277,7 @@ def admin_payment_intents_isolated(
         .all()
     )
 
-    visible = [
-        row
-        for row in rows
-        if not _is_reseller_bot_internal_user(
-            db,
-            int(row.user_id) if row.user_id is not None else None,
-        )
-    ]
+    visible = _admin_visible_payment_rows(db, rows)
 
     return [
         intent_out(row)
@@ -291,14 +305,7 @@ def admin_payment_review_summary(
         .limit(5000)
         .all()
     )
-    visible_purchases = [
-        row
-        for row in purchase_rows
-        if not _is_reseller_bot_internal_user(
-            db,
-            int(row.user_id) if row.user_id is not None else None,
-        )
-    ]
+    visible_purchases = _admin_visible_payment_rows(db, purchase_rows)
 
     purchase_review_rows = [
         row for row in visible_purchases
