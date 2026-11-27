@@ -49,6 +49,17 @@ _installed = False
 _original_queue = None
 
 
+class ControllerNodeOfflinePending(RuntimeError):
+    """An eligible restore cannot be applied to a known OFFLINE Exit."""
+
+
+def _should_defer_offline_restore(command_type: str, node_status: Any) -> bool:
+    # Never suppress revokes: expired clients require physical enforcement
+    # even when the panel currently labels an Exit offline.
+    value = str(getattr(node_status, "value", node_status) or "").upper()
+    return command_type == "restore_subscription" and value != "ONLINE"
+
+
 def _command_protocol(command: QuotaNodeCommand) -> str:
     payload = command.payload if isinstance(command.payload, dict) else {}
     return str(payload.get("protocol") or "").strip().lower()
@@ -670,6 +681,10 @@ async def _execute_command(command: dict[str, Any]) -> None:
         handled_by_central_sudoku = stale_result is not None
         if stale_result is not None:
             result_code = stale_result
+        elif _should_defer_offline_restore(command_type, node.status):
+            # Keep the command unacknowledged until the Exit is ONLINE.
+            # Avoid repeated slow SSH handshakes for every credential.
+            raise ControllerNodeOfflinePending("NODE_OFFLINE_AWAITING_RECOVERY")
         if protocol == "sudoku" and stale_result is None:
             from .sudoku_central_enforcement_v1 import (
                 central_sudoku_enforcement_result,
@@ -796,6 +811,16 @@ async def _execute_command(command: dict[str, Any]) -> None:
             from .sudoku_central_enforcement_v1 import (
                 CentralSudokuReconciliationPending,
             )
+            if isinstance(error, ControllerNodeOfflinePending) and row.expires_at > now:
+                # Recheck via the existing 90-second processing lease without
+                # consuming an SSH/attempt budget or fabricating any ACK.
+                row.status = "controller_processing"
+                row.attempt_count = max(0, int(row.attempt_count or 0) - 1)
+                row.last_delivered_at = now
+                row.result_code = "controller_offline_restore_waiting"
+                row.result_message = "NODE_OFFLINE_AWAITING_RECOVERY"
+                status_db.commit()
+                return
             if isinstance(error, CentralSudokuReconciliationPending) and row.expires_at > now:
                 # A shared family takes longer than one quota-worker cycle.
                 # Keep the command unacknowledged and recheck after the
