@@ -14,6 +14,7 @@ from pathlib import Path
 
 from ..models import Node, NodeStatus, NodeType
 from .central_runtime_ownership_v1 import allow_central_node, is_central_node
+from .central_stage_failure_backoff_v1 import recently_failed
 from ..node_install_progress_models_v1 import NodeInstallProgressV1
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +57,11 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
     if node_id <= 0:
         raise CentralStageLaunchError("CENTRAL_STAGE_INVALID_NODE_ID")
     ensure_launchable(db, node_id)
+    # A prior completed stage failure must not launch a full SSH/database
+    # remediation storm every 30 seconds. Manual repairs and explicit admin
+    # installation remain available; this guards ONLY the auto dispatcher.
+    if not initial_full and recently_failed(node_id):
+        raise CentralStageLaunchError("CENTRAL_STAGE_RECENT_FAILURE_COOLDOWN")
     systemd = shutil.which("systemd-run")
     flock = shutil.which("flock")
     if not systemd or not flock or not STAGE.is_file():
