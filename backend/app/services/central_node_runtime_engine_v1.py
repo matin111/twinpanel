@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -91,6 +92,26 @@ def runtime_family_concurrency(*, cores: int | None = None,
     return 1 if load >= max(3.0, cores * 0.35) else 2
 
 
+def _safe_failure_codes(stdout: bytes, exit_code: int) -> list[str]:
+    """Allowlisted SAFE_STOP codes only, no raw stderr or customer secrets."""
+    codes = []
+    for line in stdout[-65536:].decode("utf-8", errors="replace").splitlines():
+        if not (line.startswith("CENTRAL_") or line.startswith("SUDOKU_")):
+            continue
+        if "_SAFE_STOP" not in line[:75]:
+            continue
+        reason = re.search(r"""['"]reason['"]:\s*['"]([A-Z0-9_]{5,90})['"]""", line)
+        if reason:
+            codes.append(reason.group(1))
+            continue
+        kind = re.search(r"""['"]error_type['"]:\s*['"]([A-Za-z][A-Za-z0-9_]{0,58})['"]""", line)
+        if kind:
+            codes.append("EXCEPTION_" + kind.group(1).upper())
+    if exit_code and not codes:
+        codes.append("ADAPTER_FAILED_NO_SAFE_STOP")
+    return codes[-2:]
+
+
 async def reconcile_runtime_families(
     node_id: int, limit: int, backend: Path,
     *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=None,
@@ -138,16 +159,7 @@ async def reconcile_runtime_families(
                 except asyncio.TimeoutError:proc.kill();await proc.wait()
                 raise
             import json
-            markers=[]
-            for line in out[-65536:].decode("utf-8",errors="replace").splitlines():
-                if any(line.startswith(tag) for tag in (
-                    "CENTRAL_WIREGUARD_SAFE_STOP", "SUDOKU_SHARED_SAFE_STOP",
-                )):
-                    # Only consume a bounded, strictly allowlisted diagnostic.
-                    import re
-                    hit=re.search(r"""['"]reason['"]:\s*['"]([A-Z0-9_]{5,90})""",line)
-                    if hit:markers.append(hit.group(1))
-                    else:markers.append("SAFE_STOP_UNCLASSIFIED")
+            markers = _safe_failure_codes(out, int(code))
             print("CENTRAL_FAMILY_RESULT",json.dumps({
                 "node_id":node_id,"family":family.name,
                 "exit_code":int(code),

@@ -395,11 +395,24 @@ def parse_args(argv=None):
 
 if __name__ == "__main__":
     args = parse_args()
+    # The failed result is durable for at most 10 minutes in /run. A failure
+    # remains a real failure; no quota/entitlement ACK is ever synthesized.
+    from app.services.central_stage_failure_backoff_v1 import record_result
     try:
-        raise SystemExit(run(args.node_id, args.limit, args.apply,
-                             delta_only=args.delta_only))
+        outcome = int(run(args.node_id, args.limit, args.apply,
+                          delta_only=args.delta_only))
     except Exception as exc:
         print("CENTRAL_NODE_STAGE_SAFE_STOP", json.dumps({
             "node_id": args.node_id, "error_type": type(exc).__name__,
         }), flush=True)
-        raise SystemExit(2)
+        outcome = 2
+    if args.apply:
+        try:
+            record_result(args.node_id, outcome)
+        except Exception as exc:
+            # Do not swallow the actual stage result; the scanner separately
+            # fails closed if a present marker is unreadable.
+            print("CENTRAL_STAGE_COOLDOWN_WRITE_FAILED", json.dumps({
+                "node_id": args.node_id, "error_type": type(exc).__name__,
+            }), flush=True)
+    raise SystemExit(outcome)

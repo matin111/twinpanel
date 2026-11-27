@@ -1,0 +1,29 @@
+name: Central Stage Failure Backoff and Diagnostics
+on:
+  pull_request:
+    paths:
+      - backend/app/services/central_stage_failure_backoff_v1.py
+      - backend/app/services/central_node_stage_launcher_v1.py
+      - backend/app/services/central_node_runtime_engine_v1.py
+      - backend/scripts/twinpanel_central_node_stage_v1.py
+      - backend/tests/test_central_stage_failure_backoff_diagnostics_v1.py
+      - .github/workflows/central-stage-failure-backoff-v1.yml
+permissions:
+  contents: read
+jobs:
+  stage-failure-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile guarded stage
+        run: |
+          python -m py_compile backend/app/services/central_stage_failure_backoff_v1.py
+          python -m py_compile backend/app/services/central_node_stage_launcher_v1.py
+          python -m py_compile backend/app/services/central_node_runtime_engine_v1.py
+          python -m py_compile backend/scripts/twinpanel_central_node_stage_v1.py
+      - name: Check cooldown and secret-safe diagnostics
+        run: python backend/tests/test_central_stage_failure_backoff_diagnostics_v1.py -v
