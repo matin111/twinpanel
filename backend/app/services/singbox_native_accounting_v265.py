@@ -322,6 +322,33 @@ systemctl is-active --quiet {shlex.quote(SERVICE_NAME)}.service
     return True, "CONFIG_CHANGED=1" in output, None
 
 
+async def verified_singbox_snapshot_or_repair(
+    conn,
+) -> tuple[bool, bool, dict[str, Any] | None, str | None]:
+    """Prioritize read-only real counters; use legacy node repair if needed.
+
+    This cannot fabricate traffic, authenticate an unknown username, or
+    restart a healthy node's VPN service. A repaired API must be read back
+    successfully before a collector is allowed to attribute any traffic.
+    """
+    ok, snapshot, original_error = await collect_singbox_snapshot(conn)
+    if ok and snapshot is not None:
+        return True, False, snapshot, None
+
+    api_ok, api_changed, api_error = await ensure_singbox_accounting_api(conn)
+    if not api_ok:
+        return False, api_changed, None, (
+            api_error or original_error or "singbox_accounting_api_unavailable"
+        )
+
+    ok, snapshot, error = await collect_singbox_snapshot(conn)
+    if not ok or snapshot is None:
+        return False, api_changed, None, (
+            error or "singbox_snapshot_unavailable_after_repair"
+        )
+    return True, api_changed, snapshot, None
+
+
 def _snapshot_script() -> str:
     """Build a node-local exact protobuf reader for the initial gRPC-Web frame."""
 
@@ -1477,19 +1504,15 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                 # Release the read transaction before network-bound API probes;
                 # otherwise the collector can hold a DB snapshot for 20+ sec.
                 db.commit()
-                api_ok, api_changed, api_error = await ensure_singbox_accounting_api(conn)
-                if not api_ok:
-                    db.commit()
-                    results.append({
-                        "ok": False,
-                        "collector": "singbox-native",
-                        "node_id": int(node.id),
-                        "error": api_error or "singbox_accounting_api_unavailable",
-                    })
-                    continue
-
-                snapshot_ok, snapshot, snapshot_error = await collect_singbox_snapshot(conn)
-                if not snapshot_ok or snapshot is None:
+                # The authenticated loopback gRPC snapshot is authoritative.
+                # Do not run config mutation, service-status checks, or
+                # systemctl restart on healthy nodes at every 45-second sweep.
+                # Repair only when the read-only probe cannot return a
+                # validated snapshot, then recheck the same real source.
+                api_ok, api_changed, snapshot, snapshot_error = (
+                    await verified_singbox_snapshot_or_repair(conn)
+                )
+                if not api_ok or snapshot is None:
                     db.commit()
                     results.append({
                         "ok": False,
