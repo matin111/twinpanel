@@ -16,7 +16,7 @@ from fastapi import HTTPException
 from sqlalchemy import or_
 
 from ..database import SessionLocal
-from ..models import Node, NodeType, Plan, Subscription
+from ..models import Node, NodeType, NodeStatus, Plan, Subscription
 from ..modern_protocol_runtime import CONFIG_PATH, SERVICE_NAME, STATE_PATH
 from ..modern_protocol_runtime_v2 import TAGS
 from ..node_runtime_connection import connect_protocol_runtime
@@ -1460,6 +1460,7 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
             db.query(Node)
             .filter(
                 Node.retired_at.is_(None),
+                Node.status == NodeStatus.ONLINE,
                 or_(Node.node_type == NodeType.EXIT, Node.agent_url == "local://core"),
             )
             .order_by(Node.id.asc())
