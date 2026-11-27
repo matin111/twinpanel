@@ -507,28 +507,30 @@ async def fulfill_wallet_order_background(order_id: int) -> None:
         db.close()
 
 
-async def process_wallet_paid_orders_once(limit: int = 10) -> dict:
-    """Durably recover wallet orders not yet claimed after a restart."""
+def _wallet_paid_order_ids(limit: int) -> list[int]:
     db = SessionLocal()
     try:
         rows = db.query(StoreOrder.id).filter(
             StoreOrder.payment_method == "wallet", StoreOrder.status == "paid",
         ).order_by(StoreOrder.id.asc()).limit(max(1, int(limit))).all()
-        ids = [int(row[0]) for row in rows]
+        return [int(row[0]) for row in rows]
     finally:
         db.close()
+
+
+async def process_wallet_paid_orders_once(limit: int = 10) -> dict:
+    """Durably recover wallet orders not yet claimed after a restart."""
+    ids = await asyncio.to_thread(_wallet_paid_order_ids, limit)
     for order_id in ids:
         await fulfill_wallet_order_background(order_id)
     return {"seen": len(ids), "processed": len(ids)}
 
 
-async def process_paid_store_orders_once(limit: int = 10) -> dict:
-    """Durable fallback when an immediate BackgroundTask is lost."""
-
+def _paid_store_order_rows(limit: int) -> list:
+    """Do blocking SQLAlchemy reads off the ASGI event loop."""
     lookup = SessionLocal()
-
     try:
-        rows = (
+        return (
             lookup.query(
                 StoreOrder.id,
                 PaymentIntent.id,
@@ -551,6 +553,10 @@ async def process_paid_store_orders_once(limit: int = 10) -> dict:
     finally:
         lookup.close()
 
+
+async def process_paid_store_orders_once(limit: int = 10) -> dict:
+    """Durable fallback when an immediate BackgroundTask is lost."""
+    rows = await asyncio.to_thread(_paid_store_order_rows, limit)
     processed = 0
 
     for (
