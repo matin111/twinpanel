@@ -20,7 +20,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.database import SessionLocal
-from app.models import Node, NodeType
+from app.models import Node, NodeType, NodeStatus
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services import modern_quota_runtime_v257 as canonical
 from app.services.accounting_device_map_batch_v1 import (
@@ -52,6 +52,9 @@ async def reconcile_once() -> dict:
         node_ids = [
             int(row[0]) for row in db.query(Node.id).filter(
                 Node.retired_at.is_(None),
+                # Reconcile only reachable registered nodes; OFFLINE nodes are
+                # retried by the controller, not by each fast usage collector.
+                Node.status == NodeStatus.ONLINE,
                 or_(Node.node_type == NodeType.EXIT, Node.agent_url == "local://core"),
             ).order_by(Node.id).all()
         ]
