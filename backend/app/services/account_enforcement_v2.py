@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import and_, or_, case
 
 from ..database import SessionLocal
-from ..models import Node, NodeProtocolConfig, ProtocolCredential, Subscription, SubscriptionStatus
+from ..models import Node, NodeStatus, NodeProtocolConfig, ProtocolCredential, Subscription, SubscriptionStatus
 from ..quota_models import QuotaNodeCommand
 from ..protocol_identity import is_openvpn_central_pki_enabled
 from .. import subscription_enforcement as enforcement
@@ -159,6 +159,9 @@ def _claim_next_command(*, exclude_node_ids: set[int] | None = None) -> dict[str
         stale_before = now - timedelta(seconds=_PROCESSING_TIMEOUT_SECONDS)
         query = (
             db.query(QuotaNodeCommand)
+            # Preserve outstanding commands even when a node record is
+            # temporarily unavailable, but prioritize reachable nodes below.
+            .outerjoin(Node, Node.id == QuotaNodeCommand.node_id)
             .filter(
                 QuotaNodeCommand.expires_at > now,
                 or_(
@@ -178,16 +181,22 @@ def _claim_next_command(*, exclude_node_ids: set[int] | None = None) -> dict[str
         row = (
             query
             .order_by(
-                # Expired/suspended users must not stay online behind
-                # thousands of newer restore commands. Preserve FIFO within
-                # each class; controller work is still idempotent.
+                # OFFLINE Exit retries must never block revokes or restores
+                # on reachable nodes. Do not discard or falsely acknowledge
+                # any offline command: it remains durable and is retried
+                # after eligible ONLINE work is drained / node recovers.
+                case((Node.status == NodeStatus.ONLINE, 0), else_=1),
+                # Among ONLINE nodes revoke before restore; FIFO within
+                # each class. Offline revokes remain ahead of offline restore.
                 case(
                     (QuotaNodeCommand.command_type == "revoke_subscription", 0),
                     else_=1,
                 ),
                 QuotaNodeCommand.issued_at.asc(),
             )
-            .with_for_update(skip_locked=True)
+            # With the node metadata joined, lock ONLY quota commands.
+            # Locking Node rows here could deadlock node health and staging.
+            .with_for_update(of=QuotaNodeCommand, skip_locked=True)
             .first()
         )
         if row is None:
