@@ -228,6 +228,7 @@ def apply_exact_matches(db,node_id,candidates,report,max_patch):
     if total>max_patch or total>MAX_PATCH:
         raise RuntimeError("EXACT_LINK_PATCH_LIMIT")
     changed={proto:0 for proto in PROTOCOLS}
+    previous=[]
     for proto in PROTOCOLS:
         cfg=db.query(NodeProtocolConfig).filter(
             NodeProtocolConfig.node_id==node_id,NodeProtocolConfig.protocol==proto
@@ -240,6 +241,13 @@ def apply_exact_matches(db,node_id,candidates,report,max_patch):
             sub=db.get(Subscription,sid)
             if not valid_subscription(sub,now):
                 raise RuntimeError("EXACT_LINK_ENTITLEMENT_CHANGED")
+            if (db.query(SubscriptionNode).filter(
+                    SubscriptionNode.subscription_id==sid,
+                    SubscriptionNode.node_id==node_id).first() is None
+                    or db.query(SubscriptionProtocol).filter(
+                        SubscriptionProtocol.subscription_id==sid,
+                        SubscriptionProtocol.protocol==proto).first() is None):
+                raise RuntimeError("EXACT_LINK_NODE_MEMBERSHIP_CHANGED")
             cred=(db.query(ProtocolCredential)
                     .filter(ProtocolCredential.subscription_id==sid,
                             ProtocolCredential.protocol==proto)
@@ -261,9 +269,22 @@ def apply_exact_matches(db,node_id,candidates,report,max_patch):
                 item=awg_item(node,secret,int(cfg.port),report["awg_server_public_key"])
             if int(item.get("node_id") or 0)!=node_id:
                 raise RuntimeError("EXACT_LINK_NODE_ITEM_INVALID")
+            previous.append({"subscription_id":sid,"protocol":proto,
+                             "config_text_encrypted":cred.config_text_encrypted})
             items.append(item)
             cred.config_text_encrypted=ad._enc(items)
             changed[proto]+=1
+    if previous:
+        # Root-only reversible snapshot of encrypted delivery metadata,
+        # written BEFORE committing any new node link.
+        backup=Path("/opt/twinpanel/hotfix-backups/exact-identity-links-20261127")
+        backup.mkdir(parents=True,exist_ok=True,mode=0o700)
+        backup.chmod(0o700)
+        path=backup/("previous-"+secrets.token_hex(8)+".json")
+        fd=os.open(str(path),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+        with os.fdopen(fd,"w",encoding="utf-8") as out:
+            json.dump(previous,out,separators=(",",":"))
+            out.flush();os.fsync(out.fileno())
     db.commit()
     return changed
 
