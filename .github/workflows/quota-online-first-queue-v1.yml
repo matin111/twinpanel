@@ -1,0 +1,20 @@
+name: Quota Online First Enforcement Queue
+on:
+  pull_request:
+    paths:
+      - backend/app/services/account_enforcement_v2.py
+      - backend/tests/test_account_enforcement_online_first_queue_v1.py
+      - .github/workflows/quota-online-first-queue-v1.yml
+permissions:
+  contents: read
+jobs:
+  durable-priority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m py_compile backend/app/services/account_enforcement_v2.py backend/tests/test_account_enforcement_online_first_queue_v1.py
+      - run: python backend/tests/test_account_enforcement_online_first_queue_v1.py -v
